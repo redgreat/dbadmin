@@ -3,6 +3,10 @@
     <slot name="queryBar" />
   </QueryBar>
 
+  <Operation v-if="$slots.queryBar" mb-30 @search="handleSearch" @reset="handleReset" @batchupdate="handleBatchUpdate" @batchenable="handleBatchEnable">
+    <slot name="queryBar" />
+  </Operation>
+
   <n-data-table
     :remote="remote"
     :loading="loading"
@@ -111,7 +115,27 @@ async function handleReset() {
   emit('update:queryItems', { ...queryItems, ...initQuery })
   await nextTick()
   pagination.page = 1
-  handleQuery()
+  await handleQuery()
+}
+async function handleBatchUpdate() {
+  const queryItems = { ...props.queryItems }
+  for (const key in queryItems) {
+    queryItems[key] = ''
+  }
+  emit('update:queryItems', { ...queryItems, ...initQuery })
+  await nextTick()
+  pagination.page = 1
+  await handleQuery()
+}
+async function handleBatchEnable() {
+  const queryItems = { ...props.queryItems }
+  for (const key in queryItems) {
+    queryItems[key] = ''
+  }
+  emit('update:queryItems', { ...queryItems, ...initQuery })
+  await nextTick()
+  pagination.page = 1
+  await handleQuery()
 }
 function onPageChange(currentPage) {
   pagination.page = currentPage
@@ -128,5 +152,7 @@ function onChecked(rowKeys) {
 defineExpose({
   handleSearch,
   handleReset,
+  handleBatchUpdate,
+  handleBatchEnable,
 })
 </script>

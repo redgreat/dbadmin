@@ -41,8 +41,6 @@ def make_middlewares():
 def register_db(app: FastAPI, db_url=None):
     register_tortoise(
         app,
-        # db_url='sqlite://db.sqlite3',
-        # modules={'models':['app.models', "aerich.models"]},
         config=settings.TORTOISE_ORM,
         generate_schemas=True,
     )

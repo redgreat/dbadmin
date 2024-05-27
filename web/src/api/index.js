@@ -31,4 +31,6 @@ export default {
   updateApi: (data = {}) => request.post('/api/update', data),
   deleteApi: (params = {}) => request.delete('/api/delete', { params }),
   refreshApi: (data = {}) => request.post('/api/refresh', data),
+  // sws
+  updateOrderStatusApi: (params = {}) => request.get('/api/list', { params }),
 }

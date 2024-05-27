@@ -63,6 +63,28 @@ class Menu(BaseModel, TimestampMixin):
         table = "menu"
 
 
+class OperationLog(BaseModel, TimestampMixin):
+    id: int = fields.IntField(default=0, max_length=10, description="自增主键")
+    user_id = fields.IntField(description="操作用户Id")
+    user_name = fields.CharField(max_length=50, description="操作用户姓名")
+    status_code = fields.IntField(description="状态编码")
+    client_ip: str = Field(description="请求客户端地址")
+    request_method: str = Field(description="请求方法")
+    api_path: str = Field(description="请求API地址")
+    system: str = Field(description="客户端操作系统")
+    browser: str = Field(description="请求浏览器")
+    summary: str = Field(description="操作用户姓名")
+    route_name: str = Field(description="路由名称")
+    description: str = Field(description="描述")
+    tags: Optional[list] = Field([], description="标签")
+    process_time: float = Field(description="处理时长")
+    params: str = Field(description="调用参数")
+    logtime: Optional[datetime] = Field(description="日志写入时间")
+
+    class Meta:
+        table = "operationlog"
+
+
 # class Dept(BaseModel, TimestampMixin):
 #     name = fields.CharField(max_length=20, unique=True, description="部门名称")
 #     desc = fields.CharField(max_length=500, null=True, blank=True, description="菜单描述")
