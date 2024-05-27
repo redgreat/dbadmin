@@ -1,17 +1,13 @@
-from datetime import datetime
-from json import JSONDecodeError
-
-import orjson
-from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import FastAPI
+from fastapi.routing import APIRoute
 from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
+from user_agents import parse
+import time
+import datetime
+import json
 
 from .bgtask import BgTasks
-from app.models.system import User, Log, APILog
-from app.models.system import LogType
-from app.settings import APP_SETTINGS
-from .ctx import CTX_USER_ID
-from .dependency import check_token
 
 
 class SimpleBaseMiddleware:
@@ -23,91 +19,81 @@ class SimpleBaseMiddleware:
             await self.app(scope, receive, send)
             return
 
-        await self.handle_http(scope, receive, send)
+        request = Request(scope, receive=receive)
 
-    async def handle_http(self, scope, receive, send) -> None:
-        request = Request(scope, receive)
         response = await self.before_request(request) or self.app
+        await response(request.scope, request.receive, send)
+        await self.after_request(request)
 
-        async def send_wrapper(_response):
-            await self.after_request(request, _response)
-            await send(_response)
+    async def before_request(self, request: Request):
+        return self.app
 
-        await response(scope, receive, send_wrapper)
-
-    async def before_request(self, request: Request) -> ASGIApp | None:
-        ...
-
-    async def after_request(self, request: Request, response: dict):
-        ...
+    async def after_request(self, request: Request):
+        return None
 
 
 class BackGroundTaskMiddleware(SimpleBaseMiddleware):
-    async def before_request(self, request: Request) -> ASGIApp | None:
+    async def before_request(self, request):
         await BgTasks.init_bg_tasks_obj()
-        # return self.app
 
-    async def after_request(self, request: Request, response: dict) -> None:
+    async def after_request(self, request):
         await BgTasks.execute_tasks()
 
 
-class APILoggerMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        request.state.start_time = datetime.now()
-        path = request.url.path
+def register_operation_record_middleware(app: FastAPI):
+    """
+    操作记录中间件
+    用于将使用认证的操作全部记录到 数据库中
+    :param app:
+    :return:
+    """
 
-        if (
-                all([declude not in path for declude in APP_SETTINGS.ADD_LOG_ORIGINS_DECLUDE])
-                and (
-                "*" in APP_SETTINGS.ADD_LOG_ORIGINS_INCLUDE
-                or any([include in path for include in APP_SETTINGS.ADD_LOG_ORIGINS_INCLUDE]))
-        ):
-            if request.scope["type"] == "http":
-                token = request.headers.get("Authorization")
-                user_obj = None
-                if token:
-                    status, _, decode_data = check_token(token.replace("Bearer ", "", 1))
-                    if status and decode_data:
-                        user_id = int(decode_data["data"]["userId"])
-                        user_obj = await User.filter(id=user_id).first()
-                        if user_obj:
-                            CTX_USER_ID.set(user_id)
-                try:
-                    request_data = await request.json() if request.method in ["POST", "PUT", "PATCH"] else None
-                except JSONDecodeError:
-                    request_data = None
-
-                api_log_data = {
-                    "ip_address": request.client.host if request.client else "none",
-                    "user_agent": request.headers.get("user-agent"),
-                    "request_url": str(request.url),
-                    "request_params": dict(request.query_params) or None,
-                    "request_data": request_data
-                }
-                api_log_obj = await APILog.create(**api_log_data)
-                request.state.api_log_id = api_log_obj.id
-                await Log.create(log_type=LogType.ApiLog, by_user=user_obj, api_log=api_log_obj)
-
+    @app.middleware("http")
+    async def operation_record_middleware(request: Request, call_next):
+        start_time = time.time()
         response = await call_next(request)
+        telephone = request.scope.get('telephone', None)
+        user_id = request.scope.get('user_id', None)
+        user_name = request.scope.get('user_name', None)
+        route = request.scope.get('route')
+        process_time = time.time() - start_time
+        user_agent = parse(request.headers.get("user-agent"))
+        system = f"{user_agent.os.family} {user_agent.os.version_string}"
+        browser = f"{user_agent.browser.family} {user_agent.browser.version_string}"
+        query_params = dict(request.query_params.multi_items())
+        path_params = request.path_params
+        if isinstance(request.scope.get('body'), str):
+            body = request.scope.get('body')
+        else:
+            body = request.scope.get('body').decode()
+            if body:
+                body = json.loads(body)
+        params = {
+            "body": body,
+            "query_params": query_params if query_params else None,
+            "path_params": path_params if path_params else None,
+        }
+        content_length = response.raw_headers[0][1]
+        assert isinstance(route, APIRoute)
+        document = {
+            "process_time": process_time,
+            "telephone": telephone,
+            "user_id": user_id,
+            "user_name": user_name,
+            "request_api": request.url.__str__(),
+            "client_ip": request.client.host,
+            "system": system,
+            "browser": browser,
+            "request_method": request.method,
+            "api_path": route.path,
+            "summary": route.summary,
+            "description": route.description,
+            "tags": route.tags,
+            "route_name": route.name,
+            "status_code": response.status_code,
+            "content_length": content_length,
+            "create_datetime": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "params": json.dumps(params)
+        }
+        # await OperationRecordDal(mongo_getter(request)).create_data(document)
         return response
-
-
-class APILoggerAddResponseMiddleware(SimpleBaseMiddleware):
-    """
-    需要与APILoggerMiddleware搭配使用
-    """
-
-    async def after_request(self, request: Request, response: dict) -> None:
-        if hasattr(request.state, "api_log_id") and response.get("type") == "http.response.body":
-            response_body = response.get("body", b"")
-            try:
-                resp = orjson.loads(response_body)
-                api_log_obj = await APILog.get(id=request.state.api_log_id)
-                if api_log_obj:
-                    api_log_obj.response_data = resp
-                    api_log_obj.response_code = resp.get("code", "-1")
-                    api_log_obj.process_time = (datetime.now() - request.state.start_time).total_seconds()
-                    await api_log_obj.save()
-
-            except orjson.JSONDecodeError:
-                pass
