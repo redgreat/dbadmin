@@ -63,34 +63,15 @@ class Menu(BaseModel, TimestampMixin):
         table = "menu"
 
 
-class OperationLog(BaseModel, TimestampMixin):
-    id: int = fields.IntField(default=0, max_length=10, description="自增主键")
-    user_id = fields.IntField(description="操作用户Id")
-    user_name = fields.CharField(max_length=50, description="操作用户姓名")
-    status_code = fields.IntField(description="状态编码")
-    client_ip: str = Field(description="请求客户端地址")
-    request_method: str = Field(description="请求方法")
-    api_path: str = Field(description="请求API地址")
-    system: str = Field(description="客户端操作系统")
-    browser: str = Field(description="请求浏览器")
-    summary: str = Field(description="操作用户姓名")
-    route_name: str = Field(description="路由名称")
-    description: str = Field(description="描述")
-    tags: Optional[list] = Field([], description="标签")
-    process_time: float = Field(description="处理时长")
-    params: str = Field(description="调用参数")
-    logtime: Optional[datetime] = Field(description="日志写入时间")
+class AuditLog(BaseModel, TimestampMixin):
+    user_id = fields.IntField(description="用户ID", index=True)
+    username = fields.CharField(max_length=64, default="", description="用户名称", index=True)
+    module = fields.CharField(max_length=64, default="", description="功能模块", index=True)
+    summary = fields.CharField(max_length=128, default="", description="请求描述", index=True)
+    method = fields.CharField(max_length=10, default="", description="请求方法", index=True)
+    path = fields.CharField(max_length=255, default="", description="请求路径", index=True)
+    status = fields.IntField(default=-1, description="状态码", index=True)
+    response_time = fields.IntField(default=0, description="响应时间(单位ms)", index=True)
 
     class Meta:
-        table = "operationlog"
-
-
-# class Dept(BaseModel, TimestampMixin):
-#     name = fields.CharField(max_length=20, unique=True, description="部门名称")
-#     desc = fields.CharField(max_length=500, null=True, blank=True, description="菜单描述")
-#     is_deleted = fields.BooleanField(default=False, description="软删除标记")
-#     order = fields.IntField(default=0, description="排序")
-#     parent_id = fields.IntField(default=0, max_length=10, description="父部门ID")
-# 
-#     class Meta:
-#         table = "dept"
+        table = "auditlog"

@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
-from tortoise.contrib.fastapi import register_tortoise
 
 from app.api import api_router
 from app.controllers.user import UserCreate, user_controller
@@ -21,7 +20,7 @@ from app.models.admin import Menu
 from app.schemas.menus import MenuType
 from app.settings.config import settings
 
-from .middlewares import BackGroundTaskMiddleware
+from .middlewares import BackGroundTaskMiddleware, HttpAuditLogMiddleware
 
 
 def make_middlewares():
@@ -34,16 +33,16 @@ def make_middlewares():
             allow_headers=settings.CORS_ALLOW_HEADERS,
         ),
         Middleware(BackGroundTaskMiddleware),
+        Middleware(
+            HttpAuditLogMiddleware,
+            methods=["GET", "POST", "PUT", "DELETE"],
+            exclude_paths=[
+                "/docs",
+                "/openapi.json",
+            ],
+        ),
     ]
     return middleware
-
-
-def register_db(app: FastAPI, db_url=None):
-    register_tortoise(
-        app,
-        config=settings.TORTOISE_ORM,
-        generate_schemas=True,
-    )
 
 
 def register_exceptions(app: FastAPI):
