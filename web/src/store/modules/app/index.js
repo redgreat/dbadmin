@@ -11,7 +11,7 @@ export const useAppStore = defineStore('app', {
   state() {
     return {
       reloadFlag: true,
-      collapsed: true,
+      collapsed: false,
       fullScreen: true,
       /** keepAlive路由的key，重新赋值可重置keepAlive */
       aliveKeys: {},

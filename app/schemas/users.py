@@ -22,10 +22,10 @@ class UserCreate(BaseModel):
     password: str = Field(example="123456")
     is_active: Optional[bool] = True
     is_superuser: Optional[bool] = False
-    roles: Optional[List[int]] = []
+    role_ids: Optional[List[int]] = []
 
     def create_dict(self):
-        return self.model_dump(exclude_unset=True, exclude={"roles"})
+        return self.model_dump(exclude_unset=True, exclude={"role_ids"})
 
 
 class UserUpdate(BaseModel):
@@ -34,13 +34,9 @@ class UserUpdate(BaseModel):
     username: str
     is_active: Optional[bool] = True
     is_superuser: Optional[bool] = False
-    roles: Optional[List[int]] = []
-
-    def update_dict(self):
-        return self.model_dump(exclude_unset=True, exclude={"roles", "id"})
+    role_ids: Optional[List[int]] = []
 
 
 class UpdatePassword(BaseModel):
-    id: int = Field(description="用户ID")
     old_password: str = Field(description="旧密码")
     new_password: str = Field(description="新密码")

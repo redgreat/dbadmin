@@ -13,6 +13,7 @@ export default {
   createUser: (data = {}) => request.post('/user/create', data),
   updateUser: (data = {}) => request.post('/user/update', data),
   deleteUser: (params = {}) => request.delete(`/user/delete`, { params }),
+  resetPassword: (data = {}) => request.post(`/user/reset_password`, data),
   // role
   getRoleList: (params = {}) => request.get('/role/list', { params }),
   createRole: (data = {}) => request.post('/role/create', data),
@@ -32,12 +33,10 @@ export default {
   deleteApi: (params = {}) => request.delete('/api/delete', { params }),
   refreshApi: (data = {}) => request.post('/api/refresh', data),
   // depts
-  getDepts: (params = {}) => request.get('/dept/list', { params }),
+
   createDept: (data = {}) => request.post('/dept/create', data),
   updateDept: (data = {}) => request.post('/dept/update', data),
   deleteDept: (params = {}) => request.delete('/dept/delete', { params }),
   // auditlog
   getAuditLogList: (params = {}) => request.get('/auditlog/list', { params }),
-  // sws
-  updateOrderStatusApi: (params = {}) => request.get('/api/list', { params }),
 }

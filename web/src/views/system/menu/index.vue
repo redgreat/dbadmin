@@ -9,6 +9,9 @@ import {
   NPopconfirm,
   NSwitch,
   NTreeSelect,
+  NRadio,
+  NRadioGroup,
+  NTag,
 } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
@@ -26,7 +29,6 @@ defineOptions({ name: '菜单管理' })
 const $table = ref(null)
 const queryItems = ref({})
 const vPermission = resolveDirective('permission')
-const menuDisabled = ref(false)
 
 // 表单初始化内容
 const initForm = {
@@ -63,24 +65,49 @@ const showMenuType = ref(false)
 const menuOptions = ref([])
 
 const columns = [
-  { title: 'ID', key: 'id', width: 50, ellipsis: { tooltip: true } },
-  { title: '菜单名称', key: 'name', width: 80, ellipsis: { tooltip: true } },
+  { title: 'ID', key: 'id', width: 50, ellipsis: { tooltip: true }, align: 'center' },
+  { title: '菜单名称', key: 'name', width: 80, ellipsis: { tooltip: true }, align: 'center' },
+  {
+    title: '菜单类型',
+    key: 'menu_type',
+    width: 80,
+    align: 'center',
+    ellipsis: { tooltip: true },
+    render(row) {
+      let round = false
+      let bordered = false
+      if (row.menu_type === 'catalog') {
+        bordered = true
+        round = false
+      } else if (row.menu_type === 'menu') {
+        bordered = false
+        round = true
+      }
+      return h(
+        NTag,
+        { type: 'primary', round: round, bordered: bordered },
+        { default: () => (row.menu_type === 'catalog' ? '目录' : '菜单') }
+      )
+    },
+  },
   {
     title: '图标',
     key: 'icon',
-    width: 30,
+    width: 40,
+    align: 'center',
     render(row) {
       return h(TheIcon, { icon: row.icon, size: 20 })
     },
   },
-  { title: '排序', key: 'order', width: 30, ellipsis: { tooltip: true } },
-  { title: '访问路径', key: 'path', width: 60, ellipsis: { tooltip: true } },
-  { title: '跳转路径', key: 'redirect', width: 60, ellipsis: { tooltip: true } },
-  { title: '组件路径', key: 'component', width: 60, ellipsis: { tooltip: true } },
+  { title: '排序', key: 'order', width: 40, ellipsis: { tooltip: true }, align: 'center' },
+  { title: '访问路径', key: 'path', width: 80, ellipsis: { tooltip: true }, align: 'center' },
+  { title: '跳转路径', key: 'redirect', width: 80, ellipsis: { tooltip: true }, align: 'center' },
+  { title: '组件路径', key: 'component', width: 80, ellipsis: { tooltip: true }, align: 'center' },
   {
     title: '保活',
     key: 'keepalive',
     width: 40,
+    align: 'center',
     render(row) {
       return h(NSwitch, {
         size: 'small',
@@ -94,6 +121,7 @@ const columns = [
     title: '隐藏',
     key: 'is_hidden',
     width: 40,
+    align: 'center',
     render(row) {
       return h(NSwitch, {
         size: 'small',
@@ -106,7 +134,8 @@ const columns = [
   {
     title: '创建日期',
     key: 'created_at',
-    width: 70,
+    width: 80,
+    align: 'center',
     render(row) {
       return h('span', formatDate(row.created_at))
     },
@@ -114,7 +143,7 @@ const columns = [
   {
     title: '操作',
     key: 'actions',
-    width: 80,
+    width: 120,
     align: 'center',
     fixed: 'right',
     render(row) {
@@ -126,18 +155,17 @@ const columns = [
               size: 'tiny',
               quaternary: true,
               type: 'primary',
-              style: `display: ${row.children ? '' : 'none'};`,
+              style: `display: ${row.children && row.menu_type !== 'menu' ? '' : 'none'};`,
               onClick: () => {
                 initForm.parent_id = row.id
                 initForm.menu_type = 'menu'
                 showMenuType.value = false
-                menuDisabled.value = false
                 handleAdd()
               },
             },
-            { default: () => '子菜单', icon: renderIcon('material-symbols:add', { size: 16 }) },
+            { default: () => '子菜单', icon: renderIcon('material-symbols:add', { size: 16 }) }
           ),
-          [[vPermission, 'post/api/v1/menu/create']],
+          [[vPermission, 'post/api/v1/menu/create']]
         ),
         withDirectives(
           h(
@@ -154,9 +182,9 @@ const columns = [
             {
               default: () => '编辑',
               icon: renderIcon('material-symbols:edit-outline', { size: 16 }),
-            },
+            }
           ),
-          [[vPermission, 'post/api/v1/menu/update']],
+          [[vPermission, 'post/api/v1/menu/update']]
         ),
         h(
           NPopconfirm,
@@ -177,12 +205,12 @@ const columns = [
                   {
                     default: () => '删除',
                     icon: renderIcon('material-symbols:delete-outline', { size: 16 }),
-                  },
+                  }
                 ),
-                [[vPermission, 'delete/api/v1/menu/delete']],
+                [[vPermission, 'delete/api/v1/menu/delete']]
               ),
             default: () => h('div', {}, '确定删除该菜单吗?'),
-          },
+          }
         ),
       ]
     },
@@ -216,7 +244,6 @@ function handleClickAdd() {
   initForm.order = 1
   initForm.keepalive = true
   showMenuType.value = true
-  menuDisabled.value = true
   handleAdd()
 }
 
@@ -263,6 +290,12 @@ async function getTreeSelect() {
         :label-width="80"
         :model="modalForm"
       >
+        <NFormItem label="菜单类型" path="menu_type">
+          <NRadioGroup v-model:value="modalForm.menu_type">
+            <NRadio label="目录" value="catalog" />
+            <NRadio label="菜单" value="menu" />
+          </NRadioGroup>
+        </NFormItem>
         <NFormItem label="上级菜单" path="parent_id">
           <NTreeSelect
             v-model:value="modalForm.parent_id"
@@ -270,7 +303,6 @@ async function getTreeSelect() {
             label-field="name"
             :options="menuOptions"
             default-expand-all="true"
-            :disabled="menuDisabled"
           />
         </NFormItem>
         <NFormItem

@@ -20,9 +20,9 @@ export const useUserStore = defineStore('user', {
     email() {
       return this.userInfo?.email
     },
-    // avatar() {
-    //   return this.userInfo?.avatar
-    // },
+    avatar() {
+      return this.userInfo?.avatar
+    },
     role() {
       return this.userInfo?.roles || []
     },

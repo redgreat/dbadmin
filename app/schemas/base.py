@@ -1,6 +1,16 @@
-from typing import Any, Optional
-
+from typing import Any, Generic, Optional, TypeVar
+from pydantic import BaseModel
 from fastapi.responses import JSONResponse
+
+DataT = TypeVar("DataT")
+
+
+class ResponseSchema(BaseModel, Generic[DataT]):
+    """标准响应模式"""
+
+    code: int = 200
+    msg: str = "success"
+    data: Optional[DataT] = None
 
 
 class Success(JSONResponse):

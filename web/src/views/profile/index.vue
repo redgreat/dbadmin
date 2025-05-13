@@ -14,7 +14,7 @@ const isLoading = ref(false)
 // 用户信息的表单
 const infoFormRef = ref(null)
 const infoForm = ref({
-  // avatar: userStore.avatar,
+  avatar: userStore.avatar,
   username: userStore.name,
   email: userStore.email,
 })
@@ -133,9 +133,9 @@ function validatePasswordSame(rule, value) {
             :rules="infoFormRules"
             class="w-400"
           >
-<!--            <NFormItem :label="$t('views.profile.label_avatar')" path="avatar">-->
-<!--              <NImage width="100" :src="infoForm.avatar"></NImage>-->
-<!--            </NFormItem>-->
+            <NFormItem :label="$t('views.profile.label_avatar')" path="avatar">
+              <NImage width="100" :src="infoForm.avatar"></NImage>
+            </NFormItem>
             <NFormItem :label="$t('views.profile.label_username')" path="username">
               <NInput
                 v-model:value="infoForm.username"

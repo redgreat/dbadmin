@@ -14,23 +14,25 @@ import {
   NTabPane,
   NGrid,
   NGi,
+  useMessage,
 } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
 import CrudModal from '@/components/table/CrudModal.vue'
 import CrudTable from '@/components/table/CrudTable.vue'
+import ButtonPermission from './components/ButtonPermission.vue'
 
 import { formatDate, renderIcon } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 import TheIcon from '@/components/icon/TheIcon.vue'
-import { uniq } from 'lodash-es'
 
 defineOptions({ name: '角色管理' })
 
 const $table = ref(null)
 const queryItems = ref({})
+const $message = useMessage()
 const vPermission = resolveDirective('permission')
 
 const {
@@ -61,6 +63,8 @@ const role_id = ref(0)
 const apiOption = ref([])
 const api_ids = ref([])
 const apiTree = ref([])
+const activeTab = ref('menu')
+const selectedRoleId = ref(null)
 
 function buildApiTree(data) {
   const processedData = []
@@ -208,6 +212,23 @@ const columns = [
           ),
           [[vPermission, 'get/api/v1/role/authorized']]
         ),
+        withDirectives(
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'primary',
+              onClick: () => {
+                handleAssignPermission(row)
+              },
+            },
+            {
+              default: () => '按钮权限',
+              icon: renderIcon('material-symbols:edit-outline', { size: 16 }),
+            }
+          ),
+          [[vPermission, 'get/api/v1/role/authorized']]
+        ),
       ]
     },
   },
@@ -241,6 +262,17 @@ async function updateRoleAuthorized() {
     return v.id
   })
 }
+
+const handleAssignPermission = (row) => {
+  selectedRoleId.value = row.id
+  active.value = true
+  activeTab.value = 'button'
+}
+
+const handlePermissionUpdate = () => {
+  // 处理权限更新逻辑
+  $table.value?.handleSearch()
+}
 </script>
 
 <template>
@@ -268,8 +300,21 @@ async function updateRoleAuthorized() {
           />
         </QueryBarItem>
       </template>
-    </CrudTable>
+    </CrudTable>    <!-- 权限管理抽屉 -->
+    <NDrawer v-model:show="active" :width="500">
+      <NDrawerContent title="权限管理">
+        <NTabs v-model:value="activeTab">
+          <NTabPane name="button" tab="按钮权限">
+            <ButtonPermission
+              :role-id="selectedRoleId"
+              @update="handlePermissionUpdate"
+            />
+          </NTabPane>
+        </NTabs>
+      </NDrawerContent>
+    </NDrawer>
 
+    <!-- 创建/编辑角色弹窗 -->
     <CrudModal
       v-model:visible="modalVisible"
       :title="modalTitle"
@@ -321,7 +366,7 @@ async function updateRoleAuthorized() {
             >
           </NGi>
         </NGrid>
-        <NTabs>
+        <NTabs v-model:value="activeTab">
           <NTabPane name="menu" tab="菜单权限" display-directive="show">
             <!-- TODO：级联 -->
             <NTree
@@ -353,6 +398,12 @@ async function updateRoleAuthorized() {
               :selectable="false"
               cascade
               @update:checked-keys="(v) => (api_ids = v)"
+            />
+          </NTabPane>
+          <NTabPane name="button" tab="按钮权限" display-directive="show">
+            <ButtonPermission
+              :role-id="selectedRoleId"
+              @update="handlePermissionUpdate"
             />
           </NTabPane>
         </NTabs>

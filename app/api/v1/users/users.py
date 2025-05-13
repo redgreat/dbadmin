@@ -3,7 +3,6 @@ import logging
 from fastapi import APIRouter, Body, Query
 from tortoise.expressions import Q
 
-from app.controllers.user import UserController
 from app.controllers.user import user_controller
 from app.schemas.base import Fail, Success, SuccessExtra
 from app.schemas.users import *
@@ -46,8 +45,8 @@ async def create_user(
     user = await user_controller.get_by_email(user_in.email)
     if user:
         return Fail(code=400, msg="The user with this email already exists in the system.")
-    new_user = await user_controller.create(obj_in=user_in)
-    await user_controller.update_roles(new_user, user_in.roles)
+    new_user = await user_controller.create_user(obj_in=user_in)
+    await user_controller.update_roles(new_user, user_in.role_ids)
     return Success(msg="Created Successfully")
 
 
@@ -55,8 +54,8 @@ async def create_user(
 async def update_user(
     user_in: UserUpdate,
 ):
-    user = await user_controller.update(obj_in=user_in)
-    await user_controller.update_roles(user, user_in.roles)
+    user = await user_controller.update(id=user_in.id, obj_in=user_in)
+    await user_controller.update_roles(user, user_in.role_ids)
     return Success(msg="Updated Successfully")
 
 
@@ -69,6 +68,6 @@ async def delete_user(
 
 
 @router.post("/reset_password", summary="重置密码")
-async def reset_password(user_id: int = Body(..., description="用户ID")):
+async def reset_password(user_id: int = Body(..., description="用户ID", embed=True)):
     await user_controller.reset_password(user_id)
     return Success(msg="密码已重置为123456")

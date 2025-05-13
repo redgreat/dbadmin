@@ -1,23 +1,21 @@
 <template>
-  <QueryBar v-if="$slots.queryBar" mb-30 @search="handleSearch" @reset="handleReset">
-    <slot name="queryBar" />
-  </QueryBar>
+  <div v-bind="$attrs">
+    <QueryBar v-if="$slots.queryBar" mb-30 @search="handleSearch" @reset="handleReset">
+      <slot name="queryBar" />
+    </QueryBar>
 
-  <Operation v-if="$slots.queryBar" mb-30 @search="handleSearch" @reset="handleReset" @batchupdate="handleBatchUpdate" @batchenable="handleBatchEnable">
-    <slot name="queryBar" />
-  </Operation>
-
-  <n-data-table
-    :remote="remote"
-    :loading="loading"
-    :columns="columns"
-    :data="tableData"
-    :scroll-x="scrollX"
-    :row-key="(row) => row[rowKey]"
-    :pagination="isPagination ? pagination : false"
-    @update:checked-row-keys="onChecked"
-    @update:page="onPageChange"
-  />
+    <n-data-table
+      :remote="remote"
+      :loading="loading"
+      :columns="columns"
+      :data="tableData"
+      :scroll-x="scrollX"
+      :row-key="(row) => row[rowKey]"
+      :pagination="isPagination ? pagination : false"
+      @update:checked-row-keys="onChecked"
+      @update:page="onPageChange"
+    />
+  </div>
 </template>
 
 <script setup>
@@ -78,7 +76,23 @@ const emit = defineEmits(['update:queryItems', 'onChecked', 'onDataChange'])
 const loading = ref(false)
 const initQuery = { ...props.queryItems }
 const tableData = ref([])
-const pagination = reactive({ page: 1, page_size: 10 })
+const pagination = reactive({
+  page: 1,
+  page_size: 10,
+  pageSizes: [10, 20, 50, 100],
+  showSizePicker: true,
+  prefix({ itemCount }) {
+    return `共 ${itemCount} 条`
+  },
+  onChange: (page) => {
+    pagination.page = page
+  },
+  onUpdatePageSize: (pageSize) => {
+    pagination.page_size = pageSize
+    pagination.page = 1
+    handleQuery()
+  },
+})
 
 async function handleQuery() {
   try {
@@ -94,7 +108,7 @@ async function handleQuery() {
       ...paginationParams,
     })
     tableData.value = data
-    pagination.itemCount = total
+    pagination.itemCount = total || 0
   } catch (error) {
     tableData.value = []
     pagination.itemCount = 0
@@ -110,32 +124,12 @@ function handleSearch() {
 async function handleReset() {
   const queryItems = { ...props.queryItems }
   for (const key in queryItems) {
-    queryItems[key] = ''
+    queryItems[key] = null
   }
   emit('update:queryItems', { ...queryItems, ...initQuery })
   await nextTick()
   pagination.page = 1
-  await handleQuery()
-}
-async function handleBatchUpdate() {
-  const queryItems = { ...props.queryItems }
-  for (const key in queryItems) {
-    queryItems[key] = ''
-  }
-  emit('update:queryItems', { ...queryItems, ...initQuery })
-  await nextTick()
-  pagination.page = 1
-  await handleQuery()
-}
-async function handleBatchEnable() {
-  const queryItems = { ...props.queryItems }
-  for (const key in queryItems) {
-    queryItems[key] = ''
-  }
-  emit('update:queryItems', { ...queryItems, ...initQuery })
-  await nextTick()
-  pagination.page = 1
-  await handleQuery()
+  handleQuery()
 }
 function onPageChange(currentPage) {
   pagination.page = currentPage
@@ -152,7 +146,6 @@ function onChecked(rowKeys) {
 defineExpose({
   handleSearch,
   handleReset,
-  handleBatchUpdate,
-  handleBatchEnable,
+  tableData,
 })
 </script>

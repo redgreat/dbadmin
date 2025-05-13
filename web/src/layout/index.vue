@@ -67,7 +67,7 @@ watchEffect(() => {
 
   if (isPC.value) {
     // PC
-    appStore.setCollapsed(true)
+    appStore.setCollapsed(false)
     appStore.setFullScreen(true)
   }
 })

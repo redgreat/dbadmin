@@ -10,13 +10,15 @@
       </div>
 
       <div w-320 flex-col px-20 py-35>
-        <h5 f-c-c text-24 font-normal color="#6a6a6a">{{ $t('app_name') }}</h5>
+        <h5 f-c-c text-24 font-normal color="#6a6a6a">
+          <icon-custom-logo mr-10 text-50 color-primary />{{ $t('app_name') }}
+        </h5>
         <div mt-30>
           <n-input
             v-model:value="loginInfo.username"
             autofocus
             class="h-50 items-center pl-10 text-16"
-            placeholder="请输入用户名"
+            placeholder="admin"
             :maxlength="20"
           />
         </div>
@@ -26,7 +28,7 @@
             class="h-50 items-center pl-10 text-16"
             type="password"
             show-password-on="mousedown"
-            placeholder="请输入密码"
+            placeholder="123456"
             :maxlength="20"
             @keypress.enter="handleLogin"
           />

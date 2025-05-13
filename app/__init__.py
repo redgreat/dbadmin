@@ -1,11 +1,12 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from tortoise import Tortoise
 
 from app.core.exceptions import SettingNotFound
 from app.core.init_app import (
-    init_menus,
-    init_superuser,
+    init_app,
     make_middlewares,
-    register_db,
     register_exceptions,
     register_routers,
 )
@@ -16,24 +17,27 @@ except ImportError:
     raise SettingNotFound("Can not import settings")
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    # 启动时进行初始化
+    await init_app(app)
+    yield
+    # 关闭时清理连接
+    await Tortoise.close_connections()
+
+
 def create_app() -> FastAPI:
+    """创建FastAPI应用"""
     app = FastAPI(
         title=settings.APP_TITLE,
         description=settings.APP_DESCRIPTION,
         version=settings.VERSION,
         openapi_url="/openapi.json",
         middleware=make_middlewares(),
+        lifespan=lifespan,
     )
-    register_db(app)
-    register_exceptions(app)
-    register_routers(app, prefix="/api")
     return app
 
 
 app = create_app()
-
-
-@app.on_event("startup")
-async def startup_event():
-    await init_superuser()
-    await init_menus()

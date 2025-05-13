@@ -15,3 +15,5 @@ db.sqlite3-wal
 .DS_Store
 ._.DS_Store
 /app/settings/config.py
+/app/settings/database.py
+/script

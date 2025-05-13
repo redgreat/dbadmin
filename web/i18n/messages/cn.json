@@ -49,6 +49,28 @@
     "errors": {
       "label_error": "错误页",
       "text_back_to_home": "返回首页"
+    },
+    "system": {
+      "label_system": "系统管理",
+      "auditlog": {
+        "label": "审计日志",
+        "columns": {
+          "username": "用户名称",
+          "module": "功能模块",
+          "summary": "接口描述",
+          "method": "请求方法",
+          "path": "请求路径",
+          "status": "状态码",
+          "response_time": "响应时间",
+          "created_at": "操作时间"
+        },
+        "placeholder": {
+          "username": "请输入用户名称",
+          "module": "请输入功能模块",
+          "method": "请选择请求方法",
+          "status": "请输入状态码"
+        }
+      }
     }
   },
   "common": {

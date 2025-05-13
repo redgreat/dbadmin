@@ -51,3 +51,11 @@ class PermissionControl:
 
 DependAuth = Depends(AuthControl.is_authed)
 DependPermisson = Depends(PermissionControl.has_permission)
+
+
+async def get_current_user(user=Depends(AuthControl.is_authed)) -> User:
+    """获取当前登录用户"""
+    return user
+
+
+DependPermisson = Depends(PermissionControl.has_permission)

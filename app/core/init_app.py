@@ -1,8 +1,16 @@
+import shutil
+from tortoise import Tortoise
+from app.settings.database import get_tortoise_config
+from app.log import logger
+
+from aerich import Command
 from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
+from tortoise.expressions import Q
 
 from app.api import api_router
+from app.controllers.api import api_controller
 from app.controllers.user import UserCreate, user_controller
 from app.core.exceptions import (
     DoesNotExist,
@@ -16,7 +24,8 @@ from app.core.exceptions import (
     ResponseValidationError,
     ResponseValidationHandle,
 )
-from app.models.admin import Menu
+from app.log import logger
+from app.models.admin import Api, Menu, Role
 from app.schemas.menus import MenuType
 from app.settings.config import settings
 
@@ -57,6 +66,36 @@ def register_routers(app: FastAPI, prefix: str = "/api"):
     app.include_router(api_router, prefix=prefix)
 
 
+async def init_database(app: FastAPI):
+    """初始化数据库连接"""
+    try:
+        # 获取数据库配置
+        db_config = get_tortoise_config()
+        
+        # 注册数据库
+        await Tortoise.init(config=db_config)
+        
+        # 生成schemas
+        await Tortoise.generate_schemas()
+        
+        # 初始化数据库迁移
+        command = Command(tortoise_config=db_config, app="models")
+        
+        # 检查是否需要初始化迁移
+        try:
+            await command.init()
+        except FileExistsError:
+            logger.info("Migrations folder already exists")
+            
+        # 运行迁移（设置run_in_transaction=True以确保事务安全）
+        await command.upgrade(run_in_transaction=True)
+        
+        logger.info("Database initialization completed successfully")
+    except Exception as e:
+        logger.error(f"Error initializing database: {str(e)}")
+        raise
+
+
 async def init_superuser():
     user = await user_controller.model.exists()
     if not user:
@@ -77,13 +116,13 @@ async def init_menus():
         parent_menu = await Menu.create(
             menu_type=MenuType.CATALOG,
             name="系统管理",
-            path="system",
+            path="/system",
             order=1,
             parent_id=0,
             icon="carbon:gui-management",
             is_hidden=False,
             component="Layout",
-            keepalive=True,
+            keepalive=False,
             redirect="/system/user",
         )
         children_menu = [
@@ -96,7 +135,7 @@ async def init_menus():
                 icon="material-symbols:person-outline-rounded",
                 is_hidden=False,
                 component="/system/user",
-                keepalive=True,
+                keepalive=False,
             ),
             Menu(
                 menu_type=MenuType.MENU,
@@ -107,7 +146,7 @@ async def init_menus():
                 icon="carbon:user-role",
                 is_hidden=False,
                 component="/system/role",
-                keepalive=True,
+                keepalive=False,
             ),
             Menu(
                 menu_type=MenuType.MENU,
@@ -118,7 +157,7 @@ async def init_menus():
                 icon="material-symbols:list-alt-outline",
                 is_hidden=False,
                 component="/system/menu",
-                keepalive=True,
+                keepalive=False,
             ),
             Menu(
                 menu_type=MenuType.MENU,
@@ -129,7 +168,104 @@ async def init_menus():
                 icon="ant-design:api-outlined",
                 is_hidden=False,
                 component="/system/api",
-                keepalive=True,
+                keepalive=False,
+            ),
+            Menu(
+                menu_type=MenuType.MENU,
+                name="审计日志",
+                path="auditlog",
+                order=5,
+                parent_id=parent_menu.id,
+                icon="ph:clipboard-text-bold",
+                is_hidden=False,
+                component="/system/auditlog",
+                keepalive=False,
             ),
         ]
         await Menu.bulk_create(children_menu)
+        await Menu.create(
+            menu_type=MenuType.MENU,
+            name="一级菜单",
+            path="/top-menu",
+            order=2,
+            parent_id=0,
+            icon="material-symbols:featured-play-list-outline",
+            is_hidden=False,
+            component="/top-menu",
+            keepalive=False,
+            redirect="",
+        )
+
+
+async def init_apis():
+    apis = await api_controller.model.exists()
+    if not apis:
+        await api_controller.refresh_api()
+
+
+async def init_db():
+    command = Command(tortoise_config=settings.TORTOISE_ORM)
+    try:
+        await command.init_db(safe=True)
+    except FileExistsError:
+        pass
+
+    await command.init()
+    try:
+        await command.migrate()
+    except AttributeError:
+        logger.warning("unable to retrieve model history from database, model history will be created from scratch")
+        shutil.rmtree("migrations")
+        await command.init_db(safe=True)
+
+    await command.upgrade(run_in_transaction=True)
+
+
+async def init_roles():
+    roles = await Role.exists()
+    if not roles:
+        admin_role = await Role.create(
+            name="管理员",
+            desc="管理员角色",
+        )
+        user_role = await Role.create(
+            name="普通用户",
+            desc="普通用户角色",
+        )
+
+        # 分配所有API给管理员角色
+        all_apis = await Api.all()
+        await admin_role.apis.add(*all_apis)
+        # 分配所有菜单给管理员和普通用户
+        all_menus = await Menu.all()
+        await admin_role.menus.add(*all_menus)
+        await user_role.menus.add(*all_menus)
+
+        # 为普通用户分配基本API
+        basic_apis = await Api.filter(Q(method__in=["GET"]) | Q(tags="基础模块"))
+        await user_role.apis.add(*basic_apis)
+
+
+async def init_app(app: FastAPI):
+    """初始化应用"""
+    # 注册路由
+    register_routers(app)
+    # 注册异常处理
+    register_exceptions(app)
+    # 初始化数据库
+    await init_database(app)
+    # 初始化基础数据
+    await init_superuser()
+    await init_menus()
+    await init_apis()
+    await init_roles()
+
+    return app
+
+
+__all__ = [
+    "init_app",
+    "make_middlewares",
+    "register_exceptions",
+    "register_routers",
+]

@@ -1,22 +1,44 @@
 import { useUserStore, usePermissionStore } from '@/store'
+import buttonApi from '@/api/button'
 
-function hasPermission(permission) {
+async function hasPermission(permission) {
   const userStore = useUserStore()
   const userPermissionStore = usePermissionStore()
 
-  const accessApis = userPermissionStore.apis
+  // 超级管理员拥有所有权限
   if (userStore.isSuperUser) {
     return true
   }
-  return accessApis.includes(permission)
+
+  // 检查API权限
+  if (typeof permission === 'string') {
+    const accessApis = userPermissionStore.apis
+    return accessApis.includes(permission)
+  }
+  
+  // 检查按钮权限
+  if (permission.menuId && permission.code) {
+    try {
+      const { data: hasButtonPermission } = await buttonApi.checkButtonPermission(
+        permission.menuId,
+        permission.code
+      )
+      return hasButtonPermission
+    } catch (error) {
+      console.error('Failed to check button permission:', error)
+      return false
+    }
+  }
+
+  return false
 }
 
 export default function setupPermissionDirective(app) {
-  function updateElVisible(el, permission) {
+  async function updateElVisible(el, permission) {
     if (!permission) {
-      throw new Error(`need roles: like v-permission="get/api/v1/user/list"`)
+      throw new Error(`need permission: like v-permission="'get/api/v1/user/list'" or v-permission="{ menuId: 1, code: 'add' }"`)
     }
-    if (!hasPermission(permission)) {
+    if (!await hasPermission(permission)) {
       el.parentElement?.removeChild(el)
     }
   }

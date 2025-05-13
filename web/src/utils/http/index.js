@@ -14,6 +14,10 @@ export function createAxios(options = {}) {
   return service
 }
 
-export const request = createAxios({
+const axiosInstance = createAxios({
   baseURL: import.meta.env.VITE_BASE_API,
 })
+
+// 为了兼容性同时导出两个名称
+export const defHttp = axiosInstance
+export const request = axiosInstance
