@@ -14,6 +14,14 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     def __init__(self, model: Type[ModelType]):
         self.model = model
 
+    def get_schema_model(self):
+        raise NotImplementedError
+
+    async def _to_schema(self, obj: ModelType):
+        """将数据库模型转换为 schema 模型"""
+        schema_model = self.get_schema_model()
+        return schema_model.model_validate(obj)
+
     async def get(self, id: int) -> ModelType:
         return await self.model.get(id=id)
 

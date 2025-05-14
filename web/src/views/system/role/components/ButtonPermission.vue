@@ -54,9 +54,8 @@ const selectedButtons = ref([])
 
 // 加载菜单及其按钮
 const loadMenuButtons = async () => {
-  try {
-    // 获取所有菜单及其按钮
-    const { data } = await buttonApi.getMenuButtons("all")
+  try {    // 获取所有按钮(按菜单分组)
+    const { data } = await buttonApi.getButtonsMenuGroup()
     menuList.value = data
   } catch (error) {
     message.error('加载按钮权限失败')

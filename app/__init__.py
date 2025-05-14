@@ -33,7 +33,18 @@ def create_app() -> FastAPI:
         title=settings.APP_TITLE,
         description=settings.APP_DESCRIPTION,
         version=settings.VERSION,
+        docs_url="/docs",  # 配置swagger文档路径
+        redoc_url="/redoc",  # 配置ReDoc文档路径
         openapi_url="/openapi.json",
+        openapi_tags=[
+            {"name": "基础模块", "description": "基础信息相关接口"},
+            {"name": "用户模块", "description": "用户相关接口"},
+            {"name": "角色模块", "description": "角色相关接口"},
+            {"name": "菜单模块", "description": "菜单相关接口"},
+            {"name": "按钮权限", "description": "按钮相关接口"},
+            {"name": "接口管理", "description": "接口相关接口"},
+            {"name": "审计日志", "description": "审计日志相关接口"},
+        ],
         middleware=make_middlewares(),
         lifespan=lifespan,
     )

@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.post(
-    "", response_model=ResponseSchema[ButtonRead],
+    "/", response_model=ResponseSchema[ButtonRead],
     summary="创建按钮"
 )
 async def create_button(
@@ -65,14 +65,14 @@ async def delete_button(
 
 
 @router.get(
-    "/menu/{menu_id}", response_model=ResponseSchema[List[ButtonRead]],
+    "/list/menu/{menu_id}", response_model=ResponseSchema[List[dict]],
     summary="获取菜单按钮"
 )
 async def get_menu_buttons(
-    menu_id: str,
+    menu_id: int,
     current_user: User = Depends(get_current_user)
-) -> ResponseSchema[List[ButtonRead]]:
-    """获取菜单下的所有按钮"""
+) -> ResponseSchema[List[dict]]:
+    """获取指定菜单下的所有按钮"""
     try:
         buttons = await button_controller.get_menu_buttons(menu_id)
         return ResponseSchema(data=buttons)
@@ -81,15 +81,31 @@ async def get_menu_buttons(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get(
+    "/menu-group", response_model=ResponseSchema[List[dict]],
+    summary="获取所有按钮(按菜单分组)"
+)
+async def get_buttons_menu_group(
+    current_user: User = Depends(get_current_user)
+) -> ResponseSchema[List[dict]]:
+    """获取所有按钮并按菜单分组返回"""
+    try:
+        buttons = await button_controller.get_all_buttons_by_menu()
+        return ResponseSchema(data=buttons)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get(
-    "/role/{role_id}", response_model=ResponseSchema[List[ButtonRead]],
+    "/role/{role_id}", response_model=ResponseSchema[List[dict]],
     summary="获取角色按钮"
 )
 async def get_role_buttons(
     role_id: int,
     current_user: User = Depends(get_current_user)
-) -> ResponseSchema[List[ButtonRead]]:
+) -> ResponseSchema[List[dict]]:
     """获取角色的按钮权限"""
     try:
         buttons = await button_controller.get_role_buttons(role_id)
