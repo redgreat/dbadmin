@@ -8,11 +8,14 @@ export function addBaseParams(params) {
 
 export function resolveResError(code, message) {
   switch (code) {
+    case 201:
+      message = message ?? '用户名或密码错误'
+      break
     case 400:
       message = message ?? '请求参数错误'
       break
     case 401:
-      message = message ?? '登录已过期'
+      message = message || '登录已过期'
       break
     case 403:
       message = message ?? '没有权限'

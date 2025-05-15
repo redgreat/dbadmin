@@ -1,8 +1,8 @@
 {
   "lang": "English",
-  "app_name": "dbadmin",
-  "header": {
+  "app_name": "dbadmin",  "header": {
     "label_profile": "Profile",
+    "label_change_password": "Change Password",
     "label_logout": "Logout",
     "label_logout_dialog_title": "Hint",
     "text_logout_confirm": "Logout confirm",
@@ -24,8 +24,7 @@
       "label_information": "Information",
       "label_project": "Project",
       "label_more": "More"
-    },
-    "profile": {
+    },    "profile": {
       "label_profile": "Profile",
       "label_modify_information": "Modify your information",
       "label_change_password": "Change password",
@@ -37,26 +36,31 @@
       "label_confirm_password": "Password confirmation",
       "placeholder_username": "Please fill in your name",
       "placeholder_email": "Please fill in your email address",
-      "placeholder_old_password": "Please enter the old password",
-      "placeholder_new_password": "Please enter a new password",
-      "placeholder_confirm_password": "Please enter the confirm password",
+      "enter_old_password": "Please enter your old password",
+      "enter_new_password": "Please enter your new password",
+      "enter_confirm_password": "Please confirm your new password",
+      "old_password": "Old Password",
+      "new_password": "New Password",
+      "confirm_password": "Confirm Password",
       "message_username_required": "Please enter username",
-      "message_old_password_required": "Please enter the old password",
-      "message_new_password_required": "Please enter a new password",
-      "message_password_confirmation_required": "Please enter confirm password",
-      "message_password_confirmation_diff": "Two password inputs are inconsistent"
+      "old_password_required": "Old password is required",
+      "new_password_required": "New password is required",
+      "confirm_password_required": "Please confirm your password",
+      "password_updated": "Password updated successfully",
+      "update_password_failed": "Failed to update password"
     },
     "errors": {
       "label_error": "Error",
       "text_back_to_home": "Back to home"
     }
-  },
-  "common": {
+  },  "common": {
     "text": {
       "update_success": "Update success"
     },
     "buttons": {
-      "update": "Update"
+      "update": "Update",
+      "confirm": "Confirm",
+      "cancel": "Cancel"
     }
   }
 }

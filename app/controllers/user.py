@@ -25,23 +25,30 @@ class UserController(CRUDBase[User, UserCreate, UserUpdate]):
     async def create_user(self, obj_in: UserCreate) -> User:
         obj_in.password = get_password_hash(password=obj_in.password)
         obj = await self.create(obj_in)
-        return obj
-
+        return obj    
+    
     async def update_last_login(self, id: int) -> None:
         user = await self.model.get(id=id)
         user.last_login = datetime.now()
         await user.save()
 
-    async def authenticate(self, credentials: CredentialsSchema) -> Optional["User"]:
+    async def authenticate(self, credentials: CredentialsSchema) -> tuple[Optional["User"], Optional[str]]:
+        """验证用户登录
+        
+        Returns:
+            tuple: (User, error_message)
+            - 如果验证成功，返回 (user, None)
+            - 如果验证失败，返回 (None, error_message)
+        """
         user = await self.model.filter(username=credentials.username).first()
         if not user:
-            raise HTTPException(status_code=400, detail="无效的用户名")
+            return None, "无效的用户名"
         verified = verify_password(credentials.password, user.password)
         if not verified:
-            raise HTTPException(status_code=400, detail="密码错误!")
+            return None, "密码错误"
         if not user.is_active:
-            raise HTTPException(status_code=400, detail="用户已被禁用")
-        return user
+            return None, "用户已被禁用"
+        return user, None
 
     async def update_roles(self, user: User, role_ids: List[int]) -> None:
         await user.roles.clear()

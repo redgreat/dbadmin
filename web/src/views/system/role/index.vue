@@ -56,7 +56,7 @@ const {
 })
 
 const pattern = ref('')
-const menuOption = ref([]) // 菜单选项
+const menuOption = ref([])
 const active = ref(false)
 const menu_ids = ref([])
 const role_id = ref(0)
@@ -64,17 +64,15 @@ const apiOption = ref([])
 const api_ids = ref([])
 const apiTree = ref([])
 const activeTab = ref('menu')
-const selectedRoleId = ref(null)
+const selectedRoleId = ref(0)
 
-// 监听权限管理抽屉的显示状态
 watch(active, (value) => {
   if (!value) {
-    // 当抽屉关闭时重置状态
     pattern.value = ''
     menu_ids.value = []
     api_ids.value = []
     role_id.value = 0
-    selectedRoleId.value = null
+    selectedRoleId.value = 0
   }
 })
 

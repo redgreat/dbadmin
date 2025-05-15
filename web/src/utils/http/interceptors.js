@@ -3,7 +3,6 @@ import { resolveResError } from './helpers'
 import { useUserStore } from '@/store'
 
 export function reqResolve(config) {
-  // 处理不需要token的请求
   if (config.noNeedToken) {
     return config
   }
@@ -24,9 +23,17 @@ export function resResolve(response) {
   const { data, status, statusText } = response
   if (data?.code !== 200) {
     const code = data?.code ?? status
-    /** 根据code处理对应的操作，并返回处理后的message */
-    const message = resolveResError(code, data?.msg ?? statusText)
-    window.$message?.error(message, { keepAliveOnHover: true })
+    const message = data?.msg ?? statusText
+
+    if (response.config.url.includes('/access_token')) {
+      return Promise.reject({ 
+        code,
+        message,
+        type: 'auth'
+      })
+    }
+    
+    window.$message?.error(resolveResError(code, message), { keepAliveOnHover: true })
     return Promise.reject({ code, message, error: data || response })
   }
   return Promise.resolve(data)
@@ -35,7 +42,6 @@ export function resResolve(response) {
 export async function resReject(error) {
   if (!error || !error.response) {
     const code = error?.code
-    /** 根据code处理对应的操作，并返回处理后的message */
     const message = resolveResError(code, error.message)
     window.$message?.error(message)
     return Promise.reject({ code, message, error })
@@ -51,7 +57,6 @@ export async function resReject(error) {
       return
     }
   }
-  // 后端返回的response数据
   const code = data?.code ?? status
   const message = resolveResError(code, data?.msg ?? error.message)
   window.$message?.error(message, { keepAliveOnHover: true })

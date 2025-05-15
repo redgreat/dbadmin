@@ -18,23 +18,36 @@ router = APIRouter()
 
 @router.post("/access_token", summary="获取token")
 async def login_access_token(credentials: CredentialsSchema):
-    user: User = await user_controller.authenticate(credentials)
-    await user_controller.update_last_login(user.id)
-    access_token_expires = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    expire = datetime.now(timezone.utc) + access_token_expires
+    try:
+        user = await user_controller.model.filter(username=credentials.username).first()
+        if not user:
+            return Fail(code=201, msg="用户名为空")
+            
+        verified = verify_password(credentials.password, user.password)
+        if not verified:
+            return Fail(code=201, msg="密码错误")
 
-    data = JWTOut(
-        access_token=create_access_token(
-            data=JWTPayload(
-                user_id=user.id,
-                username=user.username,
-                is_superuser=user.is_superuser,
-                exp=expire,
-            )
-        ),
-        username=user.username,
-    )
-    return Success(data=data.model_dump())
+        if not user.is_active:
+            return Fail(code=401, msg="用户已被禁用")
+            
+        await user_controller.update_last_login(user.id)
+        access_token_expires = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + access_token_expires
+
+        data = JWTOut(
+            access_token=create_access_token(
+                data=JWTPayload(
+                    user_id=user.id,
+                    username=user.username,
+                    is_superuser=user.is_superuser,
+                    exp=expire,
+                )
+            ),
+            username=user.username,
+        )
+        return Success(data=data.model_dump())
+    except Exception as e:
+        return Fail(msg=str(e))
 
 
 @router.get("/userinfo", summary="查看用户信息", dependencies=[DependAuth])
