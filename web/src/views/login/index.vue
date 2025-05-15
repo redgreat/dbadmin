@@ -87,19 +87,17 @@ async function handleLogin() {
   }
   try {
     loading.value = true
-    // 显示验证中消息
+
     $message.loading(t('views.login.message_verifying'), {
       duration: 1000
     })
     
     const res = await api.login({ username, password: password.toString() })
     
-    // 登录成功
     $message.success(t('views.login.message_login_success'))
     setToken(res.data.access_token)
     await addDynamicRoutes()
 
-    // 确保路由添加完成后再跳转
     await nextTick()
     if (query.redirect) {
       const path = query.redirect

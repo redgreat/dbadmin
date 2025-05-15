@@ -13,16 +13,18 @@
             <template v-for="menu in menuList" :key="menu.id">
               <tr>
                 <td>{{ menu.name }}</td>
-                <td>
-                  <n-space>
-                    <n-checkbox
-                      v-for="button in menu.buttons"
-                      :key="button.id"
-                      :value="selectedButtons.includes(button.id)"
-                      @update:value="(checked) => handleButtonCheck(button.id, checked)"
-                    >
-                      {{ button.name }}
-                    </n-checkbox>
+                <td>                  <n-space>
+                    <n-checkbox-group v-model:value="selectedButtons">
+                      <n-space>
+                        <n-checkbox
+                          v-for="button in menu.buttons"
+                          :key="button.id"
+                          :value="button.id"
+                        >
+                          {{ button.name }}
+                        </n-checkbox>
+                      </n-space>
+                    </n-checkbox-group>
                   </n-space>
                 </td>
               </tr>
@@ -52,7 +54,6 @@ const message = useMessage()
 const menuList = ref([])
 const selectedButtons = ref([])
 
-// 加载菜单及其按钮
 const loadMenuButtons = async () => {
   try {    // 获取所有按钮(按菜单分组)
     const { data } = await buttonApi.getButtonsMenuGroup()
@@ -63,7 +64,6 @@ const loadMenuButtons = async () => {
   }
 }
 
-// 加载角色已有的按钮权限
 const loadRoleButtons = async () => {
   try {
     const { data } = await buttonApi.getRoleButtons(props.roleId)
@@ -73,31 +73,24 @@ const loadRoleButtons = async () => {
   }
 }
 
-// 处理按钮选择
-const handleButtonCheck = async (buttonId, checked) => {
-  const newSelected = checked
-    ? [...selectedButtons.value, buttonId]
-    : selectedButtons.value.filter(id => id !== buttonId)
-    
+watch(selectedButtons, async (newValue) => {
+  if (!props.roleId) return
+  
   try {
-    // 设置角色按钮权限
-    await buttonApi.setRoleButtons(props.roleId, newSelected)
-    selectedButtons.value = newSelected
+    await buttonApi.setRoleButtons(props.roleId, newValue)
     emit('update')
     message.success('更新按钮权限成功')
   } catch (error) {
     console.error('更新按钮权限失败:', error)
     message.error('更新按钮权限失败: ' + (error.response?.data?.detail || error.message))
   }
-}
+}, { deep: true })
 
-// 监听roleId变化
 watch(() => props.roleId, () => {
   if (props.roleId) {
     loadRoleButtons()
   }
 }, { immediate: true })
 
-// 初始化加载
 loadMenuButtons()
 </script>
