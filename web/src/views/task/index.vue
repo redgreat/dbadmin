@@ -13,7 +13,7 @@
         </n-button>
       </div>
     </template>
-    
+
     <!-- 表格 -->
     <CrudTable
       ref="$table"
@@ -71,8 +71,23 @@
         <n-form-item label="执行命令/函数" path="command">
           <n-input v-model:value="modalForm.command" type="textarea" placeholder="请输入执行命令或函数" />
         </n-form-item>
+        <n-form-item label="执行目录" path="work_dir">
+          <n-input v-model:value="modalForm.work_dir" clearable placeholder="请输入执行目录，如：/home/app" />
+        </n-form-item>
+        <n-form-item label="执行用户" path="run_user">
+          <n-input v-model:value="modalForm.run_user" clearable placeholder="请输入执行用户，如：root" />
+        </n-form-item>
+        <n-form-item label="环境变量" path="env_vars">
+          <n-input v-model:value="modalForm.env_vars" type="textarea" placeholder="请输入环境变量，格式：KEY=VALUE，每行一个" />
+        </n-form-item>
         <n-form-item label="参数" path="args">
           <n-input v-model:value="modalForm.args" type="textarea" placeholder="请输入参数，JSON格式" />
+        </n-form-item>
+        <n-form-item label="超时时间(秒)" path="timeout">
+          <n-input-number v-model:value="modalForm.timeout" :min="0" :max="86400" clearable placeholder="任务执行超时时间，0表示不限制" />
+        </n-form-item>
+        <n-form-item label="最大重试次数" path="max_retries">
+          <n-input-number v-model:value="modalForm.max_retries" :min="0" :max="10" clearable placeholder="任务失败后最大重试次数" />
         </n-form-item>
         <n-form-item label="任务状态" path="status">
           <n-switch v-model:value="modalForm.status" />
@@ -101,21 +116,21 @@
                 <n-radio :value="','">指定</n-radio>
               </n-space>
             </n-radio-group>
-            
+
             <template v-if="cronParts.seconds.type === '/'">
               <n-space>
                 从第 <n-input-number v-model:value="cronParts.seconds.start" :min="0" :max="59" style="width: 80px" /> 秒开始，每隔
                 <n-input-number v-model:value="cronParts.seconds.interval" :min="1" :max="59" style="width: 80px" /> 秒执行一次
               </n-space>
             </template>
-            
+
             <template v-if="cronParts.seconds.type === '-'">
               <n-space>
                 从第 <n-input-number v-model:value="cronParts.seconds.start" :min="0" :max="59" style="width: 80px" /> 秒到第
                 <n-input-number v-model:value="cronParts.seconds.end" :min="0" :max="59" style="width: 80px" /> 秒
               </n-space>
             </template>
-            
+
             <template v-if="cronParts.seconds.type === ','">
               <n-space align="center">
                 <span>指定秒数：</span>
@@ -130,14 +145,14 @@
             </template>
           </n-space>
         </n-tab-pane>
-        
+
         <!-- 其他选项卡（分钟、小时、日、月、周）类似，此处省略 -->
       </n-tabs>
-      
+
       <div class="mt-4">
         <n-input v-model:value="generatedCron" readonly placeholder="生成的Cron表达式" />
       </div>
-      
+
       <template #footer>
         <n-space justify="end">
           <n-button @click="cronModalVisible = false">取消</n-button>
@@ -185,9 +200,54 @@ const getData = () => {
   // 这里应该调用真实的API
   return Promise.resolve({
     items: [
-      { id: 1, name: '数据备份', type: 'shell', cron: '0 0 2 * * ?', command: 'backup.sh', args: '', status: true, lastRunTime: '2023-05-01 02:00:00', nextRunTime: '2023-05-02 02:00:00' },
-      { id: 2, name: '日志清理', type: 'shell', cron: '0 0 1 * * ?', command: 'clean_logs.sh', args: '', status: true, lastRunTime: '2023-05-01 01:00:00', nextRunTime: '2023-05-02 01:00:00' },
-      { id: 3, name: '数据同步', type: 'http', cron: '0 */30 * * * ?', command: 'http://api.example.com/sync', args: '{"type":"full"}', status: false, lastRunTime: '2023-04-30 23:30:00', nextRunTime: null },
+      {
+        id: 1,
+        name: '数据备份',
+        type: 'shell',
+        cron: '0 0 2 * * ?',
+        command: 'backup.sh',
+        work_dir: '/home/app/backup',
+        run_user: 'appuser',
+        env_vars: 'DB_HOST=localhost\nDB_PORT=5432',
+        args: '',
+        timeout: 3600,
+        max_retries: 3,
+        status: true,
+        lastRunTime: '2023-05-01 02:00:00',
+        nextRunTime: '2023-05-02 02:00:00'
+      },
+      {
+        id: 2,
+        name: '日志清理',
+        type: 'shell',
+        cron: '0 0 1 * * ?',
+        command: 'clean_logs.sh',
+        work_dir: '/var/log',
+        run_user: 'root',
+        env_vars: 'KEEP_DAYS=30',
+        args: '',
+        timeout: 1800,
+        max_retries: 1,
+        status: true,
+        lastRunTime: '2023-05-01 01:00:00',
+        nextRunTime: '2023-05-02 01:00:00'
+      },
+      {
+        id: 3,
+        name: '数据同步',
+        type: 'python',
+        cron: '0 */30 * * * ?',
+        command: 'sync_data.py',
+        work_dir: '/home/app/scripts',
+        run_user: 'appuser',
+        env_vars: 'PYTHONPATH=/home/app\nAPI_KEY=abcdef123456',
+        args: '{"type":"full"}',
+        timeout: 600,
+        max_retries: 2,
+        status: false,
+        lastRunTime: '2023-04-30 23:30:00',
+        nextRunTime: null
+      },
     ],
     total: 3,
   })
@@ -200,6 +260,8 @@ const columns = [
   { title: '任务类型', key: 'type', width: 100 },
   { title: 'Cron表达式', key: 'cron', width: 150 },
   { title: '执行命令/函数', key: 'command', width: 200 },
+  { title: '执行目录', key: 'work_dir', width: 150 },
+  { title: '执行用户', key: 'run_user', width: 100 },
   {
     title: '状态',
     key: 'status',
@@ -328,7 +390,12 @@ const {
     type: 'shell',
     cron: '0 0 * * * ?',
     command: '',
+    work_dir: '/home/app',
+    run_user: 'appuser',
+    env_vars: '',
     args: '',
+    timeout: 3600,
+    max_retries: 3,
     status: true,
     remark: '',
   },

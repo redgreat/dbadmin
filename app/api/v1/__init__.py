@@ -9,6 +9,7 @@ from .menus import menus_router
 from .roles import roles_router
 from .users import users_router
 from .buttons import buttons_router
+from .tasks import tasks_router
 
 v1_router = APIRouter()
 
@@ -19,3 +20,4 @@ v1_router.include_router(menus_router, prefix="/menu", dependencies=[DependPermi
 v1_router.include_router(buttons_router, prefix="/button", dependencies=[DependPermisson])
 v1_router.include_router(apis_router, prefix="/api", dependencies=[DependPermisson])
 v1_router.include_router(auditlog_router, prefix="/auditlog", dependencies=[DependPermisson])
+v1_router.include_router(tasks_router, prefix="/task", dependencies=[DependPermisson])

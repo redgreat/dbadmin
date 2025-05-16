@@ -28,6 +28,7 @@ from app.log import logger
 from app.models.admin import Api, Menu, Role
 from app.schemas.menus import MenuType
 from app.settings.config import settings
+from app.services.task_scheduler import scheduler
 
 from .middlewares import BackGroundTaskMiddleware, HttpAuditLogMiddleware
 
@@ -71,25 +72,25 @@ async def init_database(app: FastAPI):
     try:
         # 获取数据库配置
         db_config = get_tortoise_config()
-        
+
         # 注册数据库
         await Tortoise.init(config=db_config)
-        
+
         # 生成schemas
         await Tortoise.generate_schemas()
-        
+
         # 初始化数据库迁移
         command = Command(tortoise_config=db_config, app="models")
-        
+
         # 检查是否需要初始化迁移
         try:
             await command.init()
         except FileExistsError:
             logger.info("Migrations folder already exists")
-            
+
         # 运行迁移（设置run_in_transaction=True以确保事务安全）
         await command.upgrade(run_in_transaction=True)
-        
+
         logger.info("Database initialization completed successfully")
     except Exception as e:
         logger.error(f"Error initializing database: {str(e)}")
@@ -246,6 +247,14 @@ async def init_roles():
         await user_role.apis.add(*basic_apis)
 
 
+async def init_task_scheduler():
+    """初始化任务调度器"""
+    try:
+        await scheduler.start()
+        logger.info("任务调度器已启动")
+    except Exception as e:
+        logger.error(f"启动任务调度器时发生错误: {str(e)}")
+
 async def init_app(app: FastAPI):
     """初始化应用"""
     # 注册路由
@@ -259,6 +268,8 @@ async def init_app(app: FastAPI):
     await init_menus()
     await init_apis()
     await init_roles()
+    # 初始化任务调度器
+    await init_task_scheduler()
 
     return app
 
@@ -268,4 +279,5 @@ __all__ = [
     "make_middlewares",
     "register_exceptions",
     "register_routers",
+    "init_task_scheduler",
 ]
