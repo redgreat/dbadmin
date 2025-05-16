@@ -6,7 +6,7 @@ const Layout = () => import('@/layout/index.vue')
 export const basicRoutes = [
   {
     path: '/',
-    redirect: '/workbench', // 默认跳转到首页
+    redirect: '/workbench',
     meta: { order: 0 },
   },
   {
@@ -51,6 +51,7 @@ export const basicRoutes = [
     path: '/error-page',
     component: Layout,
     redirect: '/error-page/404',
+    isHidden: true,
     meta: {
       title: t('views.errors.label_error'),
       icon: 'mdi:alert-circle-outline',
@@ -137,7 +138,6 @@ Object.keys(modules).forEach((key) => {
   asyncRoutes.push(modules[key].default)
 })
 
-// 加载 views 下每个模块的 index.vue 文件
 const vueModules = import.meta.glob('@/views/**/index.vue')
 
 export { asyncRoutes, vueModules }
