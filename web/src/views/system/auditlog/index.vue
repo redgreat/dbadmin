@@ -23,7 +23,7 @@ function formatTimestamp(timestamp) {
   const pad = (num) => num.toString().padStart(2, '0')
 
   const year = date.getFullYear()
-  const month = pad(date.getMonth() + 1) // 月份从0开始，所以需要+1
+  const month = pad(date.getMonth() + 1)
   const day = pad(date.getDate())
   const hours = pad(date.getHours())
   const minutes = pad(date.getMinutes())
@@ -32,17 +32,15 @@ function formatTimestamp(timestamp) {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
-// 获取当天的开始时间的时间戳
 function getStartOfDayTimestamp() {
   const now = new Date()
-  now.setHours(0, 0, 0, 0) // 将小时、分钟、秒和毫秒都设置为0
+  now.setHours(0, 0, 0, 0)
   return now.getTime()
 }
 
-// 获取当天的结束时间的时间戳
 function getEndOfDayTimestamp() {
   const now = new Date()
-  now.setHours(23, 59, 59, 999) // 将小时设置为23，分钟设置为59，秒设置为59，毫秒设置为999
+  now.setHours(23, 59, 59, 999)
   return now.getTime()
 }
 
