@@ -1,6 +1,7 @@
 from typing import Any, Generic, Optional, TypeVar
-from pydantic import BaseModel
+
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 DataT = TypeVar("DataT")
 

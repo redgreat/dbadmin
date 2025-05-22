@@ -13,7 +13,10 @@
       "text_login": "Login",
       "message_input_username_password": "Please enter username and password",
       "message_verifying": "Verifying...",
-      "message_login_success": "Login successful"
+      "message_login_success": "Login successful",
+      "message_login_failed": "Login failed",
+      "placeholder_username": "Please enter username",
+      "placeholder_password": "Please enter password"
     },
     "workbench": {
       "label_workbench": "Workbench",
@@ -36,6 +39,9 @@
       "label_confirm_password": "Password confirmation",
       "placeholder_username": "Please fill in your name",
       "placeholder_email": "Please fill in your email address",
+      "placeholder_old_password": "Please enter your old password",
+      "placeholder_new_password": "Please enter your new password",
+      "placeholder_confirm_password": "Please confirm your new password",
       "enter_old_password": "Please enter your old password",
       "enter_new_password": "Please enter your new password",
       "enter_confirm_password": "Please confirm your new password",
@@ -43,9 +49,10 @@
       "new_password": "New Password",
       "confirm_password": "Confirm Password",
       "message_username_required": "Please enter username",
-      "old_password_required": "Old password is required",
-      "new_password_required": "New password is required",
-      "confirm_password_required": "Please confirm your password",
+      "message_old_password_required": "Old password is required",
+      "message_new_password_required": "New password is required",
+      "message_password_confirmation_required": "Please confirm your password",
+      "message_password_confirmation_diff": "The two passwords do not match",
       "password_updated": "Password updated successfully",
       "update_password_failed": "Failed to update password"
     },

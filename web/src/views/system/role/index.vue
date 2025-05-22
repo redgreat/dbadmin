@@ -1,5 +1,5 @@
 <script setup>
-import { h, onMounted, ref, resolveDirective, withDirectives, watch } from 'vue'
+import { h, onMounted, ref, resolveDirective, withDirectives } from 'vue'
 import {
   NButton,
   NForm,
@@ -14,14 +14,12 @@ import {
   NTabPane,
   NGrid,
   NGi,
-  useMessage,
 } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
 import CrudModal from '@/components/table/CrudModal.vue'
 import CrudTable from '@/components/table/CrudTable.vue'
-import ButtonPermission from './components/ButtonPermission.vue'
 
 import { formatDate, renderIcon } from '@/utils'
 import { useCRUD } from '@/composables'
@@ -32,7 +30,6 @@ defineOptions({ name: '角色管理' })
 
 const $table = ref(null)
 const queryItems = ref({})
-const $message = useMessage()
 const vPermission = resolveDirective('permission')
 
 const {
@@ -56,25 +53,13 @@ const {
 })
 
 const pattern = ref('')
-const menuOption = ref([])
+const menuOption = ref([]) // 菜单选项
 const active = ref(false)
 const menu_ids = ref([])
 const role_id = ref(0)
 const apiOption = ref([])
 const api_ids = ref([])
 const apiTree = ref([])
-const activeTab = ref('menu')
-const selectedRoleId = ref(0)
-
-watch(active, (value) => {
-  if (!value) {
-    pattern.value = ''
-    menu_ids.value = []
-    api_ids.value = []
-    role_id.value = 0
-    selectedRoleId.value = 0
-  }
-})
 
 function buildApiTree(data) {
   const processedData = []
@@ -192,12 +177,14 @@ const columns = [
               type: 'primary',
               onClick: async () => {
                 try {
+                  // 使用 Promise.all 来同时发送所有请求
                   const [menusResponse, apisResponse, roleAuthorizedResponse] = await Promise.all([
                     api.getMenus({ page: 1, page_size: 9999 }),
                     api.getApis({ page: 1, page_size: 9999 }),
                     api.getRoleAuthorized({ id: row.id }),
                   ])
 
+                  // 处理每个请求的响应
                   menuOption.value = menusResponse.data
                   apiOption.value = buildApiTree(apisResponse.data)
                   menu_ids.value = roleAuthorizedResponse.data.menus.map((v) => v.id)
@@ -207,15 +194,14 @@ const columns = [
 
                   active.value = true
                   role_id.value = row.id
-                  selectedRoleId.value = row.id
                 } catch (error) {
+                  // 错误处理
                   console.error('Error loading data:', error)
-                  $message?.error('加载权限数据失败')
                 }
               },
             },
             {
-              default: () => '权限设置',
+              default: () => '设置权限',
               icon: renderIcon('material-symbols:edit-outline', { size: 16 }),
             }
           ),
@@ -254,10 +240,6 @@ async function updateRoleAuthorized() {
     return v.id
   })
 }
-
-const handlePermissionUpdate = () => {
-  $table.value?.handleSearch()
-}
 </script>
 
 <template>
@@ -285,70 +267,8 @@ const handlePermissionUpdate = () => {
           />
         </QueryBarItem>
       </template>
-    </CrudTable>    <!-- 权限管理抽屉 -->
-    <NDrawer v-model:show="active" :width="500">
-      <NDrawerContent title="权限管理">
-        <NGrid x-gap="24" :cols="24">
-          <NGi :span="18">
-            <NInput
-              v-model:value="pattern"
-              type="text"
-              placeholder="输入关键词筛选"
-              style="flex-grow: 1"
-            />
-          </NGi>
-          <NGi :span="6">
-            <NButton
-              v-permission="'post/api/v1/role/authorized'"
-              type="primary"
-              @click="updateRoleAuthorized"
-            >保存权限</NButton>
-          </NGi>
-        </NGrid>
-        <NTabs v-model:value="activeTab" class="mt-4">
-          <NTabPane name="menu" tab="菜单权限">
-            <NTree
-              :data="menuOption"
-              :checked-keys="menu_ids"
-              :pattern="pattern"
-              :show-irrelevant-nodes="false"
-              key-field="id"
-              label-field="name"
-              checkable
-              :default-expand-all="true"
-              :block-line="true"
-              :selectable="false"
-              @update:checked-keys="(v) => (menu_ids = v)"
-            />
-          </NTabPane>
-          <NTabPane name="resource" tab="接口权限">
-            <NTree
-              ref="apiTree"
-              :data="apiOption"
-              :checked-keys="api_ids"
-              :pattern="pattern"
-              :show-irrelevant-nodes="false"
-              key-field="unique_id"
-              label-field="summary"
-              checkable
-              :default-expand-all="true"
-              :block-line="true"
-              :selectable="false"
-              cascade
-              @update:checked-keys="(v) => (api_ids = v)"
-            />
-          </NTabPane>
-          <NTabPane name="button" tab="按钮权限">
-            <ButtonPermission
-              :role-id="selectedRoleId"
-              @update="handlePermissionUpdate"
-            />
-          </NTabPane>
-        </NTabs>
-      </NDrawerContent>
-    </NDrawer>
+    </CrudTable>
 
-    <!-- 创建/编辑角色弹窗 -->
     <CrudModal
       v-model:visible="modalVisible"
       :title="modalTitle"
@@ -377,6 +297,66 @@ const handlePermissionUpdate = () => {
         <NFormItem label="角色描述" path="desc">
           <NInput v-model:value="modalForm.desc" placeholder="请输入角色描述" />
         </NFormItem>
-      </NForm>    </CrudModal>
+      </NForm>
+    </CrudModal>
+
+    <NDrawer v-model:show="active" placement="right" :width="500"
+      ><NDrawerContent>
+        <NGrid x-gap="24" cols="12">
+          <NGi span="8">
+            <NInput
+              v-model:value="pattern"
+              type="text"
+              placeholder="筛选"
+              style="flex-grow: 1"
+            ></NInput>
+          </NGi>
+          <NGi offset="2">
+            <NButton
+              v-permission="'post/api/v1/role/authorized'"
+              type="info"
+              @click="updateRoleAuthorized"
+              >确定</NButton
+            >
+          </NGi>
+        </NGrid>
+        <NTabs>
+          <NTabPane name="menu" tab="菜单权限" display-directive="show">
+            <!-- TODO：级联 -->
+            <NTree
+              :data="menuOption"
+              :checked-keys="menu_ids"
+              :pattern="pattern"
+              :show-irrelevant-nodes="false"
+              key-field="id"
+              label-field="name"
+              checkable
+              :default-expand-all="true"
+              :block-line="true"
+              :selectable="false"
+              @update:checked-keys="(v) => (menu_ids = v)"
+            />
+          </NTabPane>
+          <NTabPane name="resource" tab="接口权限" display-directive="show">
+            <NTree
+              ref="apiTree"
+              :data="apiOption"
+              :checked-keys="api_ids"
+              :pattern="pattern"
+              :show-irrelevant-nodes="false"
+              key-field="unique_id"
+              label-field="summary"
+              checkable
+              :default-expand-all="true"
+              :block-line="true"
+              :selectable="false"
+              cascade
+              @update:checked-keys="(v) => (api_ids = v)"
+            />
+          </NTabPane>
+        </NTabs>
+        <template #header> 设置权限 </template>
+      </NDrawerContent>
+    </NDrawer>
   </CommonPage>
 </template>

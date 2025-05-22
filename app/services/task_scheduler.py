@@ -1,24 +1,25 @@
-import os
+import asyncio
 import json
 import logging
+import os
+import pathlib
 import subprocess
 import time
 from datetime import datetime
-import asyncio
-from typing import Dict, Any, Optional, Tuple
-import pathlib
+from typing import Any, Dict, Optional, Tuple
 
 import requests
+from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
+from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.jobstores.memory import MemoryJobStore
-from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
 from tortoise import Tortoise
 
-from app.models.task import Task, TaskLog, TaskType, TaskStatus
+from app.models.task import Task, TaskLog, TaskStatus, TaskType
 from app.settings.config import settings
 
 logger = logging.getLogger(__name__)
+
 
 class TaskScheduler:
     """任务调度器，负责管理和执行定时任务"""
@@ -31,28 +32,20 @@ class TaskScheduler:
     def init_scheduler(self):
         """初始化APScheduler调度器"""
         # 使用内存作为作业存储
-        jobstores = {
-            'default': MemoryJobStore()
-        }
+        jobstores = {"default": MemoryJobStore()}
 
         # 配置执行器
         executors = {
-            'default': ThreadPoolExecutor(20),  # 线程池执行器，适合IO密集型任务
-            'processpool': ProcessPoolExecutor(5)  # 进程池执行器，适合CPU密集型任务
+            "default": ThreadPoolExecutor(20),  # 线程池执行器，适合IO密集型任务
+            "processpool": ProcessPoolExecutor(5),  # 进程池执行器，适合CPU密集型任务
         }
 
         # 作业默认配置
-        job_defaults = {
-            'coalesce': False,  # 是否合并执行
-            'max_instances': 3  # 同一个作业的最大实例数
-        }
+        job_defaults = {"coalesce": False, "max_instances": 3}  # 是否合并执行  # 同一个作业的最大实例数
 
         # 创建调度器
         self.scheduler = AsyncIOScheduler(
-            jobstores=jobstores,
-            executors=executors,
-            job_defaults=job_defaults,
-            timezone='Asia/Shanghai'  # 设置时区
+            jobstores=jobstores, executors=executors, job_defaults=job_defaults, timezone="Asia/Shanghai"  # 设置时区
         )
 
     async def start(self):
@@ -92,9 +85,9 @@ class TaskScheduler:
 
         # 根据任务类型选择执行器
         if task.type == TaskType.PYTHON:
-            executor = 'processpool'  # Python函数使用进程池执行器
+            executor = "processpool"  # Python函数使用进程池执行器
         else:
-            executor = 'default'  # 其他任务使用线程池执行器
+            executor = "default"  # 其他任务使用线程池执行器
 
         # 添加作业到调度器
         self.scheduler.add_job(
@@ -104,7 +97,7 @@ class TaskScheduler:
             name=task.name,  # 作业名称
             executor=executor,  # 执行器
             replace_existing=True,  # 如果存在则替换
-            kwargs={'task_id': task.id}  # 传递给执行函数的参数
+            kwargs={"task_id": task.id},  # 传递给执行函数的参数
         )
 
         # 更新下次执行时间
@@ -132,10 +125,7 @@ class TaskScheduler:
 
         # 创建任务日志
         task_log = await TaskLog.create(
-            task_id=task.id,
-            status=TaskStatus.RUNNING,  # 初始状态为运行中
-            start_time=datetime.now(),
-            retry_count=0
+            task_id=task.id, status=TaskStatus.RUNNING, start_time=datetime.now(), retry_count=0  # 初始状态为运行中
         )
 
         # 更新任务上次执行时间
@@ -206,8 +196,8 @@ class TaskScheduler:
             env = os.environ.copy()
             if task.env_vars:
                 for line in task.env_vars.splitlines():
-                    if '=' in line:
-                        key, value = line.split('=', 1)
+                    if "=" in line:
+                        key, value = line.split("=", 1)
                         env[key.strip()] = value.strip()
 
             # 准备命令
@@ -227,22 +217,17 @@ class TaskScheduler:
 
             # 执行命令
             process = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=task.work_dir,
-                env=env
+                command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=task.work_dir, env=env
             )
 
             # 设置超时
             try:
                 stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=task.timeout if task.timeout > 0 else None
+                    process.communicate(), timeout=task.timeout if task.timeout > 0 else None
                 )
 
-                stdout_text = stdout.decode('utf-8', errors='replace')
-                stderr_text = stderr.decode('utf-8', errors='replace')
+                stdout_text = stdout.decode("utf-8", errors="replace")
+                stderr_text = stderr.decode("utf-8", errors="replace")
 
                 if process.returncode != 0:
                     return stdout_text, stderr_text
@@ -265,8 +250,8 @@ class TaskScheduler:
             env = os.environ.copy()
             if task.env_vars:
                 for line in task.env_vars.splitlines():
-                    if '=' in line:
-                        key, value = line.split('=', 1)
+                    if "=" in line:
+                        key, value = line.split("=", 1)
                         env[key.strip()] = value.strip()
 
             # 准备命令
@@ -286,22 +271,17 @@ class TaskScheduler:
 
             # 执行命令
             process = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=task.work_dir,
-                env=env
+                command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=task.work_dir, env=env
             )
 
             # 设置超时
             try:
                 stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=task.timeout if task.timeout > 0 else None
+                    process.communicate(), timeout=task.timeout if task.timeout > 0 else None
                 )
 
-                stdout_text = stdout.decode('utf-8', errors='replace')
-                stderr_text = stderr.decode('utf-8', errors='replace')
+                stdout_text = stdout.decode("utf-8", errors="replace")
+                stderr_text = stderr.decode("utf-8", errors="replace")
 
                 if process.returncode != 0:
                     return stdout_text, stderr_text
@@ -348,7 +328,7 @@ class TaskScheduler:
                 headers=headers,
                 json=data if method in ["POST", "PUT", "PATCH"] else None,
                 params=data if method == "GET" else None,
-                timeout=timeout
+                timeout=timeout,
             )
 
             # 检查响应
@@ -362,6 +342,7 @@ class TaskScheduler:
         except Exception as e:
             logger.exception(f"执行HTTP请求时发生错误，任务ID: {task.id}")
             return None, str(e)
+
 
 # 创建全局调度器实例
 scheduler = TaskScheduler()

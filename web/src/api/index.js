@@ -32,11 +32,6 @@ export default {
   updateApi: (data = {}) => request.post('/api/update', data),
   deleteApi: (params = {}) => request.delete('/api/delete', { params }),
   refreshApi: (data = {}) => request.post('/api/refresh', data),
-  // depts
-
-  createDept: (data = {}) => request.post('/dept/create', data),
-  updateDept: (data = {}) => request.post('/dept/update', data),
-  deleteDept: (params = {}) => request.delete('/dept/delete', { params }),
   // auditlog
   getAuditLogList: (params = {}) => request.get('/auditlog/list', { params }),
 }

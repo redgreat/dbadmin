@@ -35,7 +35,7 @@ class AuditLogController(CRUDBase):
             filters=filters,
             page=query.page,
             page_size=query.page_size,
-            ordering=["-created_at"]
+            ordering=["-created_at"],
         )
 
     async def create_log(self, **kwargs) -> AuditLogSchema:

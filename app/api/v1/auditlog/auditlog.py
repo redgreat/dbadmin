@@ -1,10 +1,11 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Query
 from tortoise.expressions import Q
-from app.models.admin import AuditLog
 
+from app.models.admin import AuditLog
 from app.schemas import SuccessExtra
 from app.schemas.apis import *
-from app.core.dependency import DependPermisson
 
 router = APIRouter()
 
@@ -18,8 +19,8 @@ async def get_audit_log_list(
     method: str = Query("", description="请求方法"),
     summary: str = Query("", description="接口描述"),
     status: int = Query(None, description="状态码"),
-    start_time: str = Query("", description="开始时间"),
-    end_time: str = Query("", description="结束时间"),
+    start_time: datetime = Query("", description="开始时间"),
+    end_time: datetime = Query("", description="结束时间"),
 ):
     q = Q()
     if username:
@@ -31,7 +32,7 @@ async def get_audit_log_list(
     if summary:
         q &= Q(summary__icontains=summary)
     if status:
-        q &= Q(status__icontains=status)
+        q &= Q(status=status)
     if start_time and end_time:
         q &= Q(created_at__range=[start_time, end_time])
     elif start_time:

@@ -1,12 +1,15 @@
 from datetime import datetime
+
 from tortoise import fields
 from tortoise.models import Model
+
 
 # 定义任务类型常量
 class TaskType:
     SHELL = "shell"
     PYTHON = "python"
     HTTP = "http"
+
 
 # 定义任务执行状态常量
 class TaskStatus:
@@ -15,8 +18,10 @@ class TaskStatus:
     TIMEOUT = "timeout"
     RUNNING = "running"
 
+
 class Task(Model):
     """定时任务模型"""
+
     id = fields.IntField(pk=True)
     name = fields.CharField(max_length=100, description="任务名称")
     type = fields.CharField(max_length=20, description="任务类型：shell, python, http")
@@ -45,6 +50,7 @@ class Task(Model):
 
 class TaskLog(Model):
     """任务执行日志模型"""
+
     id = fields.IntField(pk=True)
     task = fields.ForeignKeyField("models.Task", related_name="logs", on_delete=fields.CASCADE, description="关联的任务")
     status = fields.CharField(max_length=20, description="执行状态：success, failed, timeout, running")

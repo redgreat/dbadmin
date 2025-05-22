@@ -25,8 +25,8 @@ class UserController(CRUDBase[User, UserCreate, UserUpdate]):
     async def create_user(self, obj_in: UserCreate) -> User:
         obj_in.password = get_password_hash(password=obj_in.password)
         obj = await self.create(obj_in)
-        return obj    
-    
+        return obj
+
     async def update_last_login(self, id: int) -> None:
         user = await self.model.get(id=id)
         user.last_login = datetime.now()
@@ -34,7 +34,7 @@ class UserController(CRUDBase[User, UserCreate, UserUpdate]):
 
     async def authenticate(self, credentials: CredentialsSchema) -> tuple[Optional["User"], Optional[str]]:
         """验证用户登录
-        
+
         Returns:
             tuple: (User, error_message)
             - 如果验证成功，返回 (user, None)

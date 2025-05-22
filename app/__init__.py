@@ -6,10 +6,10 @@ from tortoise import Tortoise
 from app.core.exceptions import SettingNotFound
 from app.core.init_app import (
     init_app,
+    init_task_scheduler,
     make_middlewares,
     register_exceptions,
     register_routers,
-    init_task_scheduler,
 )
 from app.services.task_scheduler import scheduler
 
@@ -44,7 +44,6 @@ def create_app() -> FastAPI:
             {"name": "用户模块", "description": "用户相关接口"},
             {"name": "角色模块", "description": "角色相关接口"},
             {"name": "菜单模块", "description": "菜单相关接口"},
-            {"name": "按钮权限", "description": "按钮相关接口"},
             {"name": "接口管理", "description": "接口相关接口"},
             {"name": "审计日志", "description": "审计日志相关接口"},
             {"name": "定时任务", "description": "定时任务相关接口"},

@@ -1,6 +1,8 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Union
+from typing import Any, Dict, List, Optional, Union
+
 from pydantic import BaseModel, Field
+
 
 # 任务基础模型
 class TaskBase(BaseModel):
@@ -17,9 +19,11 @@ class TaskBase(BaseModel):
     status: Optional[bool] = Field(True, description="任务状态：true启用，false禁用")
     remark: Optional[str] = Field(None, description="备注")
 
+
 # 创建任务请求模型
 class TaskCreate(TaskBase):
     pass
+
 
 # 更新任务请求模型
 class TaskUpdate(BaseModel):
@@ -36,6 +40,7 @@ class TaskUpdate(BaseModel):
     status: Optional[bool] = Field(None, description="任务状态：true启用，false禁用")
     remark: Optional[str] = Field(None, description="备注")
 
+
 # 数据库中的任务模型
 class TaskInDB(TaskBase):
     id: int
@@ -47,10 +52,12 @@ class TaskInDB(TaskBase):
     class Config:
         from_attributes = True
 
+
 # 任务列表响应模型
 class TaskList(BaseModel):
     items: List[TaskInDB]
     total: int
+
 
 # 任务日志基础模型
 class TaskLogBase(BaseModel):
@@ -63,9 +70,11 @@ class TaskLogBase(BaseModel):
     error: Optional[str] = Field(None, description="错误信息")
     retry_count: Optional[int] = Field(0, description="重试次数")
 
+
 # 创建任务日志请求模型
 class TaskLogCreate(TaskLogBase):
     pass
+
 
 # 数据库中的任务日志模型
 class TaskLogInDB(TaskLogBase):
@@ -75,10 +84,12 @@ class TaskLogInDB(TaskLogBase):
     class Config:
         from_attributes = True
 
+
 # 任务日志列表响应模型
 class TaskLogList(BaseModel):
     items: List[TaskLogInDB]
     total: int
+
 
 # 执行任务响应模型
 class TaskExecuteResponse(BaseModel):

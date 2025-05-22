@@ -22,14 +22,14 @@ async def login_access_token(credentials: CredentialsSchema):
         user = await user_controller.model.filter(username=credentials.username).first()
         if not user:
             return Fail(code=201, msg="用户名为空")
-            
+
         verified = verify_password(credentials.password, user.password)
         if not verified:
             return Fail(code=201, msg="密码错误")
 
         if not user.is_active:
             return Fail(code=401, msg="用户已被禁用")
-            
+
         await user_controller.update_last_login(user.id)
         access_token_expires = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
         expire = datetime.now(timezone.utc) + access_token_expires
@@ -55,7 +55,6 @@ async def get_userinfo():
     user_id = CTX_USER_ID.get()
     user_obj = await user_controller.get(id=user_id)
     data = await user_obj.to_dict(exclude_fields=["password"])
-    data["avatar"] = "https://avatars.githubusercontent.com/u/54677442?v=4"
     return Success(data=data)
 
 

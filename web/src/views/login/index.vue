@@ -18,7 +18,7 @@
             v-model:value="loginInfo.username"
             autofocus
             class="h-50 items-center pl-10 text-16"
-            placeholder="admin"
+            :placeholder="$t('views.login.placeholder_username')"
             :maxlength="20"
           />
         </div>
@@ -28,7 +28,7 @@
             class="h-50 items-center pl-10 text-16"
             type="password"
             show-password-on="mousedown"
-            placeholder="123456"
+            :placeholder="$t('views.login.placeholder_password')"
             :maxlength="20"
             @keypress.enter="handleLogin"
           />
@@ -91,9 +91,9 @@ async function handleLogin() {
     $message.loading(t('views.login.message_verifying'), {
       duration: 1000
     })
-    
+
     const res = await api.login({ username, password: password.toString() })
-    
+
     $message.success(t('views.login.message_login_success'))
     setToken(res.data.access_token)
     await addDynamicRoutes()

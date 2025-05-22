@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { NInput, NSelect } from 'naive-ui'
+import { NInput, NSelect, NPopover } from 'naive-ui'
+import TheIcon from '@/components/icon/TheIcon.vue'
 
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
@@ -23,7 +24,7 @@ function formatTimestamp(timestamp) {
   const pad = (num) => num.toString().padStart(2, '0')
 
   const year = date.getFullYear()
-  const month = pad(date.getMonth() + 1)
+  const month = pad(date.getMonth() + 1) // 月份从0开始，所以需要+1
   const day = pad(date.getDate())
   const hours = pad(date.getHours())
   const minutes = pad(date.getMinutes())
@@ -32,15 +33,17 @@ function formatTimestamp(timestamp) {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
+// 获取当天的开始时间的时间戳
 function getStartOfDayTimestamp() {
   const now = new Date()
-  now.setHours(0, 0, 0, 0)
+  now.setHours(0, 0, 0, 0) // 将小时、分钟、秒和毫秒都设置为0
   return now.getTime()
 }
 
+// 获取当天的结束时间的时间戳
 function getEndOfDayTimestamp() {
   const now = new Date()
-  now.setHours(23, 59, 59, 999)
+  now.setHours(23, 59, 59, 999) // 将小时设置为23，分钟设置为59，秒设置为59，毫秒设置为999
   return now.getTime()
 }
 
@@ -75,6 +78,16 @@ const methodOptions = [
     value: 'DELETE',
   },
 ]
+
+function formatJSON(data) {
+  try {
+    return typeof data === 'string' 
+      ? JSON.stringify(JSON.parse(data), null, 2)
+      : JSON.stringify(data, null, 2)
+  } catch (e) {
+    return data || '无数据'
+  }
+}
 
 const columns = [
   {
@@ -118,6 +131,62 @@ const columns = [
     align: 'center',
     width: 'auto',
     ellipsis: { tooltip: true },
+  },
+  {
+    title: '请求体',
+    key: 'request_body',
+    align: 'center',
+    width: 80,
+    render: (row) => {
+      return h(
+        NPopover,
+        {
+          trigger: 'hover',
+          placement: 'right',
+        },
+        {
+          trigger: () =>
+            h('div', { style: 'cursor: pointer;' }, [h(TheIcon, { icon: 'carbon:data-view' })]),
+          default: () =>
+            h(
+              'pre',
+              {
+                style:
+                  'max-height: 400px; overflow: auto; background-color: #f5f5f5; padding: 8px; border-radius: 4px;',
+              },
+              formatJSON(row.request_args)
+            ),
+        }
+      )
+    },
+  },
+  {
+    title: '响应体',
+    key: 'response_body',
+    align: 'center',
+    width: 80,
+    render: (row) => {
+      return h(
+        NPopover,
+        {
+          trigger: 'hover',
+          placement: 'right',
+        },
+        {
+          trigger: () =>
+            h('div', { style: 'cursor: pointer;' }, [h(TheIcon, { icon: 'carbon:data-view' })]),
+          default: () =>
+            h(
+              'pre',
+              {
+                style:
+                  'max-height: 400px; overflow: auto; background-color: #f5f5f5; padding: 8px; border-radius: 4px;',
+              },
+              formatJSON(row.response_body)
+            ),
+        }
+      )
+    },
   },
   {
     title: '响应时间(s)',
@@ -201,7 +270,7 @@ const columns = [
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
-        <QueryBarItem label="创建时间" :label-width="70">
+        <QueryBarItem label="操作时间" :label-width="70">
           <NDatePicker
             v-model:value="datetimeRange"
             type="datetimerange"

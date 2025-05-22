@@ -1,12 +1,10 @@
 import shutil
-from tortoise import Tortoise
-from app.settings.database import get_tortoise_config
-from app.log import logger
 
 from aerich import Command
 from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
+from tortoise import Tortoise
 from tortoise.expressions import Q
 
 from app.api import api_router
@@ -27,8 +25,9 @@ from app.core.exceptions import (
 from app.log import logger
 from app.models.admin import Api, Menu, Role
 from app.schemas.menus import MenuType
-from app.settings.config import settings
 from app.services.task_scheduler import scheduler
+from app.settings.config import settings
+from app.settings.database import get_tortoise_config
 
 from .middlewares import BackGroundTaskMiddleware, HttpAuditLogMiddleware
 
@@ -68,32 +67,20 @@ def register_routers(app: FastAPI, prefix: str = "/api"):
 
 
 async def init_database(app: FastAPI):
-    """初始化数据库连接"""
     try:
-        # 获取数据库配置
         db_config = get_tortoise_config()
-
-        # 注册数据库
         await Tortoise.init(config=db_config)
-
-        # 生成schemas
         await Tortoise.generate_schemas()
-
-        # 初始化数据库迁移
         command = Command(tortoise_config=db_config, app="models")
-
-        # 检查是否需要初始化迁移
         try:
             await command.init()
         except FileExistsError:
-            logger.info("Migrations folder already exists")
-
-        # 运行迁移（设置run_in_transaction=True以确保事务安全）
+            logger.info("迁移文件夹已存在！")
         await command.upgrade(run_in_transaction=True)
 
-        logger.info("Database initialization completed successfully")
+        logger.info("数据库初始化成功完成！")
     except Exception as e:
-        logger.error(f"Error initializing database: {str(e)}")
+        logger.error(f"初始化数据库时出错: {str(e)}")
         raise
 
 
@@ -215,7 +202,7 @@ async def init_db():
     try:
         await command.migrate()
     except AttributeError:
-        logger.warning("unable to retrieve model history from database, model history will be created from scratch")
+        logger.warning("无法从数据库中检索模型历史记录，模型历史将从头开始创建！")
         shutil.rmtree("migrations")
         await command.init_db(safe=True)
 
@@ -248,27 +235,21 @@ async def init_roles():
 
 
 async def init_task_scheduler():
-    """初始化任务调度器"""
     try:
         await scheduler.start()
-        logger.info("任务调度器已启动")
+        logger.info("任务调度器已启动！")
     except Exception as e:
         logger.error(f"启动任务调度器时发生错误: {str(e)}")
 
+
 async def init_app(app: FastAPI):
-    """初始化应用"""
-    # 注册路由
     register_routers(app)
-    # 注册异常处理
     register_exceptions(app)
-    # 初始化数据库
     await init_database(app)
-    # 初始化基础数据
     await init_superuser()
     await init_menus()
     await init_apis()
     await init_roles()
-    # 初始化任务调度器
     await init_task_scheduler()
 
     return app

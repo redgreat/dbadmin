@@ -3,7 +3,7 @@ from tortoise import fields
 from app.schemas.menus import MenuType
 
 from .base import BaseModel, TimestampMixin
-from .enums import MethodType, ButtonType
+from .enums import MethodType
 
 
 class User(BaseModel, TimestampMixin):
@@ -21,27 +21,11 @@ class User(BaseModel, TimestampMixin):
         table = "user"
 
 
-class Button(BaseModel, TimestampMixin):
-    name = fields.CharField(max_length=50, description="按钮名称", index=True)
-    code = fields.CharField(max_length=50, description="按钮标识", index=True)
-    type = fields.CharEnumField(ButtonType, description="按钮类型", index=True)
-    menu = fields.ForeignKeyField("models.Menu", related_name="buttons", description="所属菜单")
-    api = fields.ForeignKeyField("models.Api", related_name="buttons", null=True, description="关联接口")
-    desc = fields.CharField(max_length=200, null=True, description="按钮描述")
-    order = fields.IntField(default=0, description="排序", index=True)
-    is_hidden = fields.BooleanField(default=False, description="是否隐藏")
-
-    class Meta:
-        table = "button"
-        unique_together = (("code", "menu"),)  # 同一菜单下按钮标识唯一
-
-
 class Role(BaseModel, TimestampMixin):
     name = fields.CharField(max_length=20, unique=True, description="角色名称", index=True)
     desc = fields.CharField(max_length=500, null=True, description="角色描述")
     menus = fields.ManyToManyField("models.Menu", related_name="role_menus")
     apis = fields.ManyToManyField("models.Api", related_name="role_apis")
-    buttons = fields.ManyToManyField("models.Button", related_name="role_buttons")  # 新增按钮权限关联
 
     class Meta:
         table = "role"
