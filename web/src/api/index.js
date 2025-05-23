@@ -34,4 +34,11 @@ export default {
   refreshApi: (data = {}) => request.post('/api/refresh', data),
   // auditlog
   getAuditLogList: (params = {}) => request.get('/auditlog/list', { params }),
+  // conn
+  getConnList: (params = {}) => request.get('/conn/conn/list', { params }),
+  getConnById: (params = {}) => request.get('/conn/conn/get', { params }),
+  createConn: (data = {}) => request.post('/conn/conn/create', data),
+  updateConn: (data = {}) => request.post('/conn/conn/update', data),
+  deleteConn: (params = {}) => request.delete('/conn/conn/delete', { params }),
+  testConn: (data = {}) => request.post('/conn/conn/test', data),
 }

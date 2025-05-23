@@ -26,6 +26,10 @@
       "label_information": "消息",
       "label_project": "项目",
       "label_more": "更多"
+    },
+    "conn": {
+      "label_conn": "连接管理",
+      "label_conn_manage": "数据库连接"
     },    "profile": {
       "label_profile": "个人中心",
       "label_modify_information": "修改信息",

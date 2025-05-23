@@ -5,6 +5,7 @@ from app.core.dependency import DependPermisson
 from .apis import apis_router
 from .auditlog import auditlog_router
 from .base import base_router
+from .conn import router as conn_router
 from .menus import menus_router
 from .roles import roles_router
 from .tasks import tasks_router
@@ -19,3 +20,4 @@ v1_router.include_router(menus_router, prefix="/menu", dependencies=[DependPermi
 v1_router.include_router(apis_router, prefix="/api", dependencies=[DependPermisson])
 v1_router.include_router(auditlog_router, prefix="/auditlog", dependencies=[DependPermisson])
 v1_router.include_router(tasks_router, prefix="/task", dependencies=[DependPermisson])
+v1_router.include_router(conn_router, prefix="/conn", dependencies=[DependPermisson])

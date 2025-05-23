@@ -28,6 +28,7 @@ from app.schemas.menus import MenuType
 from app.services.task_scheduler import scheduler
 from app.settings.config import settings
 from app.settings.database import get_tortoise_config
+from app.utils.password import get_password_hash
 
 from .middlewares import BackGroundTaskMiddleware, HttpAuditLogMiddleware
 
@@ -91,7 +92,7 @@ async def init_superuser():
             UserCreate(
                 username="wangcw",
                 email="rubygreat@msn.com",
-                password="123456",
+                password=get_password_hash('Lunz2017'),
                 is_active=True,
                 is_superuser=True,
             )

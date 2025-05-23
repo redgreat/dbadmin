@@ -27,6 +27,10 @@
       "label_information": "Information",
       "label_project": "Project",
       "label_more": "More"
+    },
+    "conn": {
+      "label_conn": "Connection Management",
+      "label_conn_manage": "Database Connections"
     },    "profile": {
       "label_profile": "Profile",
       "label_modify_information": "Modify your information",
