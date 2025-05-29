@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from tortoise import fields
 from tortoise.models import Model
 

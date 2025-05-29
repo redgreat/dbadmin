@@ -82,12 +82,12 @@ class HttpAuditLogMiddleware(BaseHTTPMiddleware):
         pass
 
     async def after_request(self, request: Request, response: Response, process_time: int):
-        if request.method in self.methods:  # 请求方法为配置的记录方法
+        if request.method in self.methods:
             for path in self.exclude_paths:
                 if re.search(path, request.url.path, re.I) is not None:
                     return
             data: dict = await self.get_request_log(request=request, response=response)
-            data["response_time"] = process_time  # 响应时间
+            data["response_time"] = process_time
             await AuditLog.create(**data)
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:

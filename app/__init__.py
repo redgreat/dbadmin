@@ -6,10 +6,7 @@ from tortoise import Tortoise
 from app.core.exceptions import SettingNotFound
 from app.core.init_app import (
     init_app,
-    init_task_scheduler,
     make_middlewares,
-    register_exceptions,
-    register_routers,
 )
 from app.services.task_scheduler import scheduler
 
@@ -22,12 +19,10 @@ except ImportError:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时进行初始化
     await init_app(app)
     yield
-    # 关闭时清理资源
-    await scheduler.shutdown()  # 关闭任务调度器
-    await Tortoise.close_connections()  # 关闭数据库连接
+    await scheduler.shutdown()
+    await Tortoise.close_connections()
 
 
 def create_app() -> FastAPI:
@@ -47,6 +42,7 @@ def create_app() -> FastAPI:
             {"name": "接口管理", "description": "接口相关接口"},
             {"name": "审计日志", "description": "审计日志相关接口"},
             {"name": "定时任务", "description": "定时任务相关接口"},
+            {"name": "连接管理", "description": "数据库连接管理接口"},
         ],
         middleware=make_middlewares(),
         lifespan=lifespan,

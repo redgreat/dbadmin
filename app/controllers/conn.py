@@ -51,13 +51,10 @@ class DBConnectionController(CRUDBase[DBConnection, DBConnectionCreate, DBConnec
             host = conn.host
             port = conn.port
             username = conn.username
-            # 这里需要解密密码，但我们使用的是单向加密，所以无法解密
-            # 在实际应用中，应该使用可逆加密或其他方式存储密码
-            password = password  # 如果没有提供新密码，则无法测试
+            password = password
             database = conn.database
             params = conn.params
         
-        # 确保所有必要的参数都已提供
         if not all([db_type, host, port, username, password, database]):
             return False, "缺少必要的连接参数"
         
@@ -73,4 +70,4 @@ class DBConnectionController(CRUDBase[DBConnection, DBConnectionCreate, DBConnec
         )
 
 
-db_connection_controller = DBConnectionController()
+conn_controller = DBConnectionController()

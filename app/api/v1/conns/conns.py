@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Body, Query
 from tortoise.expressions import Q
 
-from app.controllers.conn import db_connection_controller
+from app.controllers.conn import conn_controller
 from app.schemas.base import Fail, Success, SuccessExtra
 from app.schemas.conn import DBConnectionCreate, DBConnectionTest, DBConnectionUpdate
 
@@ -25,7 +25,7 @@ async def list_connections(
     if status is not None:
         q &= Q(status=status)
     
-    total, conn_objs = await db_connection_controller.list(
+    total, conn_objs = await conn_controller.list(
         page=page, page_size=page_size, search=q, order=["-updated_at"]
     )
     data = [await obj.to_dict(exclude_fields=["password"]) for obj in conn_objs]
@@ -37,7 +37,7 @@ async def get_connection(
     conn_id: int = Query(..., description="连接ID"),
 ):
     """获取数据库连接详情"""
-    conn_obj = await db_connection_controller.get(id=conn_id)
+    conn_obj = await conn_controller.get(id=conn_id)
     data = await conn_obj.to_dict(exclude_fields=["password"])
     return Success(data=data)
 
@@ -48,12 +48,12 @@ async def create_connection(
 ):
     """创建数据库连接"""
     # 检查名称是否已存在
-    existing = await db_connection_controller.get_by_name(conn_in.name)
+    existing = await conn_controller.get_by_name(conn_in.name)
     if existing:
         return Fail(code=400, msg="连接名称已存在")
     
     # 创建连接
-    await db_connection_controller.create(obj_in=conn_in)
+    await conn_controller.create(obj_in=conn_in)
     return Success(msg="创建成功")
 
 
@@ -64,18 +64,18 @@ async def update_connection(
     """更新数据库连接"""
     # 检查ID是否存在
     try:
-        await db_connection_controller.get(id=conn_in.id)
+        await conn_controller.get(id=conn_in.id)
     except Exception:
         return Fail(code=404, msg="连接不存在")
     
     # 如果更新了名称，检查名称是否已存在
     if conn_in.name:
-        existing = await db_connection_controller.get_by_name(conn_in.name)
+        existing = await conn_controller.get_by_name(conn_in.name)
         if existing and existing.id != conn_in.id:
             return Fail(code=400, msg="连接名称已存在")
     
     # 更新连接
-    await db_connection_controller.update(id=conn_in.id, obj_in=conn_in)
+    await conn_controller.update(id=conn_in.id, obj_in=conn_in)
     return Success(msg="更新成功")
 
 
@@ -85,7 +85,7 @@ async def delete_connection(
 ):
     """删除数据库连接"""
     try:
-        await db_connection_controller.remove(id=conn_id)
+        await conn_controller.remove(id=conn_id)
         return Success(msg="删除成功")
     except Exception as e:
         return Fail(code=400, msg=f"删除失败: {str(e)}")
@@ -96,7 +96,7 @@ async def test_connection(
     conn_test: DBConnectionTest,
 ):
     """测试数据库连接"""
-    success, message = await db_connection_controller.test_connection(
+    success, message = await conn_controller.test_connection(
         id=conn_test.id,
         db_type=conn_test.db_type,
         host=conn_test.host,

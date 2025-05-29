@@ -35,10 +35,10 @@ export default {
   // auditlog
   getAuditLogList: (params = {}) => request.get('/auditlog/list', { params }),
   // conn
-  getConnList: (params = {}) => request.get('/conn/conn/list', { params }),
-  getConnById: (params = {}) => request.get('/conn/conn/get', { params }),
-  createConn: (data = {}) => request.post('/conn/conn/create', data),
-  updateConn: (data = {}) => request.post('/conn/conn/update', data),
-  deleteConn: (params = {}) => request.delete('/conn/conn/delete', { params }),
-  testConn: (data = {}) => request.post('/conn/conn/test', data),
+  getConnList: (params = {}) => request.get('/conn/list', { params }),
+  getConnById: (params = {}) => request.get('/conn/get', { params }),
+  createConn: (data = {}) => request.post('/conn/create', data),
+  updateConn: (data = {}) => request.post('/conn/update', data),
+  deleteConn: (params = {}) => request.delete('/conn/delete', { params }),
+  testConn: (data = {}) => request.post('/conn/test', data),
 }
