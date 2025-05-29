@@ -31,8 +31,8 @@ def create_app() -> FastAPI:
         title=settings.APP_TITLE,
         description=settings.APP_DESCRIPTION,
         version=settings.VERSION,
-        docs_url="/docs",  # 配置swagger文档路径
-        redoc_url="/redoc",  # 配置ReDoc文档路径
+        docs_url="/docs",
+        redoc_url="/redoc",
         openapi_url="/openapi.json",
         openapi_tags=[
             {"name": "基础模块", "description": "基础信息相关接口"},

@@ -222,15 +222,13 @@ async def init_roles():
             desc="普通用户角色",
         )
 
-        # 分配所有API给管理员角色
         all_apis = await Api.all()
         await admin_role.apis.add(*all_apis)
-        # 分配所有菜单给管理员和普通用户
+
         all_menus = await Menu.all()
         await admin_role.menus.add(*all_menus)
         await user_role.menus.add(*all_menus)
 
-        # 为普通用户分配基本API
         basic_apis = await Api.filter(Q(method__in=["GET"]) | Q(tags="基础模块"))
         await user_role.apis.add(*basic_apis)
 
@@ -260,6 +258,5 @@ __all__ = [
     "init_app",
     "make_middlewares",
     "register_exceptions",
-    "register_routers",
-    "init_task_scheduler",
+    "register_routers"
 ]

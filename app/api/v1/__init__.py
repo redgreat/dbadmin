@@ -20,4 +20,4 @@ v1_router.include_router(menus_router, prefix="/menu", dependencies=[DependPermi
 v1_router.include_router(apis_router, prefix="/api", dependencies=[DependPermisson])
 v1_router.include_router(auditlog_router, prefix="/auditlog", dependencies=[DependPermisson])
 v1_router.include_router(tasks_router, prefix="/task", dependencies=[DependPermisson])
-v1_router.include_router(conns_router, dependencies=[DependPermisson])
+v1_router.include_router(conns_router, prefix="/conn", dependencies=[DependPermisson])

@@ -13,10 +13,8 @@ class ApiController(CRUDBase[Api, ApiCreate, ApiUpdate]):
     async def refresh_api(self):
         from app import app
 
-        # 删除废弃API数据
         all_api_list = []
         for route in app.routes:
-            # 只更新有鉴权的API
             if isinstance(route, APIRoute) and len(route.dependencies) > 0:
                 all_api_list.append((list(route.methods)[0], route.path_format))
         delete_api = []
