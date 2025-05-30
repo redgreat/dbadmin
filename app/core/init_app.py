@@ -29,6 +29,7 @@ from app.services.task_scheduler import scheduler
 from app.settings.config import settings
 from app.settings.database import get_tortoise_config
 from app.utils.password import get_password_hash
+from app.utils.password import get_password_hash
 
 from .middlewares import BackGroundTaskMiddleware, HttpAuditLogMiddleware
 
