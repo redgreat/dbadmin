@@ -142,26 +142,31 @@ const statusOptions = [
 const getData = async (params) => {
   try {
     const res = await api.getConnList(params)
-    if (res.code === 0) {
+    if (res.code === 0 || res.code === 200) {
       // 将后端返回的created_at和updated_at映射为前端的createTime和updateTime
-      const items = res.data.map(item => ({
+      const items = (res.data || []).map(item => ({
         ...item,
         dbType: item.db_type,
         createTime: item.created_at,
         updateTime: item.updated_at
       }))
       return {
-        items,
-        total: res.total
+        data: items,
+        total: res.total || 0
       }
     } else {
-      $message.error(res.msg || '获取数据失败')
-      return { items: [], total: 0 }
+      if (res.code !== 404 && res.msg && !res.msg.includes('暂无数据')) {
+        $message.error(res.msg)
+      }
+      return { data: [], total: 0 }
     }
   } catch (error) {
+    if (error.code === 404 && error.message && error.message.includes('暂无数据')) {
+      return { data: [], total: 0 }
+    }
     console.error('获取数据库连接列表失败', error)
     $message.error('获取数据库连接列表失败')
-    return { items: [], total: 0 }
+    return { data: [], total: 0 }
   }
 }
 
@@ -298,7 +303,7 @@ const {
         remark: data.remark,
       }
       const res = await api.createConn(apiData)
-      if (res.code === 0) {
+      if (res.code === 0 || res.code === 200) {
         $message.success(res.msg || '创建成功')
         return Promise.resolve()
       } else {
@@ -313,7 +318,6 @@ const {
   },
   doUpdate: async (data) => {
     try {
-      // 将前端字段名转换为后端字段名
       const apiData = {
         id: data.id,
         name: data.name,
@@ -327,7 +331,7 @@ const {
         remark: data.remark,
       }
       const res = await api.updateConn(apiData)
-      if (res.code === 0) {
+      if (res.code === 0 || res.code === 200) {
         $message.success(res.msg || '更新成功')
         return Promise.resolve()
       } else {
@@ -343,7 +347,7 @@ const {
   doDelete: async (id) => {
     try {
       const res = await api.deleteConn({ conn_id: id })
-      if (res.code === 0) {
+      if (res.code === 0 || res.code === 200) {
         $message.success(res.msg || '删除成功')
         return Promise.resolve()
       } else {
@@ -364,7 +368,7 @@ const handleTest = async (row) => {
   try {
     $message.loading(`正在测试连接 ${row.name}...`)
     const res = await api.testConn({ id: row.id })
-    if (res.code === 0) {
+    if (res.code === 0 || res.code === 200) {
       $message.success(res.msg || `连接 ${row.name} 测试成功`)
     } else {
       $message.error(res.msg || `连接 ${row.name} 测试失败`)

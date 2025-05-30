@@ -49,25 +49,25 @@ export default function ({ name, initForm = {}, doCreate, doDelete, doUpdate, re
           cb: () => {
             callbacks.forEach((callback) => callback && callback())
           },
-          msg: () => $message.success('新增成功'),
+          msg: () => {},
         },
         edit: {
           api: () => doUpdate(modalForm.value),
           cb: () => {
             callbacks.forEach((callback) => callback && callback())
           },
-          msg: () => $message.success('编辑成功'),
+          msg: () => {},
         },
       }
       const action = actions[modalAction.value]
 
       try {
         modalLoading.value = true
-        const data = await action.api()
+        await action.api()
         action.cb()
         action.msg()
         modalLoading.value = modalVisible.value = false
-        data && refresh(data)
+        refresh()
       } catch (error) {
         modalLoading.value = false
       }
@@ -79,10 +79,9 @@ export default function ({ name, initForm = {}, doCreate, doDelete, doUpdate, re
     if (isNullOrWhitespace(params)) return
     try {
       modalLoading.value = true
-      const data = await doDelete(params)
-      $message.success('删除成功')
+      await doDelete(params)
       modalLoading.value = false
-      refresh(data)
+      refresh()
     } catch (error) {
       modalLoading.value = false
     }

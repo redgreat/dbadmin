@@ -3,7 +3,6 @@ import { resolveResError } from './helpers'
 import { useUserStore } from '@/store'
 
 export function reqResolve(config) {
-  // 处理不需要token的请求
   if (config.noNeedToken) {
     return config
   }
@@ -24,9 +23,10 @@ export function resResolve(response) {
   const { data, status, statusText } = response
   if (data?.code !== 200) {
     const code = data?.code ?? status
-    /** 根据code处理对应的操作，并返回处理后的message */
     const message = resolveResError(code, data?.msg ?? statusText)
-    window.$message?.error(message, { keepAliveOnHover: true })
+    if (code !== 404 || (data?.msg && !data.msg.includes('暂无数据'))) {
+      window.$message?.error(message, { keepAliveOnHover: true })
+    }
     return Promise.reject({ code, message, error: data || response })
   }
   return Promise.resolve(data)
@@ -51,7 +51,6 @@ export async function resReject(error) {
       return
     }
   }
-  // 后端返回的response数据
   const code = data?.code ?? status
   const message = resolveResError(code, data?.msg ?? error.message)
   window.$message?.error(message, { keepAliveOnHover: true })
