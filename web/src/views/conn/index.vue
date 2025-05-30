@@ -27,22 +27,8 @@
             placeholder="请输入连接名称"
           />
         </QueryBarItem>
-        <QueryBarItem label="数据库类型" :label-width="80">
-          <n-select
-            v-model:value="queryItems.dbType"
-            clearable
-            :options="dbTypeOptions"
-            placeholder="请选择数据库类型"
-          />
-        </QueryBarItem>
-        <QueryBarItem label="连接状态" :label-width="80">
-          <n-select
-            v-model:value="queryItems.status"
-            clearable
-            :options="statusOptions"
-            placeholder="请选择连接状态"
-          />
-        </QueryBarItem>
+
+
       </template>
     </CrudTable>
 
@@ -63,13 +49,7 @@
         <n-form-item label="连接名称" path="name">
           <n-input v-model:value="modalForm.name" clearable placeholder="请输入连接名称" />
         </n-form-item>
-        <n-form-item label="数据库类型" path="dbType">
-          <n-select
-            v-model:value="modalForm.dbType"
-            :options="dbTypeOptions"
-            placeholder="请选择数据库类型"
-          />
-        </n-form-item>
+
         <n-form-item label="主机地址" path="host">
           <n-input v-model:value="modalForm.host" clearable placeholder="请输入主机地址" />
         </n-form-item>
@@ -123,19 +103,13 @@ const queryItems = ref({})
 const vPermission = resolveDirective('permission')
 const $message = useMessage()
 
-// 数据库类型选项
-const dbTypeOptions = [
-  { label: 'MySQL', value: 'mysql' },
-  { label: 'PostgreSQL', value: 'postgresql' },
-  { label: 'SQLite', value: 'sqlite' },
-  { label: 'Oracle', value: 'oracle' },
-  { label: 'SQL Server', value: 'sqlserver' },
-]
+
 
 // 连接状态选项
 const statusOptions = [
   { label: '已连接', value: 1 },
-  { label: '未连接', value: 0 },
+  { label: '未连接', value: 2 },
+  { label: '未测试', value: 0 }
 ]
 
 // 获取数据的API
@@ -143,12 +117,12 @@ const getData = async (params) => {
   try {
     const res = await api.getConnList(params)
     if (res.code === 0 || res.code === 200) {
-      // 将后端返回的created_at和updated_at映射为前端的createTime和updateTime
       const items = (res.data || []).map(item => ({
         ...item,
         dbType: item.db_type,
         createTime: item.created_at,
-        updateTime: item.updated_at
+        updateTime: item.updated_at,
+        status: item.status
       }))
       return {
         data: items,
@@ -172,44 +146,127 @@ const getData = async (params) => {
 
 // 获取状态标签类型
 const getStatusType = (status) => {
-  const map = {
-    0: 'error',
-    1: 'success',
+  if (status === 1) {
+    return 'success'
+  } else if (status === 2) {
+    return 'error'
+  } else if (status === 0) {
+    return 'warning'
   }
-  return map[status] || 'default'
+  return 'default'
 }
 
 // 获取状态标签文本
 const getStatusText = (status) => {
-  const map = {
-    0: '未连接',
-    1: '已连接',
+  if (status === 1) {
+    return '已连接'
+  } else if (status === 2) {
+    return '未连接'
+  } else if (status === 0) {
+    return '未测试'
   }
-  return map[status] || '未知状态'
+  return '未知'
 }
 
-// 获取数据库类型文本
-const getDbTypeText = (dbType) => {
-  const option = dbTypeOptions.find(item => item.value === dbType)
-  return option ? option.label : dbType
-}
+
 
 // 表格列定义
 const columns = [
   { title: 'ID', key: 'id', width: 80 },
-  { title: '连接名称', key: 'name', width: 150 },
-  {
-    title: '数据库类型',
-    key: 'dbType',
-    width: 120,
+  { 
+    title: '连接名称', 
+    key: 'name', 
+    width: 150,
     render(row) {
-      return h('span', {}, getDbTypeText(row.dbType))
+      return h(
+        'div',
+        {
+          style: {
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer'
+          },
+          title: row.name,
+          onClick: () => {
+            window.$message.info(row.name)
+          }
+        },
+        row.name
+      )
     }
   },
-  { title: '主机地址', key: 'host', width: 150 },
+
+  { 
+    title: '主机地址', 
+    key: 'host', 
+    width: 150,
+    render(row) {
+      return h(
+        'div',
+        {
+          style: {
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer'
+          },
+          title: row.host,
+          onClick: () => {
+            window.$message.info(row.host)
+          }
+        },
+        row.host
+      )
+    }
+  },
   { title: '端口', key: 'port', width: 80 },
-  { title: '用户名', key: 'username', width: 120 },
-  { title: '数据库名', key: 'database', width: 120 },
+  { 
+    title: '用户名', 
+    key: 'username', 
+    width: 120,
+    render(row) {
+      return h(
+        'div',
+        {
+          style: {
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer'
+          },
+          title: row.username,
+          onClick: () => {
+            window.$message.info(row.username)
+          }
+        },
+        row.username
+      )
+    }
+  },
+  { 
+    title: '数据库名', 
+    key: 'database', 
+    width: 120,
+    render(row) {
+      return h(
+        'div',
+        {
+          style: {
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer'
+          },
+          title: row.database,
+          onClick: () => {
+            window.$message.info(row.database)
+          }
+        },
+        row.database
+      )
+    }
+  },
   {
     title: '连接状态',
     key: 'status',
@@ -290,7 +347,6 @@ const {
   },
   doCreate: async (data) => {
     try {
-      // 将前端字段名转换为后端字段名
       const apiData = {
         name: data.name,
         db_type: data.dbType,
@@ -373,9 +429,11 @@ const handleTest = async (row) => {
     } else {
       $message.error(res.msg || `连接 ${row.name} 测试失败`)
     }
+    handleRefresh()
   } catch (error) {
     console.error('测试连接失败', error)
     $message.error(`测试连接 ${row.name} 失败`)
+    handleRefresh()
   }
 }
 

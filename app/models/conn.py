@@ -22,7 +22,7 @@ class DBConnection(BaseModel, TimestampMixin):
     password = fields.CharField(max_length=200, description="密码(加密)")
     database = fields.CharField(max_length=100, description="数据库名")
     params = fields.TextField(description="连接参数", null=True)
-    status = fields.BooleanField(description="连接状态", default=False, index=True)
+    status = fields.SmallIntField(description="连接状态: 0-未测试, 1-已连接, 2-未连接", default=0, index=True)
     remark = fields.TextField(description="备注", null=True)
 
     class Meta:

@@ -16,17 +16,11 @@ async def list_connections(
     page: int = Query(1, description="页码"),
     page_size: int = Query(10, description="每页数量"),
     name: str = Query(None, description="连接名称"),
-    db_type: str = Query(None, description="数据库类型"),
-    status: bool = Query(None, description="连接状态"),
 ):
     """获取数据库连接列表"""
     q = Q()
     if name:
         q &= Q(name__contains=name)
-    if db_type:
-        q &= Q(db_type=db_type)
-    if status is not None:
-        q &= Q(status=status)
     
     total, conn_objs = await conn_controller.list(
         page=page, page_size=page_size, search=q, order=["-updated_at"]
