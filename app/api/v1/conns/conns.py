@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Body, Query
+import logging
+
+from fastapi import APIRouter, Query
 from tortoise.expressions import Q
 
 from app.controllers.conn import conn_controller
 from app.schemas.base import Fail, Success, SuccessExtra
 from app.schemas.conn import DBConnectionCreate, DBConnectionTest, DBConnectionUpdate
 
-router = APIRouter()
+logger = logging.getLogger(__name__)
 
+router = APIRouter()
 
 @router.get("/list", summary="获取数据库连接列表")
 async def list_connections(

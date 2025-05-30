@@ -4,7 +4,7 @@ from app.core.crud import CRUDBase
 from app.models.conn import DBConnection
 from app.schemas.conn import DBConnectionCreate, DBConnectionUpdate
 from app.services.db_connector import db_connector
-from app.utils.password import get_password_hash, verify_password
+from app.utils.password import get_password_hash
 
 
 class DBConnectionController(CRUDBase[DBConnection, DBConnectionCreate, DBConnectionUpdate]):
