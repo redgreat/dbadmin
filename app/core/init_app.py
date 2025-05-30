@@ -27,7 +27,7 @@ from app.models.admin import Api, Menu, Role
 from app.schemas.menus import MenuType
 from app.services.task_scheduler import scheduler
 from app.settings.config import settings
-from app.settings.database import get_tortoise_config
+from app.settings.database import get_tortoise_config, load_dynamic_connections
 from app.utils.password import get_password_hash
 from app.utils.password import get_password_hash
 
@@ -242,6 +242,17 @@ async def init_task_scheduler():
         logger.error(f"启动任务调度器时发生错误: {str(e)}")
 
 
+async def init_dynamic_connections():
+    """
+    初始化动态数据库连接池
+    """
+    try:
+        await load_dynamic_connections()
+        logger.info("动态数据库连接池初始化完成！")
+    except Exception as e:
+        logger.error(f"初始化动态数据库连接池时发生错误: {str(e)}")
+
+
 async def init_app(app: FastAPI):
     register_routers(app)
     register_exceptions(app)
@@ -250,6 +261,7 @@ async def init_app(app: FastAPI):
     await init_menus()
     await init_apis()
     await init_roles()
+    await init_dynamic_connections()
     await init_task_scheduler()
 
     return app

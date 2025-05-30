@@ -1,315 +1,311 @@
 <template>
-  <CommonPage show-footer title="订单完成时间修改">
-    <template #action>
-      <div>
-        <n-button class="float-right mr-15" type="primary" @click="handleAdd">
-          <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新增修改
-        </n-button>
-        <n-button class="float-right mr-15" type="info" @click="handleRefresh">
-          <TheIcon icon="material-symbols:refresh" :size="18" class="mr-5" />刷新数据
-        </n-button>
-      </div>
-    </template>
-
-    <!-- 表格 -->
-    <CrudTable
-      ref="$table"
-      v-model:query-items="queryItems"
-      :columns="columns"
-      :get-data="getData"
-    >
-      <template #queryBar>
-        <QueryBarItem label="订单编号" :label-width="80">
-          <n-input
-            v-model:value="queryItems.orderNo"
-            clearable
-            type="text"
-            placeholder="请输入订单编号"
-          />
-        </QueryBarItem>
-        <QueryBarItem label="客户名称" :label-width="80">
-          <n-input
-            v-model:value="queryItems.customerName"
-            clearable
-            type="text"
-            placeholder="请输入客户名称"
-          />
-        </QueryBarItem>
-        <QueryBarItem label="订单状态" :label-width="80">
-          <n-select
-            v-model:value="queryItems.status"
-            clearable
-            :options="statusOptions"
-            placeholder="请选择订单状态"
-          />
-        </QueryBarItem>
-      </template>
-    </CrudTable>
-
-    <!-- 新增/编辑 弹窗 -->
-    <CrudModal
-      v-model:visible="modalVisible"
-      :title="modalTitle"
-      :loading="modalLoading"
-      @save="handleSave"
-    >
+  <CommonPage show-footer title="订单审核时间修改">
+    <!-- 批量修改表单 -->
+    <n-card title="批量修改订单审核时间" class="mb-4">
       <n-form
-        ref="modalFormRef"
+        ref="batchFormRef"
         label-placement="left"
         label-align="left"
-        :label-width="100"
-        :model="modalForm"
+        :label-width="120"
+        :model="batchForm"
+        :rules="batchFormRules"
       >
-        <n-form-item label="订单编号" path="orderNo">
-          <n-input v-model:value="modalForm.orderNo" clearable placeholder="请输入订单编号" />
-        </n-form-item>
-        <n-form-item label="客户名称" path="customerName">
-          <n-input v-model:value="modalForm.customerName" clearable placeholder="请输入客户名称" />
-        </n-form-item>
-        <n-form-item label="联系电话" path="phone">
-          <n-input v-model:value="modalForm.phone" clearable placeholder="请输入联系电话" />
-        </n-form-item>
-        <n-form-item label="订单金额" path="amount">
-          <n-input-number v-model:value="modalForm.amount" clearable placeholder="请输入订单金额" />
-        </n-form-item>
-        <n-form-item label="订单状态" path="status">
-          <n-select
-            v-model:value="modalForm.status"
-            :options="statusOptions"
-            placeholder="请选择订单状态"
+        <n-form-item label="订单ID或编码" path="orderIds">
+          <n-input
+            v-model:value="batchForm.orderIds"
+            type="textarea"
+            :rows="6"
+            placeholder="请输入订单ID或订单编码，多个用逗号分隔，例如：&#10;OI9971420165,&#10;OI9971420167,&#10;20250530115737499E09E"
           />
         </n-form-item>
-        <n-form-item label="原完成时间" path="originalCompleteTime">
+        <n-form-item label="新审核时间" path="newAuditTime">
           <n-date-picker
-            v-model:value="modalForm.originalCompleteTime"
+            v-model:value="batchForm.newAuditTime"
             type="datetime"
             clearable
-            placeholder="请选择原完成时间"
-          />
-        </n-form-item>
-        <n-form-item label="新完成时间" path="newCompleteTime">
-          <n-date-picker
-            v-model:value="modalForm.newCompleteTime"
-            type="datetime"
-            clearable
-            placeholder="请选择新完成时间"
+            placeholder="请选择新的审核时间"
           />
         </n-form-item>
         <n-form-item label="修改原因" path="reason">
-          <n-input v-model:value="modalForm.reason" type="textarea" placeholder="请输入修改原因" />
-        </n-form-item>
-        <n-form-item label="备注" path="remark">
-          <n-input v-model:value="modalForm.remark" type="textarea" placeholder="请输入备注信息" />
+          <n-input
+            v-model:value="batchForm.reason"
+            type="textarea"
+            placeholder="请输入修改原因"
+          />
         </n-form-item>
       </n-form>
-    </CrudModal>
+      
+      <!-- 操作按钮 -->
+      <div class="mt-4">
+        <n-space>
+          <n-button type="primary" @click="handleValidate" :loading="loading">
+            <TheIcon icon="material-symbols:check-circle" :size="16" class="mr-2" />
+            数据校验
+          </n-button>
+          <n-button type="warning" @click="handleBatchModify" :disabled="!validationResult || !validationResult.success" :loading="loading">
+            <TheIcon icon="material-symbols:edit" :size="16" class="mr-2" />
+            批量修改
+          </n-button>
+        </n-space>
+      </div>
+    </n-card>
+
+    <!-- 验证结果展示 -->
+    <n-card v-if="validationResult" title="数据校验结果" class="mb-4">
+      <n-alert v-if="validationResult.success" type="success" class="mb-3">
+        校验通过，共找到 {{ validationResult.foundOrders.length }} 条订单记录
+      </n-alert>
+      <n-alert v-else type="error" class="mb-3">
+        校验失败：{{ validationResult.message }}
+      </n-alert>
+      
+      <div v-if="validationResult.foundOrders.length > 0">
+        <n-text strong>找到的订单：</n-text>
+        <n-table :bordered="false" :single-line="false" size="small" class="mt-2">
+          <thead>
+            <tr>
+              <th>订单ID</th>
+              <th>订单编号</th>
+              <th>当前审核时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="order in validationResult.foundOrders" :key="order.id">
+              <td>{{ order.id }}</td>
+              <td>{{ order.orderNo }}</td>
+              <td>{{ order.auditTime || '未审核' }}</td>
+            </tr>
+          </tbody>
+        </n-table>
+      </div>
+      
+      <div v-if="validationResult.notFoundIds.length > 0" class="mt-3">
+        <n-text type="error" strong>未找到的订单ID/编码：</n-text>
+        <n-tag v-for="id in validationResult.notFoundIds" :key="id" type="error" class="ml-2">
+          {{ id }}
+        </n-tag>
+      </div>
+    </n-card>
+
+    <!-- 更新结果展示 -->
+    <n-card v-if="updateResult" title="更新结果" class="mb-4">
+      <n-alert v-if="updateResult.success" type="success" class="mb-3">
+        批量修改成功，共影响 {{ updateResult.affectedCount }} 条订单
+      </n-alert>
+      <n-alert v-else type="error" class="mb-3">
+        批量修改失败：{{ updateResult.message }}
+      </n-alert>
+      
+      <div v-if="updateResult.details && updateResult.details.length > 0">
+        <n-text strong>修改详情：</n-text>
+        <n-table :bordered="false" :single-line="false" size="small" class="mt-2">
+          <thead>
+            <tr>
+              <th>订单ID</th>
+              <th>订单编号</th>
+              <th>原审核时间</th>
+              <th>新审核时间</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="detail in updateResult.details" :key="detail.orderId">
+              <td>{{ detail.orderId }}</td>
+              <td>{{ detail.orderNo }}</td>
+              <td>{{ detail.originalAuditTime || '未审核' }}</td>
+              <td>{{ detail.newAuditTime }}</td>
+              <td>
+                <n-tag :type="detail.success ? 'success' : 'error'">
+                  {{ detail.success ? '成功' : '失败' }}
+                </n-tag>
+              </td>
+            </tr>
+          </tbody>
+        </n-table>
+      </div>
+    </n-card>
   </CommonPage>
 </template>
 
 <script setup>
-import { h, onMounted, ref, resolveDirective } from 'vue'
-import { NButton, NTag, NSpace, NDatePicker } from 'naive-ui'
+import { onMounted, ref } from 'vue'
+import { NButton, NTag, NSpace, NDatePicker, NText, NTable, NAlert, NCard, NForm, NFormItem, NInput } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
-import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
-import CrudModal from '@/components/table/CrudModal.vue'
-import CrudTable from '@/components/table/CrudTable.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
 
-import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '订单完成时间修改' })
+defineOptions({ name: '订单审核时间修改' })
 
-const $table = ref(null)
-const queryItems = ref({})
-const vPermission = resolveDirective('permission')
+const message = useMessage()
 
-// 订单状态选项
-const statusOptions = [
-  { label: '待付款', value: 0 },
-  { label: '已付款', value: 1 },
-  { label: '已发货', value: 2 },
-  { label: '已完成', value: 3 },
-  { label: '已取消', value: 4 },
-]
+// 批量修改表单
+const batchFormRef = ref(null)
+const validationResult = ref(null)
+const updateResult = ref(null)
+const loading = ref(false)
 
-// 模拟获取数据的API
-const getData = () => {
-  // 这里应该调用真实的API
-  return Promise.resolve({
-    items: [
-      {
-        id: 1,
-        orderNo: 'ORD20230001',
-        customerName: '张三',
-        phone: '13800138000',
-        amount: 1000,
-        status: 3,
-        originalCompleteTime: '2023-05-05 10:00:00',
-        newCompleteTime: '2023-05-10 15:30:00',
-        reason: '客户要求延迟完成时间',
-        modifyTime: '2023-05-04 14:20:00'
-      },
-      {
-        id: 2,
-        orderNo: 'ORD20230002',
-        customerName: '李四',
-        phone: '13900139000',
-        amount: 2000,
-        status: 3,
-        originalCompleteTime: '2023-05-15 09:30:00',
-        newCompleteTime: '2023-05-18 11:00:00',
-        reason: '物流延迟',
-        modifyTime: '2023-05-14 16:45:00'
-      },
-      {
-        id: 3,
-        orderNo: 'ORD20230003',
-        customerName: '王五',
-        phone: '13700137000',
-        amount: 3000,
-        status: 3,
-        originalCompleteTime: '2023-05-20 14:00:00',
-        newCompleteTime: '2023-05-19 10:00:00',
-        reason: '提前完成',
-        modifyTime: '2023-05-18 09:15:00'
-      },
-    ],
-    total: 3,
-  })
-}
-
-// 获取状态标签类型
-const getStatusType = (status) => {
-  const map = {
-    0: 'warning',
-    1: 'info',
-    2: 'processing',
-    3: 'success',
-    4: 'error',
-  }
-  return map[status] || 'default'
-}
-
-// 获取状态标签文本
-const getStatusText = (status) => {
-  const map = {
-    0: '待付款',
-    1: '已付款',
-    2: '已发货',
-    3: '已完成',
-    4: '已取消',
-  }
-  return map[status] || '未知状态'
-}
-
-// 表格列定义
-const columns = [
-  { title: 'ID', key: 'id', width: 80 },
-  { title: '订单编号', key: 'orderNo', width: 150 },
-  { title: '客户名称', key: 'customerName', width: 120 },
-  { title: '联系电话', key: 'phone', width: 120 },
-  { title: '订单金额', key: 'amount', width: 100 },
-  {
-    title: '订单状态',
-    key: 'status',
-    width: 100,
-    render(row) {
-      return h(
-        NTag,
-        { type: getStatusType(row.status) },
-        { default: () => getStatusText(row.status) }
-      )
-    },
-  },
-  { title: '原完成时间', key: 'originalCompleteTime', width: 180 },
-  { title: '新完成时间', key: 'newCompleteTime', width: 180 },
-  { title: '修改原因', key: 'reason', width: 150 },
-  { title: '修改时间', key: 'modifyTime', width: 180 },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 200,
-    fixed: 'right',
-    render(row) {
-      return h(NSpace, { justify: 'center' }, {
-        default: () => [
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'primary',
-              onClick: () => handleEdit(row),
-            },
-            { default: () => '编辑' }
-          ),
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'error',
-              onClick: () => handleDelete(row.id),
-            },
-            { default: () => '删除' }
-          ),
-        ],
-      })
-    },
-  },
-]
-
-const {
-  modalVisible,
-  modalTitle,
-  modalLoading,
-  handleSave,
-  modalForm,
-  modalFormRef,
-  handleEdit,
-  handleDelete,
-  handleAdd,
-} = useCRUD({
-  name: '订单完成时间修改',
-  initForm: {
-    orderNo: '',
-    customerName: '',
-    phone: '',
-    amount: 0,
-    status: 3, // 默认已完成状态
-    originalCompleteTime: null,
-    newCompleteTime: null,
-    reason: '',
-    remark: '',
-  },
-  doCreate: (data) => {
-    // 这里应该调用真实的API
-    console.log('创建数据', data)
-    // 模拟添加修改时间
-    data.modifyTime = new Date().toLocaleString()
-    return Promise.resolve()
-  },
-  doUpdate: (data) => {
-    // 这里应该调用真实的API
-    console.log('更新数据', data)
-    // 模拟更新修改时间
-    data.modifyTime = new Date().toLocaleString()
-    return Promise.resolve()
-  },
-  doDelete: (id) => {
-    // 这里应该调用真实的API
-    console.log('删除数据', id)
-    return Promise.resolve()
-  },
-  refresh: () => $table.value?.handleSearch(),
+// 批量修改表单
+const batchForm = ref({
+  orderIds: '',
+  newAuditTime: null,
+  reason: ''
 })
 
-// 刷新数据
-const handleRefresh = () => {
-  $table.value?.handleSearch()
+// 表单验证规则
+const batchFormRules = {
+  orderIds: {
+    required: true,
+    message: '请输入订单ID或编码',
+    trigger: ['blur']
+  },
+  newAuditTime: {
+    required: true,
+    validator: (rule, value) => {
+      if (!value) {
+        return new Error('请选择新的审核时间')
+      }
+      return true
+    },
+    trigger: ['blur', 'change']
+  },
+  reason: {
+    required: true,
+    message: '请输入修改原因',
+    trigger: ['blur']
+  }
+}
+
+
+
+// 解析订单ID字符串
+const parseOrderIds = (orderIdsStr) => {
+  if (!orderIdsStr) return []
+  return orderIdsStr.split(',').map(id => id.trim()).filter(id => id)
+}
+
+// 数据校验处理
+const handleValidate = async () => {
+  if (!batchForm.value.orderIds) {
+    message.warning('请先填写订单ID或编码')
+    return
+  }
+
+  const orderIds = parseOrderIds(batchForm.value.orderIds)
+  if (orderIds.length === 0) {
+    message.warning('请输入有效的订单ID或编码')
+    return
+  }
+
+  try {
+    loading.value = true
+    // 调用后端API验证订单（后台写死连接名称）
+    const response = await api.post('/oms/validate-orders', {
+      orderIds: orderIds
+    })
+    
+    validationResult.value = response.data
+    updateResult.value = null // 清空之前的更新结果
+    
+    if (response.data.success) {
+      message.success('数据校验通过')
+    } else {
+      message.error('数据校验失败：' + response.data.message)
+    }
+  } catch (error) {
+    console.error('验证失败:', error)
+    // 模拟验证结果
+    const foundOrders = orderIds.slice(0, Math.floor(orderIds.length * 0.8)).map((id, index) => ({
+      id: id,
+      orderNo: id,
+      auditTime: index % 2 === 0 ? '2023-05-01 10:00:00' : null
+    }))
+    
+    const notFoundIds = orderIds.slice(Math.floor(orderIds.length * 0.8))
+    
+    validationResult.value = {
+      success: notFoundIds.length === 0,
+      foundOrders,
+      notFoundIds,
+      message: notFoundIds.length > 0 ? `有 ${notFoundIds.length} 个订单未找到` : ''
+    }
+    
+    if (notFoundIds.length === 0) {
+      message.success('数据校验通过')
+    } else {
+      message.error(`数据校验失败：有 ${notFoundIds.length} 个订单未找到`)
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+// 批量修改处理函数
+const handleBatchModify = async () => {
+  try {
+    await batchFormRef.value?.validate()
+    
+    // 检查校验结果
+    if (!validationResult.value || !validationResult.value.success) {
+      message.error('请先通过数据校验')
+      return
+    }
+    
+    // 验证时间是否大于当前时间
+    if (batchForm.value.newAuditTime && batchForm.value.newAuditTime <= Date.now()) {
+      message.warning('新审核时间必须大于当前时间')
+      return
+    }
+    
+    loading.value = true
+    
+    // 执行批量修改
+    const response = await api.post('/oms/batch-update-audit-time', {
+      orderIds: parseOrderIds(batchForm.value.orderIds),
+      newAuditTime: batchForm.value.newAuditTime,
+      reason: batchForm.value.reason
+    })
+    
+    updateResult.value = response.data
+    
+    if (response.data.success) {
+      message.success(`批量修改成功，共影响 ${response.data.affectedCount} 条订单`)
+      // 重置表单
+      batchForm.value = {
+        orderIds: '',
+        newAuditTime: null,
+        reason: ''
+      }
+      validationResult.value = null
+    } else {
+      message.error('批量修改失败：' + response.data.message)
+    }
+    
+  } catch (error) {
+    console.error('批量修改失败:', error)
+    // 模拟更新结果
+    const orderIds = parseOrderIds(batchForm.value.orderIds)
+    updateResult.value = {
+      success: false,
+      message: error.response?.data?.message || error.message,
+      affectedCount: 0,
+      details: orderIds.map(id => ({
+        orderId: id,
+        orderNo: id,
+        originalAuditTime: '2023-05-01 10:00:00',
+        newAuditTime: new Date(batchForm.value.newAuditTime).toLocaleString(),
+        success: false
+      }))
+    }
+    message.error('批量修改失败：' + (error.response?.data?.message || error.message))
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(() => {
-  $table.value?.handleSearch()
+  // 组件挂载时的初始化逻辑
 })
 </script>

@@ -7,6 +7,7 @@ from .auditlog import auditlog_router
 from .base import base_router
 from .conns import conns_router
 from .menus import menus_router
+from .oms.oms import router as oms_router
 from .roles import roles_router
 from .tasks import tasks_router
 from .users import users_router
@@ -21,3 +22,4 @@ v1_router.include_router(apis_router, prefix="/api", dependencies=[DependPermiss
 v1_router.include_router(auditlog_router, prefix="/auditlog", dependencies=[DependPermisson])
 v1_router.include_router(tasks_router, prefix="/task", dependencies=[DependPermisson])
 v1_router.include_router(conns_router, prefix="/conn", dependencies=[DependPermisson])
+v1_router.include_router(oms_router, prefix="/oms", dependencies=[DependPermisson])

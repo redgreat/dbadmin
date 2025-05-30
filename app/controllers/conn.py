@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 from app.core.crud import CRUDBase
 from app.models.conn import DBConnection
 from app.schemas.conn import DBConnectionCreate, DBConnectionUpdate
-from app.services.db_connector import db_connector
+from app.services.conn_manager import db_connector
 from app.utils.password import get_password_hash, verify_password
 from app.utils.encryption import encrypt_password, decrypt_password
 
