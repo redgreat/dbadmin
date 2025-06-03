@@ -43,7 +43,7 @@ async def login_access_token(credentials: CredentialsSchema):
             ),
             username=user.username,
         )
-        return Success(data=data.model_dump())
+        return Success(data=data.model_dump(mode='json'))
     except Exception as e:
         return Fail(msg=str(e))
 

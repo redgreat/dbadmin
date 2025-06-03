@@ -71,10 +71,10 @@ class DBConnectionManager:
         
         try:
             if params:
-                result = await connection.execute_script(sql, params)
+                result = await connection.execute_query(sql, params)
             else:
-                result = await connection.execute_script(sql)
-            return result
+                result = await connection.execute_query(sql)
+            return result[0] if isinstance(result, tuple) else result
         except Exception as e:
             logger.error(f"执行更新失败 (连接ID: {conn_id}): {str(e)}")
             raise

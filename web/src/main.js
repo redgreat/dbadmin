@@ -11,6 +11,15 @@ import { setupDirectives } from './directives'
 import { useResize } from '@/utils'
 import i18n from '~/i18n'
 
+// 配置 dayjs 时区
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+dayjs.tz.setDefault('Asia/Shanghai')
+
 async function setupApp() {
   const app = createApp(App)
 

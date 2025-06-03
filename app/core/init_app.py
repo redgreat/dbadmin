@@ -253,6 +253,26 @@ async def init_dynamic_connections():
         logger.error(f"初始化动态数据库连接池时发生错误: {str(e)}")
 
 
+async def reinit_tortoise_with_dynamic_connections():
+    """
+    重新初始化Tortoise以包含动态连接
+    """
+    try:
+        # 获取包含动态连接的完整配置
+        from app.settings.database import get_tortoise_config_with_dynamic
+        dynamic_config = get_tortoise_config_with_dynamic()
+        
+        # 关闭现有连接
+        await Tortoise.close_connections()
+        
+        # 重新初始化
+        await Tortoise.init(config=dynamic_config)
+        
+        logger.info("Tortoise动态连接重新初始化完成！")
+    except Exception as e:
+        logger.error(f"重新初始化Tortoise动态连接时发生错误: {str(e)}")
+
+
 async def init_app(app: FastAPI):
     register_routers(app)
     register_exceptions(app)
@@ -262,6 +282,7 @@ async def init_app(app: FastAPI):
     await init_apis()
     await init_roles()
     await init_dynamic_connections()
+    await reinit_tortoise_with_dynamic_connections()
     await init_task_scheduler()
 
     return app

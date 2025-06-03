@@ -34,6 +34,9 @@ export default {
   refreshApi: (data = {}) => request.post('/api/refresh', data),
   // auditlog
   getAuditLogList: (params = {}) => request.get('/auditlog/list', { params }),
+  // oplog
+  getOpLogList: (params = {}) => request.get('/oplog/list', { params }),
+  createOpLog: (data = {}) => request.post('/oplog/create', data),
   // conn
   getConnList: (params = {}) => request.get('/conn/list', { params }),
   getConnById: (params = {}) => request.get('/conn/get', { params }),
@@ -41,4 +44,7 @@ export default {
   updateConn: (data = {}) => request.post('/conn/update', data),
   deleteConn: (params = {}) => request.delete('/conn/delete', { params }),
   testConn: (data = {}) => request.post('/conn/test', data),
+  // oms
+  validateOrders: (data = {}) => request.post('/oms/validate-orders', data),
+  batchUpdateAuditTime: (data = {}) => request.post('/oms/batch-update-audit-time', data),
 }

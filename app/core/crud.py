@@ -3,6 +3,7 @@ from typing import Any, Dict, Generic, List, NewType, Tuple, Type, TypeVar, Unio
 from pydantic import BaseModel
 from tortoise.expressions import Q
 from tortoise.models import Model
+from datetime import datetime
 
 Total = NewType("Total", int)
 ModelType = TypeVar("ModelType", bound=Model)
@@ -20,7 +21,21 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     async def _to_schema(self, obj: ModelType):
         """将数据库模型转换为 schema 模型"""
         schema_model = self.get_schema_model()
-        return schema_model.model_validate(obj)
+        obj_dict = {}
+        for field_name in obj._meta.fields_map.keys():
+            if hasattr(obj, field_name):
+                value = getattr(obj, field_name)
+                if isinstance(value, datetime):
+                    obj_dict[field_name] = value
+                else:
+                    obj_dict[field_name] = value
+
+        if hasattr(obj, 'created_at'):
+            obj_dict['created_at'] = obj.created_at
+        if hasattr(obj, 'updated_at'):
+            obj_dict['updated_at'] = obj.updated_at
+            
+        return schema_model.model_validate(obj_dict)
 
     async def get(self, id: int) -> ModelType:
         return await self.model.get(id=id)

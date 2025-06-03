@@ -1,6 +1,6 @@
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class OpLogCreateRequest(BaseModel):
@@ -31,6 +31,8 @@ class OpLogQueryRequest(BaseModel):
 
 class OpLogResponse(BaseModel):
     """操作日志响应模型"""
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+    
     id: int = Field(..., description="日志ID")
     logger: str = Field(..., description="修改类型")
     chgmsg: Dict[str, Any] = Field(..., description="运维内容")
@@ -42,5 +44,7 @@ class OpLogResponse(BaseModel):
 
 class OpLogListResponse(BaseModel):
     """操作日志列表响应模型"""
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+    
     records: List[OpLogResponse] = Field(..., description="日志记录列表")
     pagination: Dict[str, Any] = Field(..., description="分页信息")

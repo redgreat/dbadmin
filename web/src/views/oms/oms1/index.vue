@@ -1,5 +1,5 @@
 <template>
-  <CommonPage show-footer title="订单审核时间修改">
+  <CommonPage show-footer>
     <!-- 批量修改表单 -->
     <n-card title="批量修改订单审核时间" class="mb-4">
       <n-form
@@ -53,13 +53,13 @@
     <!-- 验证结果展示 -->
     <n-card v-if="validationResult" title="数据校验结果" class="mb-4">
       <n-alert v-if="validationResult.success" type="success" class="mb-3">
-        校验通过，共找到 {{ validationResult.foundOrders.length }} 条订单记录
+        校验通过，共找到 {{ validationResult.foundOrders?.length || 0 }} 条订单记录
       </n-alert>
       <n-alert v-else type="error" class="mb-3">
         校验失败：{{ validationResult.message }}
       </n-alert>
       
-      <div v-if="validationResult.foundOrders.length > 0">
+      <div v-if="validationResult.foundOrders && validationResult.foundOrders.length > 0">
         <n-text strong>找到的订单：</n-text>
         <n-table :bordered="false" :single-line="false" size="small" class="mt-2">
           <thead>
@@ -70,7 +70,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="order in validationResult.foundOrders" :key="order.id">
+            <tr v-for="order in (validationResult.foundOrders || [])" :key="order.id">
               <td>{{ order.id }}</td>
               <td>{{ order.orderNo }}</td>
               <td>{{ order.auditTime || '未审核' }}</td>
@@ -79,9 +79,9 @@
         </n-table>
       </div>
       
-      <div v-if="validationResult.notFoundIds.length > 0" class="mt-3">
+      <div v-if="validationResult.notFoundIds && validationResult.notFoundIds.length > 0" class="mt-3">
         <n-text type="error" strong>未找到的订单ID/编码：</n-text>
-        <n-tag v-for="id in validationResult.notFoundIds" :key="id" type="error" class="ml-2">
+        <n-tag v-for="id in (validationResult.notFoundIds || [])" :key="id" type="error" class="ml-2">
           {{ id }}
         </n-tag>
       </div>
@@ -90,7 +90,7 @@
     <!-- 更新结果展示 -->
     <n-card v-if="updateResult" title="更新结果" class="mb-4">
       <n-alert v-if="updateResult.success" type="success" class="mb-3">
-        批量修改成功，共影响 {{ updateResult.affectedCount }} 条订单
+        批量修改成功，共影响 {{ updateResult.updated_count }} 条订单
       </n-alert>
       <n-alert v-else type="error" class="mb-3">
         批量修改失败：{{ updateResult.message }}
@@ -201,9 +201,9 @@ const handleValidate = async () => {
 
   try {
     loading.value = true
-    // 调用后端API验证订单（后台写死连接名称）
-    const response = await api.post('/oms/validate-orders', {
-      orderIds: orderIds
+    const response = await api.validateOrders({
+      order_ids: orderIds.join(','),
+      conn_id: 5
     })
     
     validationResult.value = response.data
@@ -254,24 +254,29 @@ const handleBatchModify = async () => {
     }
     
     // 验证时间是否大于当前时间
-    if (batchForm.value.newAuditTime && batchForm.value.newAuditTime <= Date.now()) {
-      message.warning('新审核时间必须大于当前时间')
+    if (batchForm.value.newAuditTime && batchForm.value.newAuditTime >= Date.now()) {
+      message.warning('新审核时间必须小于当前时间')
       return
     }
     
     loading.value = true
     
     // 执行批量修改
-    const response = await api.post('/oms/batch-update-audit-time', {
-      orderIds: parseOrderIds(batchForm.value.orderIds),
-      newAuditTime: batchForm.value.newAuditTime,
-      reason: batchForm.value.reason
+    // 确保时间以东八区时间发送给后端
+    const auditTime = batchForm.value.newAuditTime ? 
+      new Date(batchForm.value.newAuditTime).toISOString() : null
+    
+    const response = await api.batchUpdateAuditTime({
+      order_ids: parseOrderIds(batchForm.value.orderIds).join(','),
+      new_audit_time: auditTime,
+      reason: batchForm.value.reason,
+      conn_id: 5
     })
     
     updateResult.value = response.data
     
     if (response.data.success) {
-      message.success(`批量修改成功，共影响 ${response.data.affectedCount} 条订单`)
+      message.success(`批量修改成功，共影响 ${response.data.updated_count} 条订单`)
       // 重置表单
       batchForm.value = {
         orderIds: '',
