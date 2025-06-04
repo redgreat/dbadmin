@@ -47,4 +47,8 @@ export default {
   // oms
   validateOrders: (data = {}) => request.post('/oms/validate-orders', data),
   batchUpdateAuditTime: (data = {}) => request.post('/oms/batch-update-audit-time', data),
+  
+  // oms 订单删除相关API
+  validateOrdersForDelete: (data) => request.post('/oms/validate-orders-for-delete', data),
+  batchDeleteOrders: (data) => request.post('/oms/batch-delete-orders', data),
 }
