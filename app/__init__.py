@@ -7,6 +7,8 @@ from app.core.exceptions import SettingNotFound
 from app.core.init_app import (
     init_app,
     make_middlewares,
+    register_exceptions,
+    register_routers,
 )
 from app.services.task_scheduler import scheduler
 

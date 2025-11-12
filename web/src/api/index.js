@@ -41,4 +41,8 @@ export default {
   updateConn: (data = {}) => request.post('/conn/update', data),
   deleteConn: (params = {}) => request.delete('/conn/delete', { params }),
   testConn: (data = {}) => request.post('/conn/test', data),
+  // oms
+  updateOrdersAuditTimeBatch: (data = {}) => request.post('/oms/orders/update_audit_time_batch', data),
+  deleteOrdersLogicalBatch: (data = {}) => request.post('/oms/orders/delete_logical_batch', data),
+  deleteOrdersPhysicalBatch: (data = {}) => request.post('/oms/orders/delete_physical_batch', data),
 }

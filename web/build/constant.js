@@ -17,7 +17,7 @@ export const PROXY_CONFIG = {
    * @转发路径  http://localhost:9999/api/v1/user
    */
   '/api/v1': {
-    target: 'http://127.0.0.1:8090',
+    target: 'http://127.0.0.1:8000',
     changeOrigin: true,
   },
 }

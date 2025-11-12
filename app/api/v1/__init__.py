@@ -10,6 +10,7 @@ from .menus import menus_router
 from .roles import roles_router
 from .tasks import tasks_router
 from .users import users_router
+from .oms import oms_router
 
 v1_router = APIRouter()
 
@@ -21,3 +22,4 @@ v1_router.include_router(apis_router, prefix="/api", dependencies=[DependPermiss
 v1_router.include_router(auditlog_router, prefix="/auditlog", dependencies=[DependPermisson])
 v1_router.include_router(tasks_router, prefix="/task", dependencies=[DependPermisson])
 v1_router.include_router(conns_router, prefix="/conn", dependencies=[DependPermisson])
+v1_router.include_router(oms_router, prefix="/oms", dependencies=[DependPermisson])

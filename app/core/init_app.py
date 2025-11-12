@@ -71,13 +71,35 @@ async def init_database(app: FastAPI):
     try:
         db_config = get_tortoise_config()
         await Tortoise.init(config=db_config)
-        await Tortoise.generate_schemas()
         command = Command(tortoise_config=db_config, app="models")
         try:
             await command.init()
         except FileExistsError:
             logger.info("迁移文件夹已存在！")
-        await command.upgrade(run_in_transaction=True)
+
+        conn = Tortoise.get_connection("default")
+        try:
+            aerich_check = await conn.execute_query_dict("SELECT to_regclass('public.aerich') AS aerich")
+            aerich_exists = bool(aerich_check and aerich_check[0].get("aerich"))
+        except Exception:
+            aerich_exists = False
+
+        if aerich_exists:
+            await command.upgrade(run_in_transaction=True)
+        else:
+            try:
+                table_check = await conn.execute_query_dict(
+                    "SELECT to_regclass('public.conn') AS conn, to_regclass('public\"user\"') AS user"
+                )
+                has_existing_tables = any(table_check and table_check[0].values())
+            except Exception:
+                has_existing_tables = False
+
+            if has_existing_tables:
+                await Tortoise.generate_schemas()
+                logger.warning("检测到已有业务表但无迁移版本表：已跳过迁移，改为同步模型。")
+            else:
+                await command.upgrade(run_in_transaction=True)
 
         logger.info("数据库初始化成功完成！")
     except Exception as e:
@@ -172,17 +194,197 @@ async def init_menus():
             ),
         ]
         await Menu.bulk_create(children_menu)
-        await Menu.create(
-            menu_type=MenuType.MENU,
-            name="一级菜单",
-            path="/top-menu",
-            order=2,
+        # 连接管理
+        conn_catalog = await Menu.create(
+            menu_type=MenuType.CATALOG,
+            name="连接管理",
+            path="/conn",
+            order=3,
             parent_id=0,
-            icon="material-symbols:featured-play-list-outline",
+            icon="material-symbols:database",
             is_hidden=False,
-            component="/top-menu",
+            component="Layout",
             keepalive=False,
-            redirect="",
+            redirect="/conn",
+        )
+        await Menu.bulk_create(
+            [
+                Menu(
+                    menu_type=MenuType.MENU,
+                    name="连接管理",
+                    path="",
+                    order=1,
+                    parent_id=conn_catalog.id,
+                    icon="material-symbols:database-outline",
+                    is_hidden=False,
+                    component="/conn",
+                    keepalive=False,
+                ),
+            ]
+        )
+
+        # 任务中心
+        task_catalog = await Menu.create(
+            menu_type=MenuType.CATALOG,
+            name="任务中心",
+            path="/task",
+            order=4,
+            parent_id=0,
+            icon="carbon:task",
+            is_hidden=False,
+            component="Layout",
+            keepalive=False,
+            redirect="/task",
+        )
+        await Menu.bulk_create(
+            [
+                Menu(
+                    menu_type=MenuType.MENU,
+                    name="任务管理",
+                    path="",
+                    order=1,
+                    parent_id=task_catalog.id,
+                    icon="mdi:clipboard-text-outline",
+                    is_hidden=False,
+                    component="/task",
+                    keepalive=False,
+                ),
+            ]
+        )
+
+        # 告警中心
+        alert_catalog = await Menu.create(
+            menu_type=MenuType.CATALOG,
+            name="告警中心",
+            path="/alert",
+            order=5,
+            parent_id=0,
+            icon="mdi:alarm-light-outline",
+            is_hidden=False,
+            component="Layout",
+            keepalive=False,
+            redirect="/alert",
+        )
+        await Menu.bulk_create(
+            [
+                Menu(
+                    menu_type=MenuType.MENU,
+                    name="告警管理",
+                    path="",
+                    order=1,
+                    parent_id=alert_catalog.id,
+                    icon="mdi:alarm-light",
+                    is_hidden=False,
+                    component="/alert",
+                    keepalive=False,
+                ),
+            ]
+        )
+
+        # WMS 模块
+        wms_catalog = await Menu.create(
+            menu_type=MenuType.CATALOG,
+            name="WMS",
+            path="/wms",
+            order=6,
+            parent_id=0,
+            icon="mdi:warehouse",
+            is_hidden=False,
+            component="Layout",
+            keepalive=False,
+            redirect="/wms",
+        )
+        await Menu.bulk_create(
+            [
+                Menu(
+                    menu_type=MenuType.MENU,
+                    name="WMS主页",
+                    path="",
+                    order=1,
+                    parent_id=wms_catalog.id,
+                    icon="mdi:warehouse",
+                    is_hidden=False,
+                    component="/wms",
+                    keepalive=False,
+                ),
+            ]
+        )
+
+        # OMS 模块
+        oms_catalog = await Menu.create(
+            menu_type=MenuType.CATALOG,
+            name="OMS",
+            path="/oms",
+            order=7,
+            parent_id=0,
+            icon="mdi:truck-fast-outline",
+            is_hidden=False,
+            component="Layout",
+            keepalive=False,
+            redirect="/oms/oms1",
+        )
+        await Menu.bulk_create(
+            [
+                Menu(
+                    menu_type=MenuType.MENU,
+                    name="OMS1",
+                    path="oms1",
+                    order=1,
+                    parent_id=oms_catalog.id,
+                    icon="mdi:truck-fast",
+                    is_hidden=False,
+                    component="/oms/oms1",
+                    keepalive=False,
+                ),
+            ]
+        )
+    # 确保“订单删除”菜单存在（在OMS目录下）
+    try:
+        oms_parent = await Menu.filter(path="/oms").first()
+        if oms_parent:
+            exists_delete = await Menu.filter(parent_id=oms_parent.id, component="/oms/oms-delete").exists()
+            if not exists_delete:
+                await Menu.create(
+                    menu_type=MenuType.MENU,
+                    name="订单删除",
+                    path="oms-delete",
+                    order=2,
+                    parent_id=oms_parent.id,
+                    icon="mdi:trash-can-outline",
+                    is_hidden=False,
+                    component="/oms/oms-delete",
+                    keepalive=False,
+                )
+    except Exception:
+        pass
+
+        # EHCF 模块
+        ehcf_catalog = await Menu.create(
+            menu_type=MenuType.CATALOG,
+            name="EHCF",
+            path="/ehcf",
+            order=8,
+            parent_id=0,
+            icon="mdi:heart-pulse-outline",
+            is_hidden=False,
+            component="Layout",
+            keepalive=False,
+            redirect="/ehcf",
+        )
+        await Menu.bulk_create(
+            [
+                Menu(
+                    menu_type=MenuType.MENU,
+                    name="EHCF主页",
+                    path="",
+                    order=1,
+                    parent_id=ehcf_catalog.id,
+                    icon="mdi:heart-pulse",
+                    is_hidden=False,
+                    component="/ehcf",
+                    keepalive=False,
+                ),
+            ]
         )
 
 

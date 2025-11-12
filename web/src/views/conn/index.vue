@@ -59,6 +59,7 @@
         label-align="left"
         :label-width="100"
         :model="modalForm"
+        :rules="rules"
       >
         <n-form-item label="连接名称" path="name">
           <n-input v-model:value="modalForm.name" clearable placeholder="请输入连接名称" />
@@ -123,13 +124,10 @@ const queryItems = ref({})
 const vPermission = resolveDirective('permission')
 const $message = useMessage()
 
-// 数据库类型选项
+// 数据库类型选项（与后端当前支持保持一致）
 const dbTypeOptions = [
   { label: 'MySQL', value: 'mysql' },
   { label: 'PostgreSQL', value: 'postgresql' },
-  { label: 'SQLite', value: 'sqlite' },
-  { label: 'Oracle', value: 'oracle' },
-  { label: 'SQL Server', value: 'sqlserver' },
 ]
 
 // 连接状态选项
@@ -141,12 +139,20 @@ const statusOptions = [
 // 获取数据的API
 const getData = async (params) => {
   try {
-    const res = await api.getConnList(params)
-    if (res.code === 0) {
-      // 将后端返回的created_at和updated_at映射为前端的createTime和updateTime
+    const query = { ...params }
+    if (Object.prototype.hasOwnProperty.call(query, 'dbType')) {
+      query.db_type = query.dbType
+      delete query.dbType
+    }
+    if (Object.prototype.hasOwnProperty.call(query, 'status') && query.status !== undefined && query.status !== null) {
+      query.status = query.status === 1 || query.status === '1'
+    }
+    const res = await api.getConnList(query)
+    if (res.code === 200) {
       const items = res.data.map(item => ({
         ...item,
         dbType: item.db_type,
+        status: item.status ? 1 : 0,
         createTime: item.created_at,
         updateTime: item.updated_at
       }))
@@ -298,7 +304,7 @@ const {
         remark: data.remark,
       }
       const res = await api.createConn(apiData)
-      if (res.code === 0) {
+      if (res.code === 200) {
         $message.success(res.msg || '创建成功')
         return Promise.resolve()
       } else {
@@ -327,7 +333,7 @@ const {
         remark: data.remark,
       }
       const res = await api.updateConn(apiData)
-      if (res.code === 0) {
+      if (res.code === 200) {
         $message.success(res.msg || '更新成功')
         return Promise.resolve()
       } else {
@@ -343,7 +349,7 @@ const {
   doDelete: async (id) => {
     try {
       const res = await api.deleteConn({ conn_id: id })
-      if (res.code === 0) {
+      if (res.code === 200) {
         $message.success(res.msg || '删除成功')
         return Promise.resolve()
       } else {
@@ -359,12 +365,44 @@ const {
   refresh: () => $table.value?.handleSearch(),
 })
 
+// 表单校验规则（函数级中文注释）
+const rules = {
+  name: [{ required: true, message: '请输入连接名称' }],
+  dbType: [{ required: true, message: '请选择数据库类型' }],
+  host: [{ required: true, message: '请输入主机地址' }],
+  port: [
+    { required: true, message: '请输入端口' },
+    {
+      validator: (_, value) => {
+        return typeof value === 'number' && value > 0
+      },
+      message: '端口必须为正整数',
+    },
+  ],
+  username: [{ required: true, message: '请输入用户名' }],
+  password: [
+    {
+      validator: (_, value) => {
+        // 新增时必须填写密码，编辑时可选
+        return modalForm.value?.id ? true : !!value
+      },
+      message: '请输入密码',
+    },
+  ],
+  database: [{ required: true, message: '请输入数据库名' }],
+}
+
 // 测试连接
 const handleTest = async (row) => {
   try {
+    const password = window.prompt(`请输入连接 ${row.name} 的明文密码用于测试`)
+    if (!password) {
+      $message.error('请输入密码')
+      return
+    }
     $message.loading(`正在测试连接 ${row.name}...`)
-    const res = await api.testConn({ id: row.id })
-    if (res.code === 0) {
+    const res = await api.testConn({ id: row.id, password })
+    if (res.code === 200) {
       $message.success(res.msg || `连接 ${row.name} 测试成功`)
     } else {
       $message.error(res.msg || `连接 ${row.name} 测试失败`)
