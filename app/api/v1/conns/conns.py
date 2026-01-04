@@ -6,6 +6,7 @@ from tortoise.expressions import Q
 from app.controllers.conn import conn_controller
 from app.schemas.base import Fail, Success, SuccessExtra
 from app.schemas.conn import DBConnectionCreate, DBConnectionTest, DBConnectionUpdate
+from app.services.db_pool import db_pool
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,27 @@ async def test_connection(
     )
     
     if success:
+        try:
+            await conn_controller.update(id=conn_test.id, obj_in=DBConnectionUpdate(id=conn_test.id, status=True))
+        except Exception:
+            pass
+        try:
+            await db_pool.register_pool(
+                conn_id=conn_test.id,
+                db_type=conn_test.db_type,
+                host=conn_test.host,
+                port=conn_test.port,
+                username=conn_test.username,
+                password=conn_test.password,
+                database=conn_test.database,
+                params=conn_test.params,
+            )
+        except Exception:
+            pass
         return Success(msg=message)
     else:
+        try:
+            await conn_controller.update(id=conn_test.id, obj_in=DBConnectionUpdate(id=conn_test.id, status=False))
+        except Exception:
+            pass
         return Fail(code=400, msg=message)

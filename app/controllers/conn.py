@@ -3,7 +3,9 @@ from typing import Optional, Tuple
 from app.core.crud import CRUDBase
 from app.models.conn import DBConnection
 from app.schemas.conn import DBConnectionCreate, DBConnectionUpdate
-from app.services.db_connector import db_connector
+import asyncpg
+import aiomysql
+from app.services.db_pool import db_pool
 from app.utils.password import get_password_hash
 
 
@@ -18,6 +20,19 @@ class DBConnectionController(CRUDBase[DBConnection, DBConnectionCreate, DBConnec
         obj_dict["password"] = get_password_hash(obj_dict["password"])
         obj = self.model(**obj_dict)
         await obj.save()
+        try:
+            await db_pool.register_pool(
+                conn_id=obj.id,
+                db_type=obj_in.db_type,
+                host=obj_in.host,
+                port=obj_in.port,
+                username=obj_in.username,
+                password=obj_in.password,
+                database=obj_in.database,
+                params=obj_in.params,
+            )
+        except Exception:
+            pass
         return obj
 
     async def update(self, id: int, obj_in: DBConnectionUpdate) -> DBConnection:
@@ -31,6 +46,20 @@ class DBConnectionController(CRUDBase[DBConnection, DBConnectionCreate, DBConnec
         
         obj = obj.update_from_dict(obj_dict)
         await obj.save()
+        try:
+            if obj_in.password:
+                await db_pool.register_pool(
+                    conn_id=obj.id,
+                    db_type=obj_in.db_type or obj.db_type,
+                    host=obj_in.host or obj.host,
+                    port=obj_in.port or obj.port,
+                    username=obj_in.username or obj.username,
+                    password=obj_in.password,
+                    database=obj_in.database or obj.database,
+                    params=obj_in.params or obj.params,
+                )
+        except Exception:
+            pass
         return obj
 
     async def get_by_name(self, name: str) -> Optional[DBConnection]:
@@ -59,15 +88,36 @@ class DBConnectionController(CRUDBase[DBConnection, DBConnectionCreate, DBConnec
             return False, "缺少必要的连接参数"
         
         # 测试连接
-        return await db_connector.test_connection(
-            db_type=db_type,
-            host=host,
-            port=port,
-            username=username,
-            password=password,
-            database=database,
-            params=params
-        )
+        try:
+            if db_type == "postgresql":
+                conn = await asyncpg.connect(
+                    host=host,
+                    port=port,
+                    user=username,
+                    password=password,
+                    database=database,
+                    timeout=5,
+                )
+                await conn.execute("SELECT 1")
+                await conn.close()
+                return True, "连接成功"
+            elif db_type == "mysql":
+                conn = await aiomysql.connect(
+                    host=host,
+                    port=port,
+                    user=username,
+                    password=password,
+                    db=database,
+                    connect_timeout=5,
+                )
+                async with conn.cursor() as cur:
+                    await cur.execute("SELECT 1")
+                conn.close()
+                return True, "连接成功"
+            else:
+                return False, f"不支持的数据库类型: {db_type}"
+        except Exception as e:
+            return False, f"连接失败: {str(e)}"
 
 
 conn_controller = DBConnectionController()

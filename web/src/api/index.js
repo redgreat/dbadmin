@@ -45,4 +45,5 @@ export default {
   updateOrdersAuditTimeBatch: (data = {}) => request.post('/oms/orders/update_audit_time_batch', data),
   deleteOrdersLogicalBatch: (data = {}) => request.post('/oms/orders/delete_logical_batch', data),
   deleteOrdersPhysicalBatch: (data = {}) => request.post('/oms/orders/delete_physical_batch', data),
+  restoreOrderLogical: (data = {}) => request.post('/oms/orders/restore_logical', data),
 }

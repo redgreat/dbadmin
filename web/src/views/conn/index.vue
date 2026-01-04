@@ -1,5 +1,5 @@
 <template>
-  <CommonPage show-footer title="数据库连接管理">
+  <CommonPage show-footer>
     <template #action>
       <div>
         <n-button class="float-right mr-15" type="primary" @click="handleAdd">
@@ -25,22 +25,6 @@
             clearable
             type="text"
             placeholder="请输入连接名称"
-          />
-        </QueryBarItem>
-        <QueryBarItem label="数据库类型" :label-width="80">
-          <n-select
-            v-model:value="queryItems.dbType"
-            clearable
-            :options="dbTypeOptions"
-            placeholder="请选择数据库类型"
-          />
-        </QueryBarItem>
-        <QueryBarItem label="连接状态" :label-width="80">
-          <n-select
-            v-model:value="queryItems.status"
-            clearable
-            :options="statusOptions"
-            placeholder="请选择连接状态"
           />
         </QueryBarItem>
       </template>
@@ -156,18 +140,15 @@ const getData = async (params) => {
         createTime: item.created_at,
         updateTime: item.updated_at
       }))
-      return {
-        items,
-        total: res.total
-      }
+      return { data: items, total: res.total }
     } else {
       $message.error(res.msg || '获取数据失败')
-      return { items: [], total: 0 }
+      return { data: [], total: 0 }
     }
   } catch (error) {
     console.error('获取数据库连接列表失败', error)
     $message.error('获取数据库连接列表失败')
-    return { items: [], total: 0 }
+    return { data: [], total: 0 }
   }
 }
 
@@ -404,8 +385,10 @@ const handleTest = async (row) => {
     const res = await api.testConn({ id: row.id, password })
     if (res.code === 200) {
       $message.success(res.msg || `连接 ${row.name} 测试成功`)
+      $table.value?.handleSearch()
     } else {
       $message.error(res.msg || `连接 ${row.name} 测试失败`)
+      $table.value?.handleSearch()
     }
   } catch (error) {
     console.error('测试连接失败', error)

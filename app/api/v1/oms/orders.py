@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from app.core.dependency import AuthControl
 from app.models.admin import AuditLog, User
 from app.schemas.base import Fail, Success
-from app.schemas.oms import UpdateAuditTimeBatchIn, DeleteBatchIn
+from app.schemas.oms import UpdateAuditTimeBatchIn, DeleteBatchIn, RestoreLogicalIn
 from app.services.order_service import order_service
 
 logger = logging.getLogger(__name__)
@@ -33,9 +33,9 @@ async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
         new_time: datetime = body.audit_time
 
         try:
-            old_map = await db_connector.fetch_orders_audit_time(ids)
-            affected = await db_connector.update_orders_audit_time(ids, new_time)
-            new_map = await db_connector.fetch_orders_audit_time(ids)
+            old_map = await order_service.fetch_audit_time_map(ids)
+            affected = await order_service.update_audit_time_batch(ids, new_time)
+            new_map = await order_service.fetch_audit_time_map(ids)
         except Exception as e:
             logger.error(f"执行更新失败: {e}")
             return Fail(code=500, msg=f"执行失败: {str(e)}")
@@ -172,6 +172,47 @@ async def delete_physical_batch(req: Request, body: DeleteBatchIn):
                 logger.warning(f"审计日志记录失败: {e}")
 
         return Success(data={"success_count": success_count, "failed_ids": failed_ids})
+    except Exception as e:
+        logger.error(f"接口异常: {e}")
+        return Fail(code=500, msg="服务异常")
+
+
+@router.post("/restore_logical", summary="订单逻辑删除恢复")
+async def restore_logical(req: Request, body: RestoreLogicalIn):
+    """恢复被逻辑删除的订单"""
+    try:
+        try:
+            await order_service.restore_logical(order_id=body.order_id, operator_id=body.operator_id)
+        except Exception as e:
+            logger.error(f"恢复失败: {e}")
+            return Fail(code=500, msg=f"执行失败: {str(e)}")
+
+        try:
+            token = req.headers.get("token")
+            user_obj: User = None
+            if token:
+                user_obj = await AuthControl.is_authed(token)
+            user_id = user_obj.id if user_obj else 0
+            username = user_obj.username if user_obj else ""
+        except Exception:
+            user_id = 0
+            username = ""
+
+        try:
+            await AuditLog.create(
+                user_id=user_id,
+                username=username,
+                module="OMS",
+                summary=f"订单逻辑删除恢复: id={body.order_id}, 操作人={body.operator_id}",
+                method="POST",
+                path="/api/v1/oms/orders/restore_logical",
+                status=200,
+                response_time=0,
+            )
+        except Exception as e:
+            logger.warning(f"审计日志记录失败: {e}")
+
+        return Success(msg="OK")
     except Exception as e:
         logger.error(f"接口异常: {e}")
         return Fail(code=500, msg="服务异常")
