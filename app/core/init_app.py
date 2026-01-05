@@ -86,7 +86,11 @@ async def init_database(app: FastAPI):
             aerich_exists = False
 
         if aerich_exists:
-            await command.upgrade(run_in_transaction=True)
+            try:
+                await command.upgrade(run_in_transaction=True)
+            except Exception as e:
+                logger.warning(f"迁移升级失败，改为同步模型: {e}")
+                await Tortoise.generate_schemas()
         else:
             try:
                 table_check = await conn.execute_query_dict(

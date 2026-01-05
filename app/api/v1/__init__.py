@@ -11,7 +11,7 @@ from .roles import roles_router
 from .tasks import tasks_router
 from .users import users_router
 from .oplog import oplog_router
-from .oms import router as oms_router
+from .oms import oms_router
 
 v1_router = APIRouter()
 

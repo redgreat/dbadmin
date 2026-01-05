@@ -2,7 +2,6 @@ from typing import Dict, Optional, List, Any, Tuple
 from tortoise import connections
 import asyncpg
 import aiomysql
-from app.settings.database import DYNAMIC_CONNECTIONS, get_dynamic_connection
 from app.log import logger
 
 
@@ -17,29 +16,25 @@ class DBConnectionManager:
         """
         根据连接ID获取数据库连接
         """
-        connection_name = await get_dynamic_connection(conn_id)
-        if connection_name:
-            try:
-                return connections.get(connection_name)
-            except KeyError:
-                logger.error(f"连接 {connection_name} 不存在")
-                return None
-        return None
+        try:
+            return connections.get(f"conn_{conn_id}")
+        except KeyError:
+            logger.error(f"连接 conn_{conn_id} 不存在")
+            return None
     
     @staticmethod
     def get_connection_info(conn_id: int) -> Optional[Dict[str, Any]]:
         """
         获取连接信息
         """
-        connection_name = f"conn_{conn_id}"
-        return DYNAMIC_CONNECTIONS.get(connection_name)
+        return None
     
     @staticmethod
     def list_all_connections() -> Dict[str, Dict[str, Any]]:
         """
         列出所有动态连接
         """
-        return DYNAMIC_CONNECTIONS.copy()
+        return {}
     
     @staticmethod
     async def execute_query(conn_id: int, sql: str, params: Optional[List] = None) -> List[Dict]:
