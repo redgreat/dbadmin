@@ -329,7 +329,7 @@ const validateAddUser = {
 <template>
   <NLayout has-sider wh-full>
     <NLayoutContent>
-      <CommonPage show-footer title="用户列表">
+      <CommonPage show-footer>
         <template #action>
           <NButton v-permission="'post/api/v1/user/create'" type="primary" @click="handleAdd">
             <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建用户

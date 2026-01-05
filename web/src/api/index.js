@@ -34,6 +34,9 @@ export default {
   refreshApi: (data = {}) => request.post('/api/refresh', data),
   // auditlog
   getAuditLogList: (params = {}) => request.get('/auditlog/list', { params }),
+  // oplog
+  getOpLogList: (params = {}) => request.get('/oplog/list', { params }),
+  createOpLog: (data = {}) => request.post('/oplog/create', data),
   // conn
   getConnList: (params = {}) => request.get('/conn/list', { params }),
   getConnById: (params = {}) => request.get('/conn/get', { params }),
@@ -46,4 +49,10 @@ export default {
   deleteOrdersLogicalBatch: (data = {}) => request.post('/oms/orders/delete_logical_batch', data),
   deleteOrdersPhysicalBatch: (data = {}) => request.post('/oms/orders/delete_physical_batch', data),
   restoreOrderLogical: (data = {}) => request.post('/oms/orders/restore_logical', data),
+  validateOrders: (data = {}) => request.post('/oms/validate-orders', data),
+  batchUpdateAuditTime: (data = {}) => request.post('/oms/batch-update-audit-time', data),
+  
+  // oms 订单删除相关API
+  validateOrdersForDelete: (data) => request.post('/oms/validate-orders-for-delete', data),
+  batchDeleteOrders: (data) => request.post('/oms/batch-delete-orders', data),
 }

@@ -1,6 +1,5 @@
 from typing import Dict, List, Optional, Tuple
 import re
-import asyncpg
 import aiomysql
 
 from app.services.db_pool import db_pool
@@ -13,7 +12,7 @@ class OrderService:
 
     async def fetch_audit_time_map(self, order_ids: List[str]) -> Dict[str, Optional[str]]:
         """根据订单Id获取审核时间（使用指定连接池）"""
-        pool = db_pool.get_pool()
+        pool = db_pool.get_pool(conn_id)
         if pool is None:
             raise ValueError("连接池不存在")
         ids_int = [int(x) for x in order_ids]
@@ -29,7 +28,7 @@ class OrderService:
 
     async def update_audit_time_batch(self, order_ids: List[str], new_time) -> int:
         """批量更新订单审核时间（使用指定连接池）"""
-        pool = db_pool.get_pool()
+        pool = db_pool.get_pool(conn_id)
         if pool is None:
             raise ValueError("连接池不存在")
         ids_int = [int(x) for x in order_ids]

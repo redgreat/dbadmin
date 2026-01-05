@@ -176,7 +176,7 @@ const columns = [
 
 <template>
   <!-- 业务页面 -->
-  <CommonPage show-footer title="API列表">
+  <CommonPage show-footer>
     <template #action>
       <div>
         <NButton

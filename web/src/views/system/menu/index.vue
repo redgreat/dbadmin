@@ -257,7 +257,7 @@ async function getTreeSelect() {
 
 <template>
   <!-- 业务页面 -->
-  <CommonPage show-footer title="菜单列表">
+  <CommonPage show-footer>
     <template #action>
       <NButton v-permission="'post/api/v1/menu/create'" type="primary" @click="handleClickAdd">
         <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建根菜单

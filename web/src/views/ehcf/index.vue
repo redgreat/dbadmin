@@ -1,5 +1,5 @@
 <template>
-  <CommonPage show-footer title="壹好车服">
+  <CommonPage show-footer>
     <template #action>
       <div>
         <n-button class="float-right mr-15" type="primary" @click="handleAdd">

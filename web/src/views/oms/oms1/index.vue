@@ -21,7 +21,7 @@ import { useMessage } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import api from '@/api'
 
-defineOptions({ name: '订单完成时间修改' })
+defineOptions({ name: '订单审核时间修改' })
 
 const message = useMessage()
 const formRef = ref(null)
@@ -62,7 +62,7 @@ const handleExecute = async () => {
   try {
     const payload = { order_ids: ids, audit_time: form.value.auditTime }
     const res = await api.updateOrdersAuditTimeBatch(payload)
-    if (res.code === 0) {
+    if (res.code === 200) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
       message.success(`执行成功：${success_count} 条${failed_ids.length ? `，失败 ${failed_ids.length} 条` : ''}`)
     } else {

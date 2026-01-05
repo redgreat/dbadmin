@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "dbadminn"
+name = "数据运维"
 version = "0.1.0"
 description = "数据库管理后台系统"
 authors = ["wangcw <rubygreat@msn.com>"]
@@ -29,6 +29,8 @@ asyncpg = "^0.29.0"
 aiomysql = "^0.2.0"
 requests = "^2.32.3"
 apscheduler = "^3.11.0"
+cryptography = "^45.0.3"
+pytz = "^2025.2"
 
 [tool.black]
 line-length = 120
@@ -42,11 +44,11 @@ priority = "primary"
 [tool.ruff]
 line-length = 120
 extend-select = [
-  # "I",    # isort
+#   "I",    # isort
 #   "B",    # flake8-bugbear
 #   "C4",   # flake8-comprehensions
 #   "PGH",  # pygrep-hooks
-  # "RUF",  # ruff
+#   "RUF",  # ruff
 #   "W",    # pycodestyle
 #   "YTT",  # flake8-2020
 ]

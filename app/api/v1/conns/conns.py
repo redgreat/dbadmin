@@ -17,17 +17,11 @@ async def list_connections(
     page: int = Query(1, description="页码"),
     page_size: int = Query(10, description="每页数量"),
     name: str = Query(None, description="连接名称"),
-    db_type: str = Query(None, description="数据库类型"),
-    status: bool = Query(None, description="连接状态"),
 ):
     """获取数据库连接列表"""
     q = Q()
     if name:
         q &= Q(name__contains=name)
-    if db_type:
-        q &= Q(db_type=db_type)
-    if status is not None:
-        q &= Q(status=status)
     
     total, conn_objs = await conn_controller.list(
         page=page, page_size=page_size, search=q, order=["-updated_at"]
@@ -112,27 +106,6 @@ async def test_connection(
     )
     
     if success:
-        try:
-            await conn_controller.update(id=conn_test.id, obj_in=DBConnectionUpdate(id=conn_test.id, status=True))
-        except Exception:
-            pass
-        try:
-            await db_pool.register_pool(
-                conn_id=conn_test.id,
-                db_type=conn_test.db_type,
-                host=conn_test.host,
-                port=conn_test.port,
-                username=conn_test.username,
-                password=conn_test.password,
-                database=conn_test.database,
-                params=conn_test.params,
-            )
-        except Exception:
-            pass
         return Success(msg=message)
     else:
-        try:
-            await conn_controller.update(id=conn_test.id, obj_in=DBConnectionUpdate(id=conn_test.id, status=False))
-        except Exception:
-            pass
         return Fail(code=400, msg=message)

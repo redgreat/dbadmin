@@ -243,7 +243,7 @@ async function updateRoleAuthorized() {
 </script>
 
 <template>
-  <CommonPage show-footer title="角色列表">
+  <CommonPage show-footer>
     <template #action>
       <NButton v-permission="'post/api/v1/role/create'" type="primary" @click="handleAdd">
         <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建角色
