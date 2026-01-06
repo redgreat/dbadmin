@@ -45,6 +45,9 @@
         :model="modalForm"
         :rules="rules"
       >
+        <n-form-item label="数据库类型" path="dbType">
+          <n-select v-model:value="modalForm.dbType" :options="dbTypeOptions" placeholder="请选择数据库类型" />
+        </n-form-item>
         <n-form-item label="连接名称" path="name">
           <n-input v-model:value="modalForm.name" clearable placeholder="请输入连接名称" />
         </n-form-item>
@@ -82,7 +85,7 @@
 </template>
 
 <script setup>
-import { h, onMounted, ref, resolveDirective } from 'vue'
+import { h, onMounted, ref, resolveDirective, watch } from 'vue'
 import { NButton, NTag, NSpace } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
@@ -480,4 +483,20 @@ const handleRefresh = () => {
 onMounted(() => {
   $table.value?.handleSearch()
 })
+
+watch(
+  () => modalForm.value?.dbType,
+  (val, old) => {
+    if (!modalForm.value) return
+    if (val === 'mysql') {
+      if (!modalForm.value.port || modalForm.value.port === 5432) {
+        modalForm.value.port = 3306
+      }
+    } else if (val === 'postgresql') {
+      if (!modalForm.value.port || modalForm.value.port === 3306) {
+        modalForm.value.port = 5432
+      }
+    }
+  }
+)
 </script>

@@ -55,4 +55,14 @@ export default {
   // oms 订单删除相关API
   validateOrdersForDelete: (data) => request.post('/oms/validate-orders-for-delete', data),
   batchDeleteOrders: (data) => request.post('/oms/batch-delete-orders', data),
+  // simiccid
+  simiccidUpload: (formData) =>
+    request.post('/sim/simiccid/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  simiccidProcess: (data = {}) => request.post('/sim/simiccid/process', data),
+  simiccidSubmit: (formData) =>
+    request.post('/sim/simiccid/submit', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 }
