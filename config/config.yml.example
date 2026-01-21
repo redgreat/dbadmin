@@ -1,0 +1,67 @@
+# 数据运维系统配置文件
+
+# 应用配置
+app:
+  title: "数据运维"
+  version: "0.1.0"
+  description: "数据库管理后台"
+  debug: false
+  secret_key: "c25c221efe5c15c58e723b671e38961d04865d9659548b898346bdd3162736a3"
+  db_password_salt: "dbadmin_salt_v1"
+
+# 服务器配置
+server:
+  host: "0.0.0.0"
+  port: 8090
+  workers: 1
+  log_level: "info"
+
+# JWT 配置
+jwt:
+  algorithm: "HS256"
+  access_token_expire_minutes: 10080  # 7天
+
+# 数据库配置
+database:
+  # 系统管理数据库（默认连接）
+  admin:
+    engine: "postgres"  # postgres, mysql, sqlite
+    host: "localhost"
+    port: 5432
+    user: "postgres"
+    password: "your_password"
+    database: "dbadmin"
+    min_size: 2
+    max_size: 10
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(levelprefix)s %(message)s"
+  directory: "./log"
+  rotation: "50 MB"
+  retention: 5
+
+# CORS 配置
+cors:
+  origins:
+    - "*"
+  allow_credentials: true
+  allow_methods:
+    - "*"
+  allow_headers:
+    - "*"
+
+# 前端配置
+frontend:
+  title: "数据运维"
+  port: 5180
+  api_base_url: "/api"
+
+# Nginx 配置（用于生产环境）
+nginx:
+  enabled: true
+  listen_port: 80
+  server_name: "localhost"
+  static_root: "/opt/dbadmin/web/dist"
+  api_proxy_pass: "http://127.0.0.1:8090"

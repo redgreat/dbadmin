@@ -1,0 +1,46 @@
+services:
+  dbadmin:
+    build:
+      context: .
+      dockerfile: DockerfileLocal
+    image: dbadmin:local
+    container_name: dbadmin
+    hostname: dbadmin
+    restart: unless-stopped
+    environment:
+      - PYTHONPATH=/opt/dbadmin
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+      - LANG=zh_CN.UTF-8
+    volumes:
+      - ./log:/opt/dbadmin/log:rw
+      - ./config/config.yml:/opt/dbadmin/config/config.yml:ro
+    ports:
+      - "8091:80"
+    networks:
+      - dbadmin-network
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:8091/ || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  dbadmin-network:
+    driver: bridge

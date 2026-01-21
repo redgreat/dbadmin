@@ -1,4 +1,14 @@
+"""
+开发环境启动脚本
+"""
 import uvicorn
+from app.core.config_loader import get_config
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8090, reload=True, log_config="uvicorn_loggin_config.json")
+    config = get_config()
+    uvicorn.run(
+        "app:app",
+        host=config.server.host,
+        port=config.server.port,
+        reload=True,
+    )
