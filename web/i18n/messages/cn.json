@@ -30,7 +30,13 @@
     "conn": {
       "label_conn": "连接管理",
       "label_conn_manage": "数据库连接"
-    },    "profile": {
+    },
+    "tool": {
+      "label_tool": "数据库工具",
+      "label_excelimp": "Excel临时表生成",
+      "label_formatter": "SQL格式化"
+    },
+    "profile": {
       "label_profile": "个人中心",
       "label_modify_information": "修改信息",
       "label_change_password": "修改密码",

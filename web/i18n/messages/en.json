@@ -31,7 +31,13 @@
     "conn": {
       "label_conn": "Connection Management",
       "label_conn_manage": "Database Connections"
-    },    "profile": {
+    },
+    "tool": {
+      "label_tool": "Database Tools",
+      "label_excelimp": "Excel Temp Table Generator",
+      "label_formatter": "SQL Formatter"
+    },
+    "profile": {
       "label_profile": "Profile",
       "label_modify_information": "Modify your information",
       "label_change_password": "Change password",

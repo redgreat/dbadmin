@@ -199,6 +199,47 @@ async def init_menus():
             ),
         ]
         await Menu.bulk_create(children_menu)
+        
+        # 数据库工具
+        tool_catalog = await Menu.create(
+            menu_type=MenuType.CATALOG,
+            name="数据库工具",
+            path="/tools",
+            order=2,
+            parent_id=0,
+            icon="mdi:tools",
+            is_hidden=False,
+            component="Layout",
+            keepalive=False,
+            redirect="/tools/excelimp",
+        )
+        await Menu.bulk_create(
+            [
+                Menu(
+                    menu_type=MenuType.MENU,
+                    name="Excel临时表生成",
+                    path="excelimp",
+                    order=1,
+                    parent_id=tool_catalog.id,
+                    icon="mdi:file-excel-outline",
+                    is_hidden=False,
+                    component="/tool/excelimp",
+                    keepalive=False,
+                ),
+                Menu(
+                    menu_type=MenuType.MENU,
+                    name="SQL格式化",
+                    path="formatter",
+                    order=2,
+                    parent_id=tool_catalog.id,
+                    icon="mdi:code-braces",
+                    is_hidden=False,
+                    component="/tool/formatter",
+                    keepalive=False,
+                ),
+            ]
+        )
+        
         # 连接管理
         conn_catalog = await Menu.create(
             menu_type=MenuType.CATALOG,
@@ -391,6 +432,55 @@ async def init_menus():
                 ),
             ]
         )
+    
+    # 确保"数据库工具"菜单存在
+    try:
+        tool_catalog = await Menu.filter(path="/tools").first()
+        if not tool_catalog:
+            tool_catalog = await Menu.create(
+                menu_type=MenuType.CATALOG,
+                name="数据库工具",
+                path="/tools",
+                order=2,
+                parent_id=0,
+                icon="mdi:tools",
+                is_hidden=False,
+                component="Layout",
+                keepalive=False,
+                redirect="/tools/excelimp",
+            )
+        
+        # 确保Excel临时表生成菜单存在
+        exists_excelimp = await Menu.filter(parent_id=tool_catalog.id, component="/tool/excelimp").exists()
+        if not exists_excelimp:
+            await Menu.create(
+                menu_type=MenuType.MENU,
+                name="Excel临时表生成",
+                path="excelimp",
+                order=1,
+                parent_id=tool_catalog.id,
+                icon="mdi:file-excel-outline",
+                is_hidden=False,
+                component="/tool/excelimp",
+                keepalive=False,
+            )
+        
+        # 确保SQL格式化菜单存在
+        exists_formatter = await Menu.filter(parent_id=tool_catalog.id, component="/tool/formatter").exists()
+        if not exists_formatter:
+            await Menu.create(
+                menu_type=MenuType.MENU,
+                name="SQL格式化",
+                path="formatter",
+                order=2,
+                parent_id=tool_catalog.id,
+                icon="mdi:code-braces",
+                is_hidden=False,
+                component="/tool/formatter",
+                keepalive=False,
+            )
+    except Exception:
+        pass
 
 
 async def init_apis():

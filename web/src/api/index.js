@@ -65,4 +65,12 @@ export default {
     request.post('/sim/simiccid/submit', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  simiccidProgress: (params = {}) => request.get('/sim/simiccid/progress', { params }),
+  // tool - excelimp
+  generateExcelSql: (formData) =>
+    request.post('/tool/excelimp/generate', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  // tool - formatter
+  formatSql: (data) => request.post('/tool/formatter/format', data),
 }
