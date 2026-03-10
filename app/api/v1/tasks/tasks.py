@@ -13,7 +13,7 @@ from app.schemas.task import (
     TaskUpdate,
 )
 
-router = APIRouter()
+router = APIRouter(tags=["定时任务"])
 
 
 @router.get("/", response_model=TaskList, summary="获取任务列表")

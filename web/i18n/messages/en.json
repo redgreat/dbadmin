@@ -35,7 +35,11 @@
     "tool": {
       "label_tool": "Database Tools",
       "label_excelimp": "Excel Temp Table Generator",
-      "label_formatter": "SQL Formatter"
+      "label_formatter": "SQL Formatter",
+      "imptask": {
+        "label_imptask": "Import Tasks",
+        "label_imptask_list": "Task List"
+      }
     },
     "profile": {
       "label_profile": "Profile",

@@ -3,57 +3,132 @@ Excel导入服务 - 从Excel文件生成SQL语句
 """
 from io import BytesIO
 from datetime import datetime, date
-from typing import List, Tuple, Any, Literal
+from typing import List, Tuple, Any, Literal, Dict, Optional
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
 from pypinyin import lazy_pinyin, Style
+import uuid
+
+# 进度存储
+_PROGRESS: Dict[str, Dict[str, Any]] = {}
+
+
+def _progress_start(stamp: str, filename: str):
+    """开始任务"""
+    _PROGRESS[stamp] = {
+        "file": filename,
+        "stage": "parsing",
+        "total": 0,
+        "current": 0,
+        "message": "开始解析Excel文件",
+        "success": False,
+        "sql": None,
+    }
+
+
+def _progress_update(stamp: str, **kwargs):
+    """更新进度"""
+    if stamp in _PROGRESS:
+        _PROGRESS[stamp].update(kwargs)
+
+
+def _progress_fail(stamp: str, message: str):
+    """失败"""
+    _progress_update(stamp, stage="failed", message=message, success=False)
+
+
+def _progress_done(stamp: str, sql: str):
+    """完成"""
+    _progress_update(
+        stamp, stage="done", message="SQL生成完成", success=True, sql=sql
+    )
+
+
+def get_progress(stamp: str) -> Dict[str, Any]:
+    """获取进度"""
+    return _PROGRESS.get(stamp, {"stage": "", "message": ""})
+
+
+async def submit_and_generate(
+    file_bytes: bytes, filename: str, db_type: str, stamp: Optional[str] = None
+) -> str:
+    """异步生成SQL"""
+    if stamp is None:
+        stamp = str(uuid.uuid4())
+
+    _progress_start(stamp, filename)
+
+    try:
+        # 更新进度：解析文件
+        _progress_update(
+            stamp, stage="parsing", message="正在解析Excel文件..."
+        )
+
+        # 生成SQL
+        sql_result = generate_sql(file_bytes, filename, db_type)
+
+        # 更新进度：生成SQL
+        _progress_update(
+            stamp, stage="generating", message="正在生成SQL语句..."
+        )
+
+        # 完成
+        _progress_done(stamp, sql_result)
+
+    except Exception as e:
+        _progress_fail(stamp, str(e))
+
+    return stamp
 
 
 def generate_sql(content: bytes, filename: str, db_type: Literal["mysql", "postgresql"]) -> str:
     """
     从Excel文件内容生成SQL语句
-    
+
     参数:
         content: Excel文件内容（字节）
         filename: 原始文件名
         db_type: 数据库类型（mysql或postgresql）
-    
+
     返回:
         生成的SQL语句字符串
     """
     # 解析Excel文件
     workbook = openpyxl.load_workbook(BytesIO(content), data_only=True)
     sheet = workbook.active
-    
+
     if not sheet:
         raise ValueError("Excel文件中没有找到工作表")
-    
+
     # 提取列名和数据行
     columns, data_rows = _parse_sheet(sheet)
-    
+
     if not columns:
         raise ValueError("Excel文件中没有找到列名（第一行）")
-    
+
     if not data_rows:
         raise ValueError("Excel文件中没有找到数据行")
-    
-    # 生成英文字段名
-    field_names = _generate_field_names(columns)
-    
+
+    # 生成英文字段名和主键名称
+    field_names, primary_key_name = _generate_field_names(columns)
+
     # 推断数据类型
     field_types = _infer_field_types(data_rows, db_type)
-    
+
     # 生成带时间戳的表名
     table_name = _generate_table_name()
-    
+
     # 生成CREATE TABLE语句
-    create_table_sql = _generate_create_table(table_name, field_names, field_types, db_type)
-    
+    create_table_sql = _generate_create_table(table_name, field_names, field_types, db_type, primary_key_name)
+
     # 生成INSERT语句
     insert_sql = _generate_insert_statements(table_name, field_names, data_rows, db_type)
-    
+
+    # 生成索引语句
+    index_sql = _generate_index_statements(table_name, field_names, db_type, primary_key_name)
+
     # 合并所有SQL语句
-    return f"{create_table_sql}\n\n{insert_sql}"
+    return f"{create_table_sql}\n\n{insert_sql}\n\n{index_sql}"
 
 
 def _parse_sheet(sheet: Worksheet) -> Tuple[List[str], List[List[Any]]]:
@@ -82,36 +157,52 @@ def _parse_sheet(sheet: Worksheet) -> Tuple[List[str], List[List[Any]]]:
     return columns, data_rows
 
 
-def _generate_field_names(columns: List[str]) -> List[str]:
+def _generate_field_names(columns: List[str]) -> Tuple[List[str], str]:
     """
     从列名生成有效的SQL字段名
     将中文字符转换为拼音，确保符合SQL标识符规范
     通过添加数字后缀处理重复字段名
+
+    返回:
+        元组 (字段名列表, 主键名称)
     """
     field_names = []
     seen = {}
-    
+
+    # 确定主键名称
+    primary_key_name = "id"
+    counter = 1
+    while primary_key_name in [c.lower() for c in columns]:
+        primary_key_name = f"id_{counter}"
+        counter += 1
+    # 同时检查已生成的字段名
+    for col in columns:
+        field_name = _convert_to_sql_identifier(col.strip())
+        if field_name and field_name.lower() == primary_key_name.lower():
+            primary_key_name = f"id_{counter}"
+            counter += 1
+
     for col in columns:
         col = col.strip()
-        
+
         # 将中文字符转换为拼音
         field_name = _convert_to_sql_identifier(col)
-        
+
         # 如果转换后为空，使用默认名称
         if not field_name:
             field_name = f"column_{len(field_names) + 1}"
-        
+
         # 通过添加数字后缀处理重复字段名
         original_name = field_name
-        counter = 1
+        name_counter = 1
         while field_name in seen:
-            field_name = f"{original_name}_{counter}"
-            counter += 1
-        
+            field_name = f"{original_name}_{name_counter}"
+            name_counter += 1
+
         seen[field_name] = True
         field_names.append(field_name)
-    
-    return field_names
+
+    return field_names, primary_key_name
 
 
 def _convert_to_sql_identifier(text: str) -> str:
@@ -328,23 +419,65 @@ def _generate_table_name() -> str:
     return f"tmp_{timestamp}"
 
 
+def _generate_index_statements(
+    table_name: str,
+    field_names: List[str],
+    db_type: Literal["mysql", "postgresql"],
+    primary_key_name: str
+) -> str:
+    """
+    生成索引语句（在数据导入后执行）
+    为所有非主键字段生成索引
+    """
+    if not field_names:
+        return ""
+
+    index_statements = []
+
+    # 为每个字段生成索引
+    for i, field_name in enumerate(field_names):
+        # 跳过主键字段（虽然主键不应该在field_names中，但为了安全起见）
+        if field_name.lower() == primary_key_name.lower():
+            continue
+
+        # 生成索引名
+        index_name = f"idx_{table_name}_{field_name}"
+        # 确保索引名长度不超过数据库限制（MySQL 64字符，PostgreSQL 63字符）
+        if len(index_name) > 60:
+            index_name = f"idx_{table_name[:30]}_{field_name[:20]}"
+
+        index_statements.append(f"CREATE INDEX {index_name} ON {table_name} ({field_name});")
+
+    return "\n".join(index_statements)
+
+
 def _generate_create_table(
     table_name: str,
     field_names: List[str],
     field_types: List[str],
-    db_type: Literal["mysql", "postgresql"]
+    db_type: Literal["mysql", "postgresql"],
+    primary_key_name: str
 ) -> str:
     """
     生成CREATE TABLE语句
     """
     field_definitions = []
+
+    # 添加自增主键
+    if db_type == "mysql":
+        field_definitions.append(f"  {primary_key_name} BIGINT NOT NULL AUTO_INCREMENT")
+    else:  # postgresql
+        field_definitions.append(f"  {primary_key_name} BIGSERIAL PRIMARY KEY")
+
+    # 添加其他字段
     for name, type_ in zip(field_names, field_types):
         field_definitions.append(f"  {name} {type_}")
-    
+
     fields_sql = ",\n".join(field_definitions)
-    
+
     if db_type == "mysql":
-        return f"CREATE TABLE {table_name} (\n{fields_sql}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+        # 移除字符集和排序规则设置
+        return f"CREATE TABLE {table_name} (\n{fields_sql},\n  PRIMARY KEY ({primary_key_name})\n) ENGINE=InnoDB;"
     else:  # postgresql
         return f"CREATE TABLE {table_name} (\n{fields_sql}\n);"
 

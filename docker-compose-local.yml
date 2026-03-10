@@ -1,6 +1,9 @@
 services:
   dbadmin:
-    image: redgreat/dbadmin:latest
+    build:
+      context: .
+      dockerfile: DockerfileLocal
+    image: dbadmin:local
     container_name: dbadmin
     hostname: dbadmin
     restart: unless-stopped
@@ -17,7 +20,7 @@ services:
     networks:
       - dbadmin-network
     healthcheck:
-      test: [ "CMD-SHELL", "curl -fsS http://localhost/ || exit 1" ]
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:8091/ || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3

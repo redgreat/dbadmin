@@ -19,6 +19,9 @@ db.sqlite3-wal
 /script
 .trae
 .kiro
+.arts
 /aiagent
 config/config.yml
 log/
+uploads/
+.codeartsdoer

@@ -30,15 +30,15 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
 # 设置时区
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 安装 Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    ln -s $POETRY_HOME/bin/poetry /usr/local/bin/poetry
+# 安装 Poetry - 使用国内镜像
+RUN pip install -i https://mirrors.aliyun.com/pypi/simple/ poetry==1.8.2
 
 # 复制项目依赖文件
 COPY pyproject.toml poetry.lock ./
 
-# 安装Python依赖
+# 安装Python依赖 - 使用国内镜像
 RUN poetry config virtualenvs.create false && \
+    poetry config repositories.pypi https://mirrors.aliyun.com/pypi/simple/ && \
     poetry install --no-root --only main -n
 
 # 复制项目文件

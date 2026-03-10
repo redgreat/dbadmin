@@ -3,3 +3,4 @@ from .admin import *
 from .task import *
 from .conn import *
 from .oplog import *
+from .imptask import *

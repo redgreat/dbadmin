@@ -1,5 +1,5 @@
 <template>
-  <CommonPage show-footer title="订单完成时间修改">
+  <CommonPage show-footer>
     <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" :label-width="100">
       <n-form-item label="订单Id" path="orderIds">
         <n-input v-model:value="form.orderIds" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单Id，逗号分隔" />

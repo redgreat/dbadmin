@@ -132,12 +132,7 @@ export const EMPTY_ROUTE = {
   component: null,
 }
 
-const modules = import.meta.glob('@/views/**/route.js', { eager: true })
-const asyncRoutes = []
-Object.keys(modules).forEach((key) => {
-  asyncRoutes.push(modules[key].default)
-})
-
+// 动态加载所有 Vue 组件，用于后端路由动态匹配
 const vueModules = import.meta.glob('@/views/**/index.vue')
 
-export { asyncRoutes, vueModules }
+export { vueModules }

@@ -71,6 +71,19 @@ export default {
     request.post('/tool/excelimp/generate', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  submitExcelSql: (formData) =>
+    request.post('/tool/excelimp/submit', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  getExcelProgress: (params) => request.get('/tool/excelimp/progress', { params }),
   // tool - formatter
   formatSql: (data) => request.post('/tool/formatter/format', data),
+  // imptask - Excel导入任务
+  getExcelImportTaskList: (params = {}) => request.get('/imptask/list', { params }),
+  getExcelImportTaskDetail: (id) => request.get(`/imptask/detail/${id}`),
+  createExcelImportTask: (formData) =>
+    request.post('/imptask/create', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  deleteExcelImportTask: (id) => request.delete(`/imptask/delete/${id}`),
 }
