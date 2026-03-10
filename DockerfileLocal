@@ -44,9 +44,6 @@ RUN poetry config virtualenvs.create false && \
 # 复制项目文件
 COPY . .
 
-# 复制本地构建好的前端文件
-COPY web/dist /opt/dbadmin/web/dist
-
 # Supervisor 配置（带 nginx）
 COPY deploy/supervisord_with_nginx.conf /etc/supervisor/supervisord.conf
 COPY deploy/app_supervisor_with_nginx.conf /etc/supervisor/conf.d/app.conf

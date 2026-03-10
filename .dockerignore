@@ -1,5 +1,73 @@
-web/node_modules
-run.py
-script
-.trae/
+# Git相关
+.git
+.gitignore
 .github
+
+# IDE和编辑器
+.vscode
+.idea
+.trae
+.arts
+.kiro
+.codeartsdoer
+*.swp
+*.swo
+*~
+
+# 前端开发文件
+web/node_modules
+web/src
+web/public
+web/.env.development
+web/.env.production
+web/package.json
+web/package-lock.json
+web/pnpm-lock.yaml
+web/vite.config.js
+web/unocss.config.js
+web/jsconfig.json
+web/.eslint*
+web/.prettier*
+web/README.md
+web/stats.html
+web/build
+
+# Python缓存
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist-info
+
+# 测试和文档
+tests
+.pytest_cache
+.coverage
+htmlcov
+*.md
+LICENSE
+
+# 脚本和工具
+script
+Makefile
+docker-compose-local.yml
+
+# 日志和临时文件
+log
+*.log
+uploads
+nul
+*.tmp
+
+# Docker相关
+Dockerfile
+DockerfileLocal
+docker-compose.yml
+docker-compose-local.yml
+.dockerignore
+
+# 其他不需要的文件
+.DS_Store
+Thumbs.db
