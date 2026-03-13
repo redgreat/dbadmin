@@ -65,3 +65,11 @@ nginx:
   server_name: "localhost"
   static_root: "/opt/dbadmin/web/dist"
   api_proxy_pass: "http://127.0.0.1:8090"
+
+# 报表配置
+report:
+  report_dir: "./uploads/reports"
+  max_rows_per_sheet: 500000
+  max_sheets_per_file: 2
+  page_size: 1000
+  file_expire_days: 30

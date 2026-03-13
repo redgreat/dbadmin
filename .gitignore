@@ -25,3 +25,4 @@ config/config.yml
 log/
 uploads/
 .codeartsdoer
+docs

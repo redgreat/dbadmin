@@ -15,6 +15,7 @@ from .oms import oms_router
 from .sim import sim_router
 from .tool import tool_router
 from .imptask import router as imptask_router
+from .report import report_router
 
 v1_router = APIRouter()
 
@@ -31,3 +32,4 @@ v1_router.include_router(oms_router, prefix="/oms", tags=["订单运维"], depen
 v1_router.include_router(sim_router, prefix="/sim", tags=["SIM卡中心"], dependencies=[DependPermisson])
 v1_router.include_router(tool_router, prefix="/tool", tags=["日常工具"])
 v1_router.include_router(imptask_router, prefix="/imptask", tags=["Excel导入任务"])
+v1_router.include_router(report_router, prefix="/report", tags=["报表管理"], dependencies=[DependPermisson])

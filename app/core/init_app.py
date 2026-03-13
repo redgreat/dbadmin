@@ -521,8 +521,6 @@ async def reinit_tortoise_with_dynamic_connections():
 
 
 async def init_app(app: FastAPI):
-    register_routers(app)
-    register_exceptions(app)
     await init_database(app)
     await init_superuser()
     await init_menus()

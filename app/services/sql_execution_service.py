@@ -1,0 +1,132 @@
+from typing import List, Dict, Any, Optional, Tuple
+import asyncpg
+import aiomysql
+from app.models.conn import DBConnection
+from app.services.db_pool import db_pool
+from app.log import logger
+
+
+class SQLExecutionService:
+    """SQL执行服务"""
+
+    @staticmethod
+    async def get_connection(db_conn: DBConnection):
+        """
+        获取数据库连接
+        """
+        try:
+            if db_conn.db_type == "mysql":
+                conn = await aiomysql.connect(
+                    host=db_conn.host,
+                    port=db_conn.port,
+                    user=db_conn.username,
+                    password=db_conn.password,
+                    db=db_conn.database,
+                    charset='utf8mb4'
+                )
+                return conn
+            elif db_conn.db_type == "postgresql":
+                conn = await asyncpg.connect(
+                    host=db_conn.host,
+                    port=db_conn.port,
+                    user=db_conn.username,
+                    password=db_conn.password,
+                    database=db_conn.database
+                )
+                return conn
+            else:
+                raise ValueError(f"不支持的数据库类型: {db_conn.db_type}")
+        except Exception as e:
+            logger.error(f"获取数据库连接失败: {str(e)}")
+            raise
+
+    @staticmethod
+    async def execute_query(
+        db_conn: DBConnection,
+        sql: str,
+        offset: int = 0,
+        limit: int = 1000
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        执行SQL查询（分页）
+        :param db_conn: 数据库连接对象
+        :param sql: SQL语句
+        :param offset: 偏移量
+        :param limit: 限制数量
+        :return: (数据列表, 总数)
+        """
+        conn = None
+        try:
+            conn = await SQLExecutionService.get_connection(db_conn)
+
+            if db_conn.db_type == "mysql":
+                # MySQL查询
+                async with conn.cursor(aiomysql.DictCursor) as cursor:
+                    # 获取总数
+                    count_sql = f"SELECT COUNT(*) as total FROM ({sql}) as count_table"
+                    await cursor.execute(count_sql)
+                    count_result = await cursor.fetchone()
+                    total = count_result['total']
+
+                    # 获取数据
+                    data_sql = f"{sql} LIMIT {offset}, {limit}"
+                    await cursor.execute(data_sql)
+                    rows = await cursor.fetchall()
+
+                    return list(rows), total
+
+            elif db_conn.db_type == "postgresql":
+                # PostgreSQL查询
+                # 获取总数
+                count_sql = f"SELECT COUNT(*) as total FROM ({sql}) as count_table"
+                count_result = await conn.fetchrow(count_sql)
+                total = count_result['total']
+
+                # 获取数据
+                data_sql = f"{sql} OFFSET {offset} LIMIT {limit}"
+                rows = await conn.fetch(data_sql)
+
+                # 转换为字典列表
+                result = [dict(row) for row in rows]
+                return result, total
+
+            else:
+                raise ValueError(f"不支持的数据库类型: {db_conn.db_type}")
+
+        except Exception as e:
+            logger.error(f"执行SQL查询失败: {str(e)}")
+            raise
+        finally:
+            if conn:
+                await conn.close()
+
+    @staticmethod
+    async def get_total_count(db_conn: DBConnection, sql: str) -> int:
+        """
+        获取SQL查询的总数
+        """
+        conn = None
+        try:
+            conn = await SQLExecutionService.get_connection(db_conn)
+
+            if db_conn.db_type == "mysql":
+                async with conn.cursor(aiomysql.DictCursor) as cursor:
+                    count_sql = f"SELECT COUNT(*) as total FROM ({sql}) as count_table"
+                    await cursor.execute(count_sql)
+                    result = await cursor.fetchone()
+                    return result['total']
+
+            elif db_conn.db_type == "postgresql":
+                count_sql = f"SELECT COUNT(*) as total FROM ({sql}) as count_table"
+                result = await conn.fetchrow(count_sql)
+                return result['total']
+
+            else:
+                raise ValueError(f"不支持的数据库类型: {db_conn.db_type}")
+
+        except Exception as e:
+            logger.error(f"获取总数失败: {str(e)}")
+            raise
+        finally:
+            if conn:
+                await conn.close()

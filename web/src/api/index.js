@@ -86,4 +86,16 @@ export default {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   deleteExcelImportTask: (id) => request.delete(`/imptask/delete/${id}`),
+
+  // report - 报表管理
+  getReportConfigList: (params = {}) => request.get('/report/config/list', { params }),
+  getReportConfigDetail: (params = {}) => request.get('/report/config/detail', { params }),
+  createReportConfig: (data = {}) => request.post('/report/config/create', data),
+  updateReportConfig: (data = {}) => request.post('/report/config/update', data),
+  deleteReportConfig: (params = {}) => request.delete('/report/config/delete', { params }),
+  getSystemNameOptions: (params = {}) => request.get('/report/options/systems', { params }),
+  generateReport: (data = {}) => request.post('/report/generate', data),
+  getReportGenerationList: (params = {}) => request.get('/report/generation/list', { params }),
+  downloadReport: (params = {}) => request.get('/report/generation/download', { params, responseType: 'blob' }),
+  deleteReportGeneration: (params = {}) => request.delete('/report/generation/delete', { params }),
 }

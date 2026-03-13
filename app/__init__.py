@@ -50,10 +50,13 @@ def create_app() -> FastAPI:
             {"name": "SIM卡中心", "description": "SIM卡管理相关接口,包括ICCID导入、特殊预警客户等"},
             {"name": "订单运维", "description": "订单中心运维相关接口,包括订单时间修改、订单删除等"},
             {"name": "运维日志", "description": "运维日志记录相关接口"},
+            {"name": "报表管理", "description": "报表配置和生成相关接口"},
         ],
         middleware=make_middlewares(),
         lifespan=lifespan,
     )
+    register_routers(app)
+    register_exceptions(app)
     return app
 
 

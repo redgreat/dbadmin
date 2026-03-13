@@ -84,6 +84,15 @@ class NginxConfig(BaseModel):
     api_proxy_pass: str = "http://127.0.0.1:8090"
 
 
+class ReportConfig(BaseModel):
+    """报表配置"""
+    report_dir: str = "./uploads/reports"
+    max_rows_per_sheet: int = 500000
+    max_sheets_per_file: int = 2
+    page_size: int = 1000
+    file_expire_days: int = 30
+
+
 class Config(BaseModel):
     """统一配置模型"""
     app: AppConfig
@@ -94,6 +103,7 @@ class Config(BaseModel):
     cors: CORSConfig
     frontend: FrontendConfig
     nginx: NginxConfig
+    report: ReportConfig
 
 
 class ConfigLoader:
