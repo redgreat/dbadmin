@@ -22,8 +22,7 @@ class ExcelExportService:
     MAX_SHEETS_PER_FILE = config.report.max_sheets_per_file
     PAGE_SIZE = config.report.page_size
 
-    @staticmethod
-    async def export_report(generation_id: int):
+    async def export_report(self, generation_id: int):
         """
         导出报表主流程
         :param generation_id: 报表生成记录ID
@@ -39,7 +38,8 @@ class ExcelExportService:
             # 获取报表配置
             config = generation.report_config
             if not config:
-                await ExcelExportService._update_generation_status(
+                logger.error("报表配置不存在")
+                await self._update_generation_status(
                     generation,
                     "failed",
                     error_msg="报表配置不存在"
@@ -49,7 +49,8 @@ class ExcelExportService:
             # 获取数据库连接
             db_conn = await DBConnection.get_or_none(id=config.db_connection_id)
             if not db_conn:
-                await ExcelExportService._update_generation_status(
+                logger.error("数据库连接不存在")
+                await self._update_generation_status(
                     generation,
                     "failed",
                     error_msg="数据库连接不存在"
@@ -70,7 +71,7 @@ class ExcelExportService:
             }
 
             # 执行导出
-            file_path = await ExcelExportService._execute_export(
+            file_path = await self._execute_export(
                 generation=generation,
                 db_conn=db_conn,
                 sql=config.sql_statement
@@ -93,14 +94,17 @@ class ExcelExportService:
         except Exception as e:
             logger.error(f"报表导出失败: {str(e)}", exc_info=True)
             if generation:
-                await ExcelExportService._update_generation_status(
-                    generation,
-                    "failed",
-                    error_msg=str(e)
-                )
+                try:
+                    await self._update_generation_status(
+                        generation,
+                        "failed",
+                        error_msg=str(e)
+                    )
+                except Exception as update_error:
+                    logger.error(f"更新状态失败: {str(update_error)}")
 
-    @staticmethod
     async def _execute_export(
+        self,
         generation: ReportGeneration,
         db_conn: DBConnection,
         sql: str
@@ -117,13 +121,13 @@ class ExcelExportService:
             raise ValueError("查询结果为空，无法导出")
 
         # 计算需要的sheet数和文件数
-        total_sheets = (total_count + ExcelExportService.MAX_ROWS_PER_SHEET - 1) // ExcelExportService.MAX_ROWS_PER_SHEET
-        total_files = (total_sheets + ExcelExportService.MAX_SHEETS_PER_FILE - 1) // ExcelExportService.MAX_SHEETS_PER_FILE
+        total_sheets = (total_count + self.MAX_ROWS_PER_SHEET - 1) // self.MAX_ROWS_PER_SHEET
+        total_files = (total_sheets + self.MAX_SHEETS_PER_FILE - 1) // self.MAX_SHEETS_PER_FILE
 
         logger.info(f"需要 {total_sheets} 个sheet, {total_files} 个文件")
 
         # 创建文件存储目录
-        file_dir = ExcelExportService._get_file_dir()
+        file_dir = self._get_file_dir()
         os.makedirs(file_dir, exist_ok=True)
 
         # 生成的文件列表
@@ -140,10 +144,10 @@ class ExcelExportService:
         try:
             while current_row < total_count:
                 # 判断是否需要创建新文件
-                if current_sheet % ExcelExportService.MAX_SHEETS_PER_FILE == 0:
+                if current_sheet % self.MAX_SHEETS_PER_FILE == 0:
                     # 保存上一个文件
                     if wb:
-                        file_path = await ExcelExportService._save_workbook(
+                        file_path = self._save_workbook(
                             wb,
                             file_dir,
                             generation.report_name,
@@ -162,12 +166,12 @@ class ExcelExportService:
                 logger.info(f"创建第 {current_sheet} 个sheet")
 
                 # 写入数据到当前sheet
-                rows_written, headers = await ExcelExportService._write_data_to_sheet(
+                rows_written, headers = await self._write_data_to_sheet(
                     ws=ws,
                     db_conn=db_conn,
                     sql=sql,
                     offset=current_row,
-                    limit=ExcelExportService.MAX_ROWS_PER_SHEET,
+                    limit=self.MAX_ROWS_PER_SHEET,
                     headers=headers
                 )
 
@@ -176,7 +180,7 @@ class ExcelExportService:
 
             # 保存最后一个文件
             if wb:
-                file_path = await ExcelExportService._save_workbook(
+                file_path = self._save_workbook(
                     wb,
                     file_dir,
                     generation.report_name,
@@ -208,8 +212,8 @@ class ExcelExportService:
                     os.remove(file_path)
             raise
 
-    @staticmethod
     async def _write_data_to_sheet(
+        self,
         ws,
         db_conn: DBConnection,
         sql: str,
@@ -222,7 +226,8 @@ class ExcelExportService:
         :return: (写入的行数, 表头列表)
         """
         rows_written = 0
-        batch_size = ExcelExportService.PAGE_SIZE
+        batch_size = self.PAGE_SIZE
+        original_headers = None  # 原始字段名，用于数据获取
 
         # 分批查询并写入
         while rows_written < limit:
@@ -242,12 +247,25 @@ class ExcelExportService:
 
             # 写入表头（仅第一次）
             if rows_written == 0 and headers is None:
-                headers = list(data[0].keys())
+                original_headers = list(data[0].keys())
+                # 处理重复字段名，第二个及以后的重名字段添加_2, _3等后缀
+                seen = {}
+                unique_headers = []
+                for h in original_headers:
+                    if h in seen:
+                        seen[h] += 1
+                        unique_headers.append(f"{h}_{seen[h]}")
+                    else:
+                        seen[h] = 1
+                        unique_headers.append(h)
+                headers = unique_headers
                 ws.append(headers)
+            elif original_headers is None:
+                original_headers = list(data[0].keys())
 
-            # 写入数据行
+            # 写入数据行（使用原始字段名获取数据）
             for row in data:
-                ws.append([row.get(header) for header in headers])
+                ws.append([row.get(h) for h in original_headers])
 
             rows_written += len(data)
 
@@ -257,8 +275,8 @@ class ExcelExportService:
 
         return rows_written, headers
 
-    @staticmethod
-    async def _save_workbook(
+    def _save_workbook(
+        self,
         wb: Workbook,
         file_dir: str,
         report_name: str,
@@ -273,8 +291,7 @@ class ExcelExportService:
         logger.info(f"保存Excel文件: {file_path}")
         return file_path
 
-    @staticmethod
-    def _get_file_dir() -> str:
+    def _get_file_dir(self) -> str:
         """
         获取文件存储目录
         """
@@ -287,8 +304,8 @@ class ExcelExportService:
         )
         return dir_path
 
-    @staticmethod
     async def _update_generation_status(
+        self,
         generation: ReportGeneration,
         status: str,
         error_msg: Optional[str] = None
@@ -300,7 +317,7 @@ class ExcelExportService:
             generation.status = status
             generation.completed_at = datetime.now()
 
-            if error_msg and generation.execution_json:
+            if error_msg:
                 execution_log = generation.execution_json or {}
                 execution_log["error"] = error_msg
                 execution_log["end_time"] = datetime.now().isoformat()

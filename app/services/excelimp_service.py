@@ -525,8 +525,12 @@ def _format_value(val: Any) -> str:
     """
     格式化SQL INSERT语句的值
     处理: None, bool, int, float, date, datetime和字符串
+    空值（None或空字符串）统一返回NULL
     """
     if val is None:
+        return "NULL"
+    elif isinstance(val, str) and val.strip() == "":
+        # 空字符串统一返回NULL
         return "NULL"
     elif isinstance(val, bool):
         return "TRUE" if val else "FALSE"

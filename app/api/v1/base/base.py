@@ -52,7 +52,10 @@ async def login_access_token(credentials: CredentialsSchema):
 async def get_userinfo():
     user_id = CTX_USER_ID.get()
     user_obj = await user_controller.get(id=user_id)
-    data = await user_obj.to_dict(exclude_fields=["password"])
+    data = await user_obj.to_dict(m2m=True, exclude_fields=["password"])
+    # 将roles转换为角色名称列表
+    roles = data.get("roles", [])
+    data["roles"] = [role.get("name") for role in roles]
     return Success(data=data)
 
 

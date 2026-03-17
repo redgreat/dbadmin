@@ -23,6 +23,6 @@ db.sqlite3-wal
 /aiagent
 config/config.yml
 log/
-uploads/
+data/
 .codeartsdoer
 docs

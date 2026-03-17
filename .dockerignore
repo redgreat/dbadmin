@@ -57,7 +57,6 @@ docker-compose-local.yml
 # 日志和临时文件
 log
 *.log
-uploads
 nul
 *.tmp
 
@@ -71,3 +70,6 @@ docker-compose-local.yml
 # 其他不需要的文件
 .DS_Store
 Thumbs.db
+
+# 上传文件，docker本地测试最好注释掉
+# data

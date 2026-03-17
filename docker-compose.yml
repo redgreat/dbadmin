@@ -12,6 +12,7 @@ services:
     volumes:
       - ./log:/opt/dbadmin/log:rw
       - ./config/config.yml:/opt/dbadmin/config/config.yml:ro
+      - ./data:/opt/dbadmin/data:rw
     ports:
       - "8091:80"
     networks:

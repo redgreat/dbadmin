@@ -86,7 +86,7 @@ class NginxConfig(BaseModel):
 
 class ReportConfig(BaseModel):
     """报表配置"""
-    report_dir: str = "./uploads/reports"
+    report_dir: str = "./data/reports"
     max_rows_per_sheet: int = 500000
     max_sheets_per_file: int = 2
     page_size: int = 1000

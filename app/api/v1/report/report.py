@@ -84,9 +84,6 @@ async def create_config(
 ):
     """创建报表配置"""
     try:
-        # 判断是否为管理员
-        is_admin = "admin" in current_user.roles
-
         config = await ReportService.create_config(
             system_name=config_in.system_name,
             report_name=config_in.report_name,
@@ -110,16 +107,13 @@ async def update_config(
 ):
     """更新报表配置"""
     try:
-        # 判断是否为管理员
-        is_admin = "admin" in current_user.roles
-
         # 准备更新数据
         update_data = config_in.dict(exclude_unset=True, exclude={"id"})
 
         config = await ReportService.update_config(
             config_id=config_in.id,
             user=current_user.username,
-            is_admin=is_admin,
+            is_admin=current_user.is_superuser,
             **update_data
         )
 
@@ -140,13 +134,10 @@ async def delete_config(
 ):
     """删除报表配置"""
     try:
-        # 判断是否为管理员
-        is_admin = "admin" in current_user.roles
-
         await ReportService.delete_config(
             config_id=config_id,
             user=current_user.username,
-            is_admin=is_admin
+            is_admin=current_user.is_superuser
         )
 
         return Success(msg="删除成功")
@@ -203,7 +194,7 @@ async def generate_report(
 
         # 提交后台任务
         background_tasks.add_task(
-            ExcelExportService.export_report,
+            ExcelExportService().export_report,
             generation.id
         )
 

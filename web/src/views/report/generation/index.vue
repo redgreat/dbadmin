@@ -46,7 +46,7 @@
 </template>
 
 <script setup>
-import { h, ref, computed } from 'vue'
+import { h, ref, computed, onMounted } from 'vue'
 import { NButton, NTag, NSpace, NIcon, useMessage, useDialog } from 'naive-ui'
 import { useUserStore } from '@/store'
 
@@ -65,8 +65,8 @@ const $message = useMessage()
 const $dialog = useDialog()
 const userStore = useUserStore()
 
-// 判断是否为管理员
-const isAdmin = computed(() => userStore.role?.includes('admin'))
+// 判断是否为管理员（超级管理员或拥有admin角色）
+const isAdmin = computed(() => userStore.isSuperUser || userStore.role?.includes('admin'))
 
 // 状态选项
 const statusOptions = [
@@ -191,7 +191,7 @@ const getData = async (params) => {
 
 // 刷新数据
 const handleRefresh = () => {
-  $table.value?.refresh()
+  $table.value?.handleSearch()
 }
 
 // 下载报表
@@ -247,6 +247,11 @@ const handleDelete = (row) => {
     }
   })
 }
+
+onMounted(() => {
+  // 首次加载数据
+  $table.value?.handleSearch()
+})
 </script>
 
 <style scoped>

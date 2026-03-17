@@ -110,8 +110,8 @@ const $message = useMessage()
 const $dialog = useDialog()
 const userStore = useUserStore()
 
-// 判断是否为管理员
-const isAdmin = computed(() => userStore.role?.includes('admin'))
+// 判断是否为管理员（超级管理员或拥有admin角色）
+const isAdmin = computed(() => userStore.isSuperUser || userStore.role?.includes('admin'))
 
 // 系统名称选项
 const systemNameOptions = ref([])
@@ -251,12 +251,12 @@ const {
   doCreate: (data) => api.createReportConfig(data),
   doUpdate: (data) => api.updateReportConfig(data),
   doDelete: (data) => api.deleteReportConfig({ config_id: data.id }),
-  refresh: () => $table.value?.refresh()
+  refresh: () => $table.value?.handleSearch()
 })
 
 // 刷新数据
 const handleRefresh = () => {
-  $table.value?.refresh()
+  $table.value?.handleSearch()
 }
 
 // 显示SQL详情
@@ -318,5 +318,7 @@ const loadDBConnectionOptions = async () => {
 onMounted(() => {
   loadSystemNameOptions()
   loadDBConnectionOptions()
+  // 首次加载数据
+  $table.value?.handleSearch()
 })
 </script>

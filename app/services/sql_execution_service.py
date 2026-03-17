@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import asyncpg
 import aiomysql
 from app.models.conn import DBConnection
+from app.controllers.conn import conn_controller
 from app.services.db_pool import db_pool
 from app.log import logger
 
@@ -12,30 +13,35 @@ class SQLExecutionService:
     @staticmethod
     async def get_connection(db_conn: DBConnection):
         """
-        获取数据库连接
+        获取数据库连接（密码解密后使用）
         """
         try:
-            if db_conn.db_type == "mysql":
+            # 获取解密后的连接信息
+            conn_info = await conn_controller.get_decrypted_connection(db_conn.id)
+            if not conn_info:
+                raise ValueError("无法解密数据库连接密码，请重新保存连接配置")
+
+            if conn_info["db_type"] == "mysql":
                 conn = await aiomysql.connect(
-                    host=db_conn.host,
-                    port=db_conn.port,
-                    user=db_conn.username,
-                    password=db_conn.password,
-                    db=db_conn.database,
+                    host=conn_info["host"],
+                    port=conn_info["port"],
+                    user=conn_info["username"],
+                    password=conn_info["password"],
+                    db=conn_info["database"],
                     charset='utf8mb4'
                 )
                 return conn
-            elif db_conn.db_type == "postgresql":
+            elif conn_info["db_type"] == "postgresql":
                 conn = await asyncpg.connect(
-                    host=db_conn.host,
-                    port=db_conn.port,
-                    user=db_conn.username,
-                    password=db_conn.password,
-                    database=db_conn.database
+                    host=conn_info["host"],
+                    port=conn_info["port"],
+                    user=conn_info["username"],
+                    password=conn_info["password"],
+                    database=conn_info["database"]
                 )
                 return conn
             else:
-                raise ValueError(f"不支持的数据库类型: {db_conn.db_type}")
+                raise ValueError(f"不支持的数据库类型: {conn_info['db_type']}")
         except Exception as e:
             logger.error(f"获取数据库连接失败: {str(e)}")
             raise
@@ -58,6 +64,9 @@ class SQLExecutionService:
         conn = None
         try:
             conn = await SQLExecutionService.get_connection(db_conn)
+
+            # 移除SQL末尾的分号，避免语法错误
+            sql = sql.strip().rstrip(';')
 
             if db_conn.db_type == "mysql":
                 # MySQL查询
@@ -108,6 +117,9 @@ class SQLExecutionService:
         conn = None
         try:
             conn = await SQLExecutionService.get_connection(db_conn)
+
+            # 移除SQL末尾的分号，避免语法错误
+            sql = sql.strip().rstrip(';')
 
             if db_conn.db_type == "mysql":
                 async with conn.cursor(aiomysql.DictCursor) as cursor:
