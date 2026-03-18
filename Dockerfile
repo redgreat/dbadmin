@@ -9,10 +9,13 @@ WORKDIR /app
 RUN npm config set registry https://registry.npmjs.org
 
 # 复制前端源代码
-COPY web/ ./
+COPY web/package*.json ./
 
 # 安装依赖
 RUN npm install
+
+# 复制前端源代码
+COPY web/ ./
 
 # 构建前端
 RUN npm run build
