@@ -1,6 +1,6 @@
 services:
   dbadmin:
-    image: redgreat/dbadmin:latest
+    image: registry.cn-hangzhou.aliyuncs.com/redgreat/dbadmin:latest
     container_name: dbadmin
     hostname: dbadmin
     restart: unless-stopped
