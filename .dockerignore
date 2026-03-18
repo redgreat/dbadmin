@@ -16,21 +16,6 @@
 
 # 前端开发文件
 web/node_modules
-web/src
-web/public
-web/.env.development
-web/.env.production
-web/package.json
-web/package-lock.json
-web/pnpm-lock.yaml
-web/vite.config.js
-web/unocss.config.js
-web/jsconfig.json
-web/.eslint*
-web/.prettier*
-web/README.md
-web/stats.html
-web/build
 
 # Python缓存
 __pycache__
