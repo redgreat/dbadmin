@@ -26,7 +26,7 @@ database:
   # 系统管理数据库（默认连接）
   admin:
     engine: "postgres"  # postgres, mysql, sqlite
-    host: "localhost"
+    host: "host.docker.internal"  # Docker环境使用宿主机，本地开发改为localhost
     port: 5432
     user: "postgres"
     password: "your_password"

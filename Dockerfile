@@ -66,6 +66,9 @@ RUN poetry config virtualenvs.create false && \
 # 复制项目文件
 COPY . .
 
+# 如果 config.yml 不存在，从示例文件复制
+RUN if [ ! -f config/config.yml ]; then cp config/config.yml.example config/config.yml; fi
+
 # 从前端构建阶段复制构建产物
 COPY --from=frontend-builder /app/dist /opt/dbadmin/web/dist
 
