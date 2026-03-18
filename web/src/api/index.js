@@ -98,4 +98,12 @@ export default {
   getReportGenerationList: (params = {}) => request.get('/report/generation/list', { params }),
   downloadReport: (params = {}) => request.get('/report/generation/download', { params, responseType: 'blob' }),
   deleteReportGeneration: (params = {}) => request.delete('/report/generation/delete', { params }),
+  // dict - 字典管理
+  getDictList: (params = {}) => request.get('/dict/list', { params }),
+  getDictTree: (params = {}) => request.get('/dict/tree', { params }),
+  getDictOptions: (params = {}) => request.get('/dict/options', { params }),
+  getDictById: (params = {}) => request.get('/dict/get', { params }),
+  createDict: (data = {}) => request.post('/dict/create', data),
+  updateDict: (data = {}) => request.post('/dict/update', data),
+  deleteDict: (params = {}) => request.delete('/dict/delete', { params }),
 }

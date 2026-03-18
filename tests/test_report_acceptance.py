@@ -248,7 +248,7 @@ def test_file_structure():
         print_success("前端文件完整")
 
         # 检查上传目录
-        upload_dir = base_path / 'uploads' / 'reports'
+        upload_dir = base_path / 'data' / 'reports'
         assert upload_dir.exists(), "上传目录不存在"
         print_success(f"上传目录存在: {upload_dir}")
 

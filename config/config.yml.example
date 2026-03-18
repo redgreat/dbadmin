@@ -68,7 +68,7 @@ nginx:
 
 # 报表配置
 report:
-  report_dir: "./uploads/reports"
+  report_dir: "./data/reports"
   max_rows_per_sheet: 500000
   max_sheets_per_file: 2
   page_size: 1000

@@ -21,6 +21,12 @@ export function reqReject(error) {
 
 export function resResolve(response) {
   const { data, status, statusText } = response
+
+  // 如果是 Blob 类型响应，直接返回
+  if (data instanceof Blob) {
+    return Promise.resolve(data)
+  }
+
   if (data?.code !== 200) {
     const code = data?.code ?? status
     const message = resolveResError(code, data?.msg ?? statusText)

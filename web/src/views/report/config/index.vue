@@ -20,11 +20,12 @@
     >
       <template #queryBar>
         <QueryBarItem label="系统名称" :label-width="80">
-          <n-input
+          <n-select
             v-model:value="queryItems.system_name"
+            :options="systemNameOptions"
             clearable
-            type="text"
-            placeholder="请输入系统名称"
+            filterable
+            placeholder="请选择系统名称"
           />
         </QueryBarItem>
         <QueryBarItem label="报表名称" :label-width="80">
@@ -58,6 +59,8 @@
             v-model:value="modalForm.system_name"
             :options="systemNameOptions"
             placeholder="请选择系统名称"
+            filterable
+            :menu-props="{ style: { maxHeight: '300px' } }"
           />
         </n-form-item>
         <n-form-item label="报表名称" path="report_name">
@@ -207,7 +210,14 @@ const columns = [
 // 表单规则
 const rules = {
   system_name: { required: true, message: '请选择系统名称', trigger: 'blur' },
-  report_name: { required: true, message: '请输入报表名称', trigger: 'blur' },
+  report_name: [
+    { required: true, message: '请输入报表名称', trigger: 'blur' },
+    {
+      pattern: /^[^\/\\:*?"<>|]+$/,
+      message: '报表名称不能包含 / \\ : * ? " < > | 等特殊字符',
+      trigger: 'blur'
+    }
+  ],
   sql_statement: { required: true, message: '请输入SQL语句', trigger: 'blur' },
   db_connection_id: { required: true, type: 'number', message: '请选择数据库连接', trigger: 'blur' }
 }

@@ -1,6 +1,7 @@
 from typing import Tuple, Optional, List
 from app.models.report import ReportConfig, ReportGeneration
 from app.models.conn import DBConnection
+from app.models.dict import Dict
 from app.log import logger
 
 
@@ -169,12 +170,12 @@ class ReportService:
     @staticmethod
     async def get_system_name_options() -> List[str]:
         """
-        获取系统名称选项列表
+        获取系统名称选项列表（从字典表获取）
         """
-        # 后台代码写死，后续改为从字典表获取
-        return [
-            "仓储中心",
-            "订单中心",
-            "SIM卡中心",
-            "壹好车服"
-        ]
+        # 从字典表获取应用系统（yyxt_1）
+        dicts = await Dict.filter(
+            parent_code='yyxt_1',
+            deleted=False
+        ).order_by('created_at')
+        
+        return [dict_item.name for dict_item in dicts]

@@ -16,11 +16,15 @@ class SQLExecutionService:
         获取数据库连接（密码解密后使用）
         """
         try:
+            logger.info(f"获取解密连接信息, db_conn.id: {db_conn.id}")
             # 获取解密后的连接信息
             conn_info = await conn_controller.get_decrypted_connection(db_conn.id)
+            logger.info(f"解密连接信息: {conn_info is not None}")
             if not conn_info:
                 raise ValueError("无法解密数据库连接密码，请重新保存连接配置")
 
+            logger.info(f"连接类型: {conn_info['db_type']}, 主机: {conn_info['host']}")
+            
             if conn_info["db_type"] == "mysql":
                 conn = await aiomysql.connect(
                     host=conn_info["host"],
@@ -30,6 +34,7 @@ class SQLExecutionService:
                     db=conn_info["database"],
                     charset='utf8mb4'
                 )
+                logger.info("MySQL连接成功")
                 return conn
             elif conn_info["db_type"] == "postgresql":
                 conn = await asyncpg.connect(
@@ -39,6 +44,7 @@ class SQLExecutionService:
                     password=conn_info["password"],
                     database=conn_info["database"]
                 )
+                logger.info("PostgreSQL连接成功")
                 return conn
             else:
                 raise ValueError(f"不支持的数据库类型: {conn_info['db_type']}")
@@ -75,7 +81,7 @@ class SQLExecutionService:
                     count_sql = f"SELECT COUNT(*) as total FROM ({sql}) as count_table"
                     await cursor.execute(count_sql)
                     count_result = await cursor.fetchone()
-                    total = count_result['total']
+                    total = count_result['total'] if count_result else 0
 
                     # 获取数据
                     data_sql = f"{sql} LIMIT {offset}, {limit}"
@@ -89,7 +95,7 @@ class SQLExecutionService:
                 # 获取总数
                 count_sql = f"SELECT COUNT(*) as total FROM ({sql}) as count_table"
                 count_result = await conn.fetchrow(count_sql)
-                total = count_result['total']
+                total = count_result['total'] if count_result else 0
 
                 # 获取数据
                 data_sql = f"{sql} OFFSET {offset} LIMIT {limit}"
@@ -107,7 +113,7 @@ class SQLExecutionService:
             raise
         finally:
             if conn:
-                await conn.close()
+                conn.close()
 
     @staticmethod
     async def get_total_count(db_conn: DBConnection, sql: str) -> int:
@@ -126,11 +132,15 @@ class SQLExecutionService:
                     count_sql = f"SELECT COUNT(*) as total FROM ({sql}) as count_table"
                     await cursor.execute(count_sql)
                     result = await cursor.fetchone()
+                    if result is None:
+                        return 0
                     return result['total']
 
             elif db_conn.db_type == "postgresql":
                 count_sql = f"SELECT COUNT(*) as total FROM ({sql}) as count_table"
                 result = await conn.fetchrow(count_sql)
+                if result is None:
+                    return 0
                 return result['total']
 
             else:
@@ -141,4 +151,4 @@ class SQLExecutionService:
             raise
         finally:
             if conn:
-                await conn.close()
+                conn.close()

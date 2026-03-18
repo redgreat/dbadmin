@@ -5,3 +5,4 @@ from .conn import *
 from .oplog import *
 from .imptask import *
 from .report import *
+from .dict import *

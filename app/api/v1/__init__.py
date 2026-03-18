@@ -6,6 +6,7 @@ from .apis import apis_router
 from .auditlog import auditlog_router
 from .base import base_router
 from .conns import conns_router
+from .dicts import dicts_router
 from .menus import menus_router
 from .roles import roles_router
 from .tasks import tasks_router
@@ -27,6 +28,7 @@ v1_router.include_router(apis_router, prefix="/api", tags=["接口管理"], depe
 v1_router.include_router(auditlog_router, prefix="/auditlog", tags=["审计日志"], dependencies=[DependPermisson])
 v1_router.include_router(tasks_router, prefix="/task", tags=["定时任务"], dependencies=[DependPermisson])
 v1_router.include_router(conns_router, prefix="/conn", tags=["连接管理"], dependencies=[DependPermisson])
+v1_router.include_router(dicts_router, prefix="/dict", tags=["字典管理"], dependencies=[DependPermisson])
 v1_router.include_router(oplog_router, prefix="/oplog", tags=["运维日志"], dependencies=[DependPermisson])
 v1_router.include_router(oms_router, prefix="/oms", tags=["订单运维"], dependencies=[DependPermisson])
 v1_router.include_router(sim_router, prefix="/sim", tags=["SIM卡中心"], dependencies=[DependPermisson])

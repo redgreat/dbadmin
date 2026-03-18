@@ -17,11 +17,12 @@
     >
       <template #queryBar>
         <QueryBarItem label="系统名称" :label-width="80">
-          <n-input
+          <n-select
             v-model:value="queryItems.system_name"
+            :options="systemNameOptions"
             clearable
-            type="text"
-            placeholder="请输入系统名称"
+            filterable
+            placeholder="请选择系统名称"
           />
         </QueryBarItem>
         <QueryBarItem label="报表名称" :label-width="80">
@@ -30,14 +31,6 @@
             clearable
             type="text"
             placeholder="请输入报表名称"
-          />
-        </QueryBarItem>
-        <QueryBarItem label="报表状态" :label-width="80">
-          <n-select
-            v-model:value="queryItems.status"
-            :options="statusOptions"
-            clearable
-            placeholder="请选择状态"
           />
         </QueryBarItem>
       </template>
@@ -67,6 +60,9 @@ const userStore = useUserStore()
 
 // 判断是否为管理员（超级管理员或拥有admin角色）
 const isAdmin = computed(() => userStore.isSuperUser || userStore.role?.includes('admin'))
+
+// 系统名称选项
+const systemNameOptions = ref([])
 
 // 状态选项
 const statusOptions = [
@@ -248,7 +244,20 @@ const handleDelete = (row) => {
   })
 }
 
+// 加载系统名称选项
+const loadSystemNameOptions = async () => {
+  try {
+    const res = await api.getSystemNameOptions()
+    if (res.code === 200) {
+      systemNameOptions.value = res.data
+    }
+  } catch (error) {
+    console.error('获取系统名称选项失败', error)
+  }
+}
+
 onMounted(() => {
+  loadSystemNameOptions()
   // 首次加载数据
   $table.value?.handleSearch()
 })

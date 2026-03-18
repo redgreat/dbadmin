@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 import openpyxl
 from openpyxl.workbook.workbook import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from app.models.report import ReportGeneration, ReportConfig
 from app.models.conn import DBConnection
 from app.services.sql_execution_service import SQLExecutionService
@@ -29,14 +31,19 @@ class ExcelExportService:
         """
         generation = None
         try:
+            logger.info(f"开始导出报表, generation_id: {generation_id}")
+            
             # 获取生成记录
             generation = await ReportGeneration.get_or_none(id=generation_id).prefetch_related("report_config")
             if not generation:
                 logger.error(f"报表生成记录不存在: {generation_id}")
                 return
 
+            logger.info(f"获取到生成记录: {generation.report_name}")
+
             # 获取报表配置
-            config = generation.report_config
+            config = await generation.report_config
+            logger.info(f"获取报表配置: {config}")
             if not config:
                 logger.error("报表配置不存在")
                 await self._update_generation_status(
@@ -46,8 +53,11 @@ class ExcelExportService:
                 )
                 return
 
+            logger.info(f"报表配置: {config.report_name}")
+
             # 获取数据库连接
-            db_conn = await DBConnection.get_or_none(id=config.db_connection_id)
+            db_conn = await config.db_connection
+            logger.info(f"获取数据库连接: {db_conn}")
             if not db_conn:
                 logger.error("数据库连接不存在")
                 await self._update_generation_status(
@@ -56,6 +66,8 @@ class ExcelExportService:
                     error_msg="数据库连接不存在"
                 )
                 return
+
+            logger.info(f"数据库连接: {db_conn.name}")
 
             # 记录执行日志
             execution_log = {
@@ -113,7 +125,10 @@ class ExcelExportService:
         执行导出逻辑
         :return: 生成的文件路径
         """
+        logger.info(f"_execute_export 开始, sql长度: {len(sql)}")
+        
         # 获取总数
+        logger.info("开始获取总数...")
         total_count = await SQLExecutionService.get_total_count(db_conn, sql)
         logger.info(f"报表 {generation.report_name} 总数据量: {total_count}")
 
@@ -140,6 +155,7 @@ class ExcelExportService:
         wb = None
         ws = None
         headers = None
+        sheet_data = []  # 存储当前sheet的数据
 
         try:
             while current_row < total_count:
@@ -155,18 +171,20 @@ class ExcelExportService:
                         )
                         file_list.append(file_path)
 
-                    # 创建新工作簿
-                    wb = openpyxl.Workbook(write_only=True)
+                    # 创建新工作簿（普通模式，支持样式）
+                    wb = openpyxl.Workbook()
+                    wb.remove(wb.active)  # 删除默认sheet
                     current_file += 1
                     logger.info(f"创建第 {current_file} 个Excel文件")
 
                 # 创建新sheet
                 ws = wb.create_sheet(title=f"Sheet{current_sheet + 1}")
                 current_sheet += 1
+                sheet_data = []  # 重置sheet数据
                 logger.info(f"创建第 {current_sheet} 个sheet")
 
-                # 写入数据到当前sheet
-                rows_written, headers = await self._write_data_to_sheet(
+                # 收集数据到当前sheet
+                rows_written, headers = await self._collect_data_to_sheet(
                     ws=ws,
                     db_conn=db_conn,
                     sql=sql,
@@ -190,7 +208,8 @@ class ExcelExportService:
 
             # 如果有多个文件，压缩成ZIP
             if len(file_list) > 1:
-                zip_path = os.path.join(file_dir, f"{generation.report_name}.zip")
+                safe_name = generation.report_name.replace('/', '_').replace('\\', '_').replace(':', '_')
+                zip_path = os.path.join(file_dir, f"{safe_name}.zip")
                 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                     for file_path in file_list:
                         zipf.write(file_path, os.path.basename(file_path))
@@ -212,7 +231,7 @@ class ExcelExportService:
                     os.remove(file_path)
             raise
 
-    async def _write_data_to_sheet(
+    async def _collect_data_to_sheet(
         self,
         ws,
         db_conn: DBConnection,
@@ -222,19 +241,18 @@ class ExcelExportService:
         headers: Optional[List[str]] = None
     ) -> tuple[int, List[str]]:
         """
-        写入数据到sheet
+        收集数据并写入sheet，应用样式美化
         :return: (写入的行数, 表头列表)
         """
         rows_written = 0
         batch_size = self.PAGE_SIZE
         original_headers = None  # 原始字段名，用于数据获取
+        all_data = []  # 收集所有数据
 
-        # 分批查询并写入
+        # 分批查询数据
         while rows_written < limit:
-            # 计算当前批次大小
             current_batch_size = min(batch_size, limit - rows_written)
 
-            # 查询数据
             data, _ = await SQLExecutionService.execute_query(
                 db_conn=db_conn,
                 sql=sql,
@@ -245,10 +263,10 @@ class ExcelExportService:
             if not data:
                 break
 
-            # 写入表头（仅第一次）
+            # 记录表头（仅第一次）
             if rows_written == 0 and headers is None:
                 original_headers = list(data[0].keys())
-                # 处理重复字段名，第二个及以后的重名字段添加_2, _3等后缀
+                # 处理重复字段名
                 seen = {}
                 unique_headers = []
                 for h in original_headers:
@@ -259,21 +277,110 @@ class ExcelExportService:
                         seen[h] = 1
                         unique_headers.append(h)
                 headers = unique_headers
-                ws.append(headers)
             elif original_headers is None:
                 original_headers = list(data[0].keys())
 
-            # 写入数据行（使用原始字段名获取数据）
-            for row in data:
-                ws.append([row.get(h) for h in original_headers])
-
+            all_data.extend(data)
             rows_written += len(data)
 
-            # 如果查询结果少于批次大小，说明数据已查完
             if len(data) < current_batch_size:
                 break
 
+        # 写入数据并应用样式
+        if headers and all_data:
+            self._write_with_styles(ws, headers, all_data, original_headers)
+
         return rows_written, headers
+
+    def _write_with_styles(
+        self,
+        ws,
+        headers: List[str],
+        data: List[Dict],
+        original_headers: List[str]
+    ):
+        """
+        写入数据并应用Excel样式美化
+        """
+        # 定义样式
+        header_font = Font(name='微软雅黑', size=12, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+        data_font = Font(name='微软雅黑', size=10)
+        data_alignment = Alignment(horizontal='left', vertical='center')
+
+        # 交替行颜色
+        odd_fill = PatternFill(start_color='D9E2F3', end_color='D9E2F3', fill_type='solid')  # 浅蓝
+        even_fill = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')  # 白色
+
+        # 边框
+        thin_border = Border(
+            left=Side(style='thin', color='B4C6E7'),
+            right=Side(style='thin', color='B4C6E7'),
+            top=Side(style='thin', color='B4C6E7'),
+            bottom=Side(style='thin', color='B4C6E7')
+        )
+
+        # 写入表头
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_idx, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+
+        # 写入数据行
+        for row_idx, row_data in enumerate(data, 2):
+            fill = odd_fill if row_idx % 2 == 0 else even_fill
+            for col_idx, h in enumerate(original_headers, 1):
+                value = row_data.get(h)
+                # None值显示为空字符串
+                if value is None:
+                    value = ''
+                cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                cell.font = data_font
+                cell.fill = fill
+                cell.alignment = data_alignment
+                cell.border = thin_border
+
+        # 自动调整列宽
+        self._auto_adjust_column_width(ws, headers, data, original_headers)
+
+        # 冻结首行
+        ws.freeze_panes = 'A2'
+
+        # 添加自动筛选
+        max_col = get_column_letter(len(headers))
+        ws.auto_filter.ref = f'A1:{max_col}{len(data) + 1}'
+
+    def _auto_adjust_column_width(
+        self,
+        ws,
+        headers: List[str],
+        data: List[Dict],
+        original_headers: List[str]
+    ):
+        """
+        自动调整列宽
+        """
+        for col_idx, header in enumerate(headers, 1):
+            max_length = len(str(header))
+            # 检查数据行，最多检查前100行
+            for row_data in data[:100]:
+                value = row_data.get(original_headers[col_idx - 1])
+                if value:
+                    # 中文字符算2个宽度
+                    cell_length = 0
+                    for char in str(value):
+                        if '\u4e00' <= char <= '\u9fff':
+                            cell_length += 2
+                        else:
+                            cell_length += 1
+                    max_length = max(max_length, cell_length)
+            # 设置列宽，最小8，最大50
+            adjusted_width = min(max(max_length + 2, 8), 50)
+            ws.column_dimensions[get_column_letter(col_idx)].width = adjusted_width
 
     def _save_workbook(
         self,
@@ -285,7 +392,9 @@ class ExcelExportService:
         """
         保存工作簿
         """
-        file_name = f"{report_name}_{file_index}.xlsx"
+        # 替换文件名中的非法字符
+        safe_name = report_name.replace('/', '_').replace('\\', '_').replace(':', '_')
+        file_name = f"{safe_name}_{file_index}.xlsx"
         file_path = os.path.join(file_dir, file_name)
         wb.save(file_path)
         logger.info(f"保存Excel文件: {file_path}")

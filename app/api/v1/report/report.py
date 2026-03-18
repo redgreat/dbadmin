@@ -193,10 +193,9 @@ async def generate_report(
         )
 
         # 提交后台任务
-        background_tasks.add_task(
-            ExcelExportService().export_report,
-            generation.id
-        )
+        async def run_export():
+            await ExcelExportService().export_report(generation.id)
+        background_tasks.add_task(run_export)
 
         logger.info(f"创建报表生成任务: {report_name}, ID: {generation.id}")
 
