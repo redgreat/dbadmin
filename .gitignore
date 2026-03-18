@@ -16,7 +16,7 @@ db.sqlite3-wal
 ._.DS_Store
 /app/settings/config.py
 /app/settings/database.py
-/script
+/scripts
 .trae
 .kiro
 .arts
