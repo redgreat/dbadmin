@@ -95,11 +95,24 @@ async def get_user_api():
         api_objs: list[Api] = await Api.all()
         apis = [api.method.lower() + api.path for api in api_objs]
         return Success(data=apis)
+    
+    # 获取用户的所有角色
     role_objs: list[Role] = await user_obj.roles
-    apis = []
+    # 获取所有角色的菜单
+    menu_ids = set()
     for role_obj in role_objs:
-        api_objs: list[Api] = await role_obj.apis
-        apis.extend([api.method.lower() + api.path for api in api_objs])
+        menus = await role_obj.menus
+        menu_ids.update([menu.id for menu in menus])
+    
+    # 通过菜单-API映射表获取API
+    from app.models.admin import MenuApi
+    menu_api_relations = await MenuApi.filter(menu_id__in=menu_ids).prefetch_related("api")
+    
+    apis = []
+    for relation in menu_api_relations:
+        if relation.api:
+            apis.append(relation.api.method.lower() + relation.api.path)
+    
     apis = list(set(apis))
     return Success(data=apis)
 

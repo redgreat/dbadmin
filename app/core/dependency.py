@@ -4,7 +4,7 @@ import jwt
 from fastapi import Depends, Header, HTTPException, Request
 
 from app.core.ctx import CTX_USER_ID
-from app.models import Role, User
+from app.models import MenuApi, Role, User
 from app.settings import settings
 
 
@@ -41,12 +41,37 @@ class PermissionControl:
         roles: list[Role] = await current_user.roles
         if not roles:
             raise HTTPException(status_code=403, detail="The user is not bound to a role")
-        apis = [await role.apis for role in roles]
-        permission_apis = list(set((api.method, api.path) for api in sum(apis, [])))
-        # path = "/api/v1/auth/userinfo"
-        # method = "GET"
+        
+        # 获取用户所有角色的菜单ID
+        menu_ids = set()
+        for role in roles:
+            role_menus = await role.menus.all()
+            for menu in role_menus:
+                menu_ids.add(menu.id)
+        
+        # 通过menu_api表获取菜单对应的API
+        if menu_ids:
+            menu_api_relations = await MenuApi.filter(menu_id__in=menu_ids).prefetch_related("api")
+            permission_apis = set()
+            for relation in menu_api_relations:
+                if relation.api:
+                    permission_apis.add((relation.api.method, relation.api.path))
+        else:
+            permission_apis = set()
+        
         if (method, path) not in permission_apis:
-            raise HTTPException(status_code=403, detail=f"Permission denied method:{method} path:{path}")
+            # 提供更详细的错误信息
+            from app.models.admin import Api
+            api_exists = await Api.filter(method=method, path=path).exists()
+            if not api_exists:
+                detail = f"API not found in database: {method} {path}. Please refresh API table."
+            elif not menu_ids:
+                detail = f"User has no menu permissions. Please assign menus to user's roles."
+            elif not permission_apis:
+                detail = f"Menus have no API mappings. Please configure menu-API relations in menu management."
+            else:
+                detail = f"Permission denied: {method} {path}. Please add this API to user's menu permissions."
+            raise HTTPException(status_code=403, detail=detail)
 
 
 DependAuth = Depends(AuthControl.is_authed)

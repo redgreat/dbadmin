@@ -25,7 +25,6 @@ class Role(BaseModel, TimestampMixin):
     name = fields.CharField(max_length=20, unique=True, description="角色名称", index=True)
     desc = fields.CharField(max_length=500, null=True, description="角色描述")
     menus = fields.ManyToManyField("models.Menu", related_name="role_menus")
-    apis = fields.ManyToManyField("models.Api", related_name="role_apis")
 
     class Meta:
         table = "role"
@@ -56,6 +55,17 @@ class Menu(BaseModel, TimestampMixin):
 
     class Meta:
         table = "menu"
+
+
+class MenuApi(BaseModel, TimestampMixin):
+    """菜单与API映射关系表"""
+    menu = fields.ForeignKeyField("models.Menu", related_name="menu_apis", description="菜单")
+    api = fields.ForeignKeyField("models.Api", related_name="api_menus", description="API")
+
+    class Meta:
+        table = "menu_api"
+        # 确保菜单-API组合唯一
+        unique_together = ("menu_id", "api_id")
 
 
 class AuditLog(BaseModel, TimestampMixin):

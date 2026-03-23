@@ -59,5 +59,5 @@ docker-compose-local.yml
 .DS_Store
 Thumbs.db
 
-# 上传文件，docker本地测试最好注释掉
-# data
+# 上传文件，docker本地需要
+data

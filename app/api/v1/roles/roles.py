@@ -69,5 +69,5 @@ async def get_role_authorized(id: int = Query(..., description="角色ID")):
 @router.post("/authorized", summary="更新角色权限")
 async def update_role_authorized(role_in: RoleUpdateMenusApis):
     role_obj = await role_controller.get(id=role_in.id)
-    await role_controller.update_roles(role=role_obj, menu_ids=role_in.menu_ids, api_infos=role_in.api_infos)
+    await role_controller.update_roles(role=role_obj, menu_ids=role_in.menu_ids)
     return Success(msg="Updated Successfully")

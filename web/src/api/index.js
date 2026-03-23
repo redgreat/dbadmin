@@ -26,6 +26,12 @@ export default {
   createMenu: (data = {}) => request.post('/menu/create', data),
   updateMenu: (data = {}) => request.post('/menu/update', data),
   deleteMenu: (params = {}) => request.delete('/menu/delete', { params }),
+  // menu-api mapping
+  getMenuApis: (params = {}) => request.get('/menu/api/list', { params }),
+  updateMenuApis: (data = {}) => request.post('/menu/api/update', data),
+  getAvailableApis: (params = {}) => request.get('/menu/api/available', { params }),
+  refreshMenuApiRelations: (mode = 'increment') => request.post('/menu/api/refresh', { mode }),
+  getRefreshMenuApiStatus: () => request.get('/menu/api/refresh/status'),
   // apis
   getApis: (params = {}) => request.get('/api/list', { params }),
   createApi: (data = {}) => request.post('/api/create', data),

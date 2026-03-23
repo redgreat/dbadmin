@@ -10,8 +10,6 @@ import {
   NTree,
   NDrawer,
   NDrawerContent,
-  NTabs,
-  NTabPane,
   NGrid,
   NGi,
 } from 'naive-ui'
@@ -57,35 +55,6 @@ const menuOption = ref([]) // 菜单选项
 const active = ref(false)
 const menu_ids = ref([])
 const role_id = ref(0)
-const apiOption = ref([])
-const api_ids = ref([])
-const apiTree = ref([])
-
-function buildApiTree(data) {
-  const processedData = []
-  const groupedData = {}
-
-  data.forEach((item) => {
-    const tags = item['tags']
-    const pathParts = item['path'].split('/')
-    const path = pathParts.slice(0, -1).join('/')
-    const summary = tags.charAt(0).toUpperCase() + tags.slice(1)
-    const unique_id = item['method'].toLowerCase() + item['path']
-    if (!(path in groupedData)) {
-      groupedData[path] = { unique_id: path, path: path, summary: summary, children: [] }
-    }
-
-    groupedData[path].children.push({
-      id: item['id'],
-      path: item['path'],
-      method: item['method'],
-      summary: item['summary'],
-      unique_id: unique_id,
-    })
-  })
-  processedData.push(...Object.values(groupedData))
-  return processedData
-}
 
 onMounted(() => {
   $table.value?.handleSearch()
@@ -177,25 +146,18 @@ const columns = [
               type: 'primary',
               onClick: async () => {
                 try {
-                  // 使用 Promise.all 来同时发送所有请求
-                  const [menusResponse, apisResponse, roleAuthorizedResponse] = await Promise.all([
+                  // 获取菜单列表和角色已有权限
+                  const [menusResponse, roleAuthorizedResponse] = await Promise.all([
                     api.getMenus({ page: 1, page_size: 9999 }),
-                    api.getApis({ page: 1, page_size: 9999 }),
                     api.getRoleAuthorized({ id: row.id }),
                   ])
 
-                  // 处理每个请求的响应
                   menuOption.value = menusResponse.data
-                  apiOption.value = buildApiTree(apisResponse.data)
                   menu_ids.value = roleAuthorizedResponse.data.menus.map((v) => v.id)
-                  api_ids.value = roleAuthorizedResponse.data.apis.map(
-                    (v) => v.method.toLowerCase() + v.path
-                  )
 
                   active.value = true
                   role_id.value = row.id
                 } catch (error) {
-                  // 错误处理
                   console.error('Error loading data:', error)
                 }
               },
@@ -213,32 +175,17 @@ const columns = [
 ]
 
 async function updateRoleAuthorized() {
-  const checkData = apiTree.value.getCheckedData()
-  const apiInfos = []
-  checkData &&
-    checkData.options.forEach((item) => {
-      if (!item.children) {
-        apiInfos.push({
-          path: item.path,
-          method: item.method,
-        })
-      }
-    })
+  // 只需要传递菜单ID，API权限会自动关联
   const { code, msg } = await api.updateRoleAuthorized({
     id: role_id.value,
     menu_ids: menu_ids.value,
-    api_infos: apiInfos,
   })
   if (code === 200) {
     $message?.success('设置成功')
+    active.value = false
   } else {
     $message?.error(msg)
   }
-
-  const result = await api.getRoleAuthorized({ id: role_id.value })
-  menu_ids.value = result.data.menus.map((v) => {
-    return v.id
-  })
 }
 </script>
 
@@ -300,14 +247,14 @@ async function updateRoleAuthorized() {
       </NForm>
     </CrudModal>
 
-    <NDrawer v-model:show="active" placement="right" :width="500"
-      ><NDrawerContent>
+    <NDrawer v-model:show="active" placement="right" :width="500">
+      <NDrawerContent>
         <NGrid x-gap="24" cols="12">
           <NGi span="8">
             <NInput
               v-model:value="pattern"
               type="text"
-              placeholder="筛选"
+              placeholder="筛选菜单"
               style="flex-grow: 1"
             ></NInput>
           </NGi>
@@ -320,42 +267,24 @@ async function updateRoleAuthorized() {
             >
           </NGi>
         </NGrid>
-        <NTabs>
-          <NTabPane name="menu" tab="菜单权限" display-directive="show">
-            <!-- TODO：级联 -->
-            <NTree
-              :data="menuOption"
-              :checked-keys="menu_ids"
-              :pattern="pattern"
-              :show-irrelevant-nodes="false"
-              key-field="id"
-              label-field="name"
-              checkable
-              :default-expand-all="true"
-              :block-line="true"
-              :selectable="false"
-              @update:checked-keys="(v) => (menu_ids = v)"
-            />
-          </NTabPane>
-          <NTabPane name="resource" tab="接口权限" display-directive="show">
-            <NTree
-              ref="apiTree"
-              :data="apiOption"
-              :checked-keys="api_ids"
-              :pattern="pattern"
-              :show-irrelevant-nodes="false"
-              key-field="unique_id"
-              label-field="summary"
-              checkable
-              :default-expand-all="true"
-              :block-line="true"
-              :selectable="false"
-              cascade
-              @update:checked-keys="(v) => (api_ids = v)"
-            />
-          </NTabPane>
-        </NTabs>
-        <template #header> 设置权限 </template>
+        <div class="mt-4 mb-2 text-gray-500">
+          提示：设置菜单权限后，对应的接口访问权限将自动关联
+        </div>
+        <NTree
+          :data="menuOption"
+          :checked-keys="menu_ids"
+          :pattern="pattern"
+          :show-irrelevant-nodes="false"
+          key-field="id"
+          label-field="name"
+          checkable
+          cascade
+          :default-expand-all="true"
+          :block-line="true"
+          :selectable="false"
+          @update:checked-keys="(v) => (menu_ids = v)"
+        />
+        <template #header> 设置菜单权限 </template>
       </NDrawerContent>
     </NDrawer>
   </CommonPage>
