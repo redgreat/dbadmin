@@ -17,6 +17,7 @@ from .sim import sim_router
 from .tool import tool_router
 from .imptask import router as imptask_router
 from .report import report_router
+from .wms import wms_router
 
 v1_router = APIRouter()
 
@@ -30,8 +31,9 @@ v1_router.include_router(tasks_router, prefix="/task", tags=["定时任务"], de
 v1_router.include_router(conns_router, prefix="/conn", tags=["连接管理"], dependencies=[DependPermisson])
 v1_router.include_router(dicts_router, prefix="/dict", tags=["字典管理"], dependencies=[DependPermisson])
 v1_router.include_router(oplog_router, prefix="/oplog", tags=["运维日志"], dependencies=[DependPermisson])
-v1_router.include_router(oms_router, prefix="/oms", tags=["订单运维"], dependencies=[DependPermisson])
+v1_router.include_router(oms_router, prefix="/oms", tags=["订单中心"], dependencies=[DependPermisson])
 v1_router.include_router(sim_router, prefix="/sim", tags=["SIM卡中心"], dependencies=[DependPermisson])
 v1_router.include_router(tool_router, prefix="/tool", tags=["日常工具"], dependencies=[DependPermisson])
 v1_router.include_router(imptask_router, prefix="/imptask", tags=["Excel导入任务"], dependencies=[DependPermisson])
 v1_router.include_router(report_router, prefix="/report", tags=["报表管理"], dependencies=[DependPermisson])
+v1_router.include_router(wms_router, prefix="/wms", tags=["仓储中心"], dependencies=[DependPermisson])

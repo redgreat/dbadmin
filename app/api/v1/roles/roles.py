@@ -61,8 +61,18 @@ async def delete_role(
 
 @router.get("/authorized", summary="查看角色权限")
 async def get_role_authorized(id: int = Query(..., description="角色ID")):
+    """
+    优化后的角色权限查询
+    只返回菜单ID列表，避免查询完整的菜单对象
+    """
     role_obj = await role_controller.get(id=id)
-    data = await role_obj.to_dict(m2m=True)
+    # 只获取菜单ID，不获取完整菜单对象
+    menus = await role_obj.menus.all().values_list('id', flat=True)
+    data = {
+        "id": role_obj.id,
+        "name": role_obj.name,
+        "menus": [{"id": menu_id} for menu_id in menus]
+    }
     return Success(data=data)
 
 

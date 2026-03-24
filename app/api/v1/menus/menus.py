@@ -19,18 +19,43 @@ async def list_menu(
     page: int = Query(1, description="页码"),
     page_size: int = Query(10, description="每页数量"),
 ):
-    async def get_menu_with_children(menu_id: int):
-        menu = await menu_controller.model.get(id=menu_id)
-        menu_dict = await menu.to_dict()
-        child_menus = await menu_controller.model.filter(parent_id=menu_id).order_by("order")
-        # 只有当有子菜单时才添加children字段
-        if child_menus:
-            menu_dict["children"] = [await get_menu_with_children(child.id) for child in child_menus]
-        return menu_dict
-
-    parent_menus = await menu_controller.model.filter(parent_id=0).order_by("order")
-    res_menu = [await get_menu_with_children(menu.id) for menu in parent_menus]
-    return SuccessExtra(data=res_menu, total=len(res_menu), page=page, page_size=page_size)
+    """
+    优化后的菜单列表查询
+    使用单次查询获取所有菜单，然后在内存中构建树形结构
+    """
+    import time
+    start_time = time.time()
+    
+    # 一次性获取所有菜单（避免N+1查询问题）
+    all_menus = await menu_controller.model.all().order_by("order")
+    query_time = time.time()
+    logger.debug(f"查询所有菜单耗时: {query_time - start_time:.3f}秒, 菜单数量: {len(all_menus)}")
+    
+    # 构建菜单字典，方便快速查找
+    menu_dict = {menu.id: await menu.to_dict() for menu in all_menus}
+    dict_time = time.time()
+    logger.debug(f"构建菜单字典耗时: {dict_time - query_time:.3f}秒")
+    
+    # 构建树形结构
+    root_menus = []
+    for menu in all_menus:
+        menu_data = menu_dict[menu.id]
+        if menu.parent_id == 0:
+            # 根菜单
+            root_menus.append(menu_data)
+        else:
+            # 子菜单，添加到父菜单的children中
+            parent = menu_dict.get(menu.parent_id)
+            if parent:
+                if "children" not in parent:
+                    parent["children"] = []
+                parent["children"].append(menu_data)
+    
+    build_time = time.time()
+    logger.debug(f"构建树形结构耗时: {build_time - dict_time:.3f}秒")
+    logger.info(f"菜单列表查询总耗时: {build_time - start_time:.3f}秒")
+    
+    return SuccessExtra(data=root_menus, total=len(root_menus), page=page, page_size=page_size)
 
 
 @router.get("/get", summary="查看菜单")

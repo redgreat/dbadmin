@@ -98,16 +98,21 @@ class Settings:
     @property
     def DB_PASSWORD_SALT(self) -> str:
         return self._config.app.db_password_salt
-    
+
     @property
     def SIM_CONN_ID(self) -> int:
         # 保持原有的硬编码值（可以后续移到配置文件）
         return 5
-    
+
     @property
     def ORDER_CONN_ID(self) -> int:
         # 保持原有的硬编码值（可以后续移到配置文件）
         return 4
+
+    @property
+    def WMS_CONN_ID(self) -> int:
+        # 仓储中心数据库连接ID（需要用户配置）
+        return 6
 
 
 settings = Settings()

@@ -112,4 +112,8 @@ export default {
   createDict: (data = {}) => request.post('/dict/create', data),
   updateDict: (data = {}) => request.post('/dict/update', data),
   deleteDict: (params = {}) => request.delete('/dict/delete', { params }),
+  // wms - 仓储中心
+  deleteWmsDocumentsLogicalBatch: (data = {}) => request.post('/wms/wms_curd/delete_logical_batch', data),
+  deleteWmsDocumentsPhysicalBatch: (data = {}) => request.post('/wms/wms_curd/delete_physical_batch', data),
+  restoreWmsDocumentLogical: (data = {}) => request.post('/wms/wms_curd/restore_logical', data),
 }
