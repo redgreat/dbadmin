@@ -31,7 +31,7 @@ class WmsService:
             params=conn["params"],
         )
 
-    async def delete_logical_batch(self, stock_ids: List[str]) -> Tuple[int, List[str]]:
+    async def delete_logical_batch(self, stock_ids: List[str], operator_id: str) -> Tuple[int, List[str]]:
         """批量逻辑删除单据（逐行调用存储过程）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(conn_id)
@@ -39,23 +39,21 @@ class WmsService:
             raise ValueError("连接池不存在")
         success = 0
         failed: List[str] = []
-        for did in stock_ids:
+        for stock_id in stock_ids:
             try:
-                stock_id = int(did)
                 if isinstance(pool, aiomysql.Pool):
                     async with pool.acquire() as conn:
                         async with conn.cursor() as cur:
-                            # 调用存储过程：逻辑删除单据，参数：stock_id
-                            # 注意：存储过程名称需要用户自己编写，例如：sp_wms_delete_document_logical
-                            await cur.execute("CALL sp_wms_delete_document_logical(%s)", (stock_id,))
+                            # 调用存储过程：逻辑删除单据，参数：stock_id, operator_id
+                            await cur.execute("CALL proc_DeleteStockInfoById(%s, %s)", (stock_id, operator_id))
                 else:
                     raise ValueError("不支持的连接池类型")
                 success += 1
             except Exception:
-                failed.append(str(did))
+                failed.append(str(stock_id))
         return success, failed
 
-    async def delete_physical_batch(self, stock_ids: List[str]) -> Tuple[int, List[str]]:
+    async def delete_physical_batch(self, stock_ids: List[str], operator_id: str) -> Tuple[int, List[str]]:
         """批量物理删除单据（逐行调用存储过程）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(conn_id)
@@ -63,23 +61,21 @@ class WmsService:
             raise ValueError("连接池不存在")
         success = 0
         failed: List[str] = []
-        for did in stock_ids:
+        for stock_id in stock_ids:
             try:
-                stock_id = int(did)
                 if isinstance(pool, aiomysql.Pool):
                     async with pool.acquire() as conn:
                         async with conn.cursor() as cur:
-                            # 调用存储过程：物理删除单据，参数：stock_id
-                            # 注意：存储过程名称需要用户自己编写，例如：sp_wms_delete_document_physical
-                            await cur.execute("CALL sp_wms_delete_document_physical(%s)", (stock_id,))
+                            # 调用存储过程：物理删除单据，参数：stock_id, operator_id
+                            await cur.execute("CALL proc_TruncateStockInfoById(%s, %s)", (stock_id, operator_id))
                 else:
                     raise ValueError("不支持的连接池类型")
                 success += 1
             except Exception:
-                failed.append(str(did))
+                failed.append(str(stock_id))
         return success, failed
 
-    async def restore_logical(self, stock_id: int, operator_id: int) -> bool:
+    async def restore_logical(self, stock_id: str, operator_id: str) -> bool:
         """恢复逻辑删除的单据"""
         await self._ensure_pool()
         pool = db_pool.get_pool(conn_id)
@@ -89,8 +85,7 @@ class WmsService:
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     # 调用存储过程：恢复单据，参数：stock_id, operator_id
-                    # 注意：存储过程名称需要用户自己编写，例如：sp_wms_restore_document
-                    await cur.execute("CALL sp_wms_restore_document(%s, %s)", (stock_id, operator_id))
+                    await cur.execute("CALL proc_ReDeleteStockInfoById(%s, %s)", (stock_id, operator_id))
                     return True
         raise ValueError("不支持的连接池类型")
 

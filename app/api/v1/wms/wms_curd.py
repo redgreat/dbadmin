@@ -14,20 +14,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/delete_logical_batch", summary="按单据Id批量逻辑删除")
+@router.post("/wms_curd/delete_logical_batch", summary="按单据Id批量逻辑删除")
 async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
     """批量逻辑删除单据"""
     try:
         ids: List[str] = [s.strip() for s in body.stock_ids if s and s.strip()]
         if not ids:
             return Fail(code=400, msg="单据Id不能为空")
-        try:
-            _ = [int(x) for x in ids]
-        except Exception:
-            return Fail(code=400, msg="单据Id需为数字")
 
         try:
-            success_count, failed_ids = await wms_service.delete_logical_batch(ids)
+            success_count, failed_ids = await wms_service.delete_logical_batch(ids, body.operator_id)
         except Exception as e:
             logger.error(f"逻辑删除失败: {e}")
             return Fail(code=500, msg=f"执行失败: {str(e)}")
@@ -65,20 +61,16 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
         return Fail(code=500, msg="服务异常")
 
 
-@router.post("/delete_physical_batch", summary="按单据Id批量物理删除")
+@router.post("/wms_curd/delete_physical_batch", summary="按单据Id批量物理删除")
 async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
     """批量物理删除单据"""
     try:
         ids: List[str] = [s.strip() for s in body.stock_ids if s and s.strip()]
         if not ids:
             return Fail(code=400, msg="单据Id不能为空")
-        try:
-            _ = [int(x) for x in ids]
-        except Exception:
-            return Fail(code=400, msg="单据Id需为数字")
 
         try:
-            success_count, failed_ids = await wms_service.delete_physical_batch(ids)
+            success_count, failed_ids = await wms_service.delete_physical_batch(ids, body.operator_id)
         except Exception as e:
             logger.error(f"物理删除失败: {e}")
             return Fail(code=500, msg=f"执行失败: {str(e)}")
@@ -116,7 +108,7 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
         return Fail(code=500, msg="服务异常")
 
 
-@router.post("/restore_logical", summary="单据逻辑删除恢复")
+@router.post("/wms_curd/restore_logical", summary="单据逻辑删除恢复")
 async def restore_logical(req: Request, body: WmsRestoreLogicalIn):
     """恢复被逻辑删除的单据"""
     try:

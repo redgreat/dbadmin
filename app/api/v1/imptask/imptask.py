@@ -116,9 +116,8 @@ async def create_task(
         "user_id": user_id,
         "username": username,
     })
-
-    # 提交后台任务
-    await submit_imptask(task.id)
+    import asyncio
+    asyncio.create_task(submit_imptask(task.id))
 
     return Success(data={"task_id": task.id}, msg="任务创建成功，正在后台处理")
 
@@ -135,8 +134,44 @@ async def get_task_detail(task_id: int):
 
 
 @router.get("/download/{task_id}", summary="下载SQL文件")
-async def download_sql_file(task_id: int):
-    """下载生成的SQL文件"""
+async def download_sql_file(task_id: int, req: Request):
+    """下载生成的SQL文件（支持查询参数token）"""
+    # 手动验证token（支持Header和查询参数两种方式）
+    import jwt
+    from app.settings import settings
+    
+    try:
+        # 优先从Header获取token
+        token = req.headers.get("token")
+        
+        # 如果Header中没有，尝试从查询参数获取
+        if not token:
+            token = req.query_params.get("token")
+        
+        # 如果还是没有token，返回错误
+        if not token:
+            raise HTTPException(status_code=401, detail="未提供认证token，请在Header或查询参数中提供token")
+        
+        # 验证token（直接解析JWT）
+        try:
+            decode_data = jwt.decode(token, settings.SECRET_KEY, algorithms=settings.JWT_ALGORITHM)
+            user_id = decode_data.get("user_id")
+        except jwt.DecodeError:
+            raise HTTPException(status_code=401, detail="无效的Token")
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="登录已过期")
+        
+        # 验证用户是否存在
+        user = await User.filter(id=user_id).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="用户不存在")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"认证失败: {str(e)}")
+    
+    # 获取任务
     task = await imptask_controller.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")

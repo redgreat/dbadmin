@@ -84,6 +84,7 @@ import { useCRUD } from '@/composables'
 import api from '@/api'
 import { useMessage } from 'naive-ui'
 import { useUserStore } from '@/store'
+import { getToken } from '@/utils'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -375,7 +376,15 @@ const handleView = async (row) => {
 
 // 下载SQL文件
 const handleDownload = (row) => {
-  const url = `/api/v1/imptask/download/${row.id}`
+  // 获取token
+  const token = getToken()
+  if (!token) {
+    message.error('未登录，请先登录')
+    return
+  }
+  
+  // 构造带token的下载URL
+  const url = `/api/v1/imptask/download/${row.id}?token=${encodeURIComponent(token)}`
   window.open(url, '_blank')
 }
 
