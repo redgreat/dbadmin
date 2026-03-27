@@ -114,5 +114,8 @@ class Settings:
         # 仓储中心数据库连接ID（需要用户配置）
         return 6
 
-
+    @property
+    def FCC_CONN_ID(self) -> int:
+        # FCC数据库连接ID（需要用户配置）
+        return 7
 settings = Settings()

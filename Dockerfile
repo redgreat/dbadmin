@@ -36,7 +36,7 @@ ENV PYTHONPATH=/opt/dbadmin \
     POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_CREATE=false
 
-# 安装系统依赖（包含 nginx）
+# 安装系统依赖
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -48,7 +48,17 @@ RUN apt-get update && apt-get install -y \
     nginx \
     curl \
     gettext-base \
+    unixodbc \
+    unixodbc-dev \
+    gnupg2 \
     && rm -rf /var/lib/apt/lists/*
+
+# 安装 Microsoft ODBC Driver 18 for SQL Server
+RUN curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/microsoft-keyring.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list && \
+    apt-get update && \
+    ACCEPT_EULA=Y apt-get install -y msodbcsql18 && \
+    rm -rf /var/lib/apt/lists/*
 
 # 设置时区
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -61,6 +71,7 @@ COPY pyproject.toml poetry.lock ./
 
 # 安装Python依赖
 RUN poetry config virtualenvs.create false && \
+    poetry lock --no-update && \
     poetry install --no-root --only main -n
 
 # 复制项目文件
@@ -69,7 +80,7 @@ COPY . .
 # 从前端构建阶段复制构建产物
 COPY --from=frontend-builder /app/dist /opt/dbadmin/web/dist
 
-# Supervisor 配置（带 nginx）
+# Supervisor 配置
 COPY deploy/supervisord_with_nginx.conf /etc/supervisor/supervisord.conf
 COPY deploy/app_supervisor_with_nginx.conf /etc/supervisor/conf.d/app.conf
 

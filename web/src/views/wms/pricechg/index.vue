@@ -1,175 +1,132 @@
 <template>
   <CommonPage show-footer>
-    <n-space vertical size="large">
-      <n-card title="单据逻辑删除" size="small">
-        <n-form ref="logicalFormRef" :model="logicalForm" :rules="rules" label-placement="left" :label-width="100">
-          <n-form-item label="单据Id" path="stock_ids">
-            <n-input v-model:value="logicalForm.stock_ids" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据Id，逗号分隔" />
-          </n-form-item>
-          <n-space>
-            <n-button type="primary" :loading="logicalExecuting" @click="handleLogicalExecute">执行逻辑删除</n-button>
-            <n-button @click="handleLogicalReset">重置</n-button>
-          </n-space>
-        </n-form>
-      </n-card>
-
-      <n-card title="单据物理删除" size="small">
-        <n-form ref="physicalFormRef" :model="physicalForm" :rules="rules" label-placement="left" :label-width="100">
-          <n-form-item label="单据Id" path="stock_ids">
-            <n-input v-model:value="physicalForm.stock_ids" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据Id，逗号分隔" />
-          </n-form-item>
-          <n-space>
-            <n-button type="error" :loading="physicalExecuting" @click="handlePhysicalExecute">执行物理删除</n-button>
-            <n-button @click="handlePhysicalReset">重置</n-button>
-          </n-space>
-        </n-form>
-      </n-card>
-
-      <n-card title="单据逻辑删除恢复" size="small">
-        <n-form ref="restoreFormRef" :model="restoreForm" :rules="restoreRules" label-placement="left" :label-width="100">
-          <n-form-item label="单据Id" path="stock_id">
-            <n-input v-model:value="restoreForm.stock_id" clearable placeholder="输入单个单据Id" />
-          </n-form-item>
-          <n-form-item label="删除人Id" path="operatorId">
-            <n-input v-model:value="restoreForm.operatorId" clearable placeholder="输入删除人Id" />
-          </n-form-item>
-          <n-space>
-            <n-button type="primary" :loading="restoreExecuting" @click="handleRestoreExecute">执行恢复</n-button>
-            <n-button @click="handleRestoreReset">重置</n-button>
-          </n-space>
-        </n-form>
-      </n-card>
-    </n-space>
+    <n-card title="价格查询与修改" size="small">
+      <n-form ref="priceFormRef" :model="priceForm" :rules="priceRules" label-placement="left" :label-width="100">
+        <n-form-item label="入库单编码" path="stock_code">
+          <n-input v-model:value="priceForm.stock_code" clearable placeholder="请输入入库单编码" />
+        </n-form-item>
+        <n-form-item label="物料名称" path="material_name">
+          <n-input v-model:value="priceForm.material_name" clearable placeholder="请输入物料名称" />
+        </n-form-item>
+        <n-form-item label="修改后价格" path="new_price">
+          <n-input v-model:value="priceForm.new_price" clearable placeholder="请输入修改后价格（decimal(18,2)）" />
+        </n-form-item>
+        <n-space>
+          <n-button type="primary" :loading="priceQuerying" @click="handlePriceQuery">查询</n-button>
+          <n-button type="warning" :loading="priceModifying" :disabled="!canModify" @click="handlePriceModify">修改</n-button>
+          <n-button @click="handlePriceReset">重置</n-button>
+        </n-space>
+      </n-form>
+      
+      <n-divider />
+      
+      <n-data-table
+        v-if="priceResults.length > 0"
+        :columns="priceColumns"
+        :data="priceResults"
+        :bordered="false"
+        size="small"
+      />
+      <n-empty v-else description="暂无查询结果" />
+    </n-card>
   </CommonPage>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
-import { NCard, NSpace } from 'naive-ui'
+import { NCard, NSpace, NDataTable, NDivider, NEmpty } from 'naive-ui'
 import api from '@/api'
 
-defineOptions({ name: '单据删除' })
+defineOptions({ name: '价格修改' })
 
 const message = useMessage()
 
-const logicalFormRef = ref(null)
-const physicalFormRef = ref(null)
-const restoreFormRef = ref(null)
+const priceFormRef = ref(null)
+const priceForm = ref({ stock_code: '', material_name: '', new_price: '' })
+const priceResults = ref([])
+const priceQuerying = ref(false)
+const priceModifying = ref(false)
 
-const logicalForm = ref({ stock_ids: '' })
-const physicalForm = ref({ stock_ids: '' })
-const restoreForm = ref({ stock_id: '', operatorId: '' })
-
-const logicalExecuting = ref(false)
-const physicalExecuting = ref(false)
-const restoreExecuting = ref(false)
-
-const rules = {
-  stock_ids: [
-    { required: true, message: '请输入单据Id', trigger: ['blur', 'input'] },
+const priceRules = {
+  new_price: [
     {
       validator: (_, value) => {
-        if (!value) return false
-        const ids = value
-          .split(',')
-          .map((s) => s.trim())
-          .filter((s) => s.length)
-        if (!ids.length) return false
-        const allNumeric = ids.every((s) => /^\d+$/.test(s))
-        return allNumeric || '单据Id需为数字，逗号分隔'
+        if (value && !/^\d+(\.\d{1,2})?$/.test(value)) {
+          return new Error('价格格式不正确，应为decimal(18,2)')
+        }
+        return true
       },
-      trigger: ['blur', 'input'],
     },
   ],
 }
 
-const restoreRules = {
-  stock_id: [
-    { required: true, message: '请输入单据Id', trigger: ['blur', 'input'] },
-    {
-      validator: (_, value) => /^\d+$/.test(String(value || '').trim()) || '单据Id需为数字',
-      trigger: ['blur', 'input'],
-    },
-  ],
-  operatorId: [
-    { required: true, message: '请输入删除人Id', trigger: ['blur', 'input'] },
-    {
-      validator: (_, value) => /^\d+$/.test(String(value || '').trim()) || '删除人Id需为数字',
-      trigger: ['blur', 'input'],
-    },
-  ],
-}
+const priceColumns = [
+  { title: '明细Id', key: 'detail_id' },
+  { title: '物料名称', key: 'material_name' },
+  { title: '原价格', key: 'original_price' },
+  { title: '新价格', key: 'new_price' },
+]
 
-const parseIds = (text) => text.split(',').map((s) => s.trim()).filter((s) => s.length)
+const canModify = computed(() => priceResults.value.length === 1)
 
-const handleLogicalReset = () => {
-  logicalForm.value = { stock_ids: '' }
-}
-
-const handlePhysicalReset = () => {
-  physicalForm.value = { stock_ids: '' }
-}
-
-const handleRestoreReset = () => {
-  restoreForm.value = { stock_id: '', operatorId: '' }
-}
-
-const handleLogicalExecute = async () => {
-  await logicalFormRef.value?.validate()
-  const ids = parseIds(logicalForm.value.stock_ids)
-  logicalExecuting.value = true
+const handlePriceQuery = async () => {
+  priceQuerying.value = true
   try {
-    const res = await api.deleteWmsDocumentsLogicalBatch({ stock_ids: ids })
-    if (res.code === 0) {
-      const { success_count = 0, failed_ids = [] } = res.data || {}
-      message.success(`逻辑删除成功：${success_count} 条${failed_ids.length ? `，失败 ${failed_ids.length} 条` : ''}`)
-    } else {
-      message.error(res.msg || '逻辑删除失败')
-    }
-  } catch (e) {
-    message.error('请求异常')
-  } finally {
-    logicalExecuting.value = false
-  }
-}
-
-const handlePhysicalExecute = async () => {
-  await physicalFormRef.value?.validate()
-  const ids = parseIds(physicalForm.value.stock_ids)
-  physicalExecuting.value = true
-  try {
-    const res = await api.deleteWmsDocumentsPhysicalBatch({ stock_ids: ids })
-    if (res.code === 0) {
-      const { success_count = 0, failed_ids = [] } = res.data || {}
-      message.success(`物理删除成功：${success_count} 条${failed_ids.length ? `，失败 ${failed_ids.length} 条` : ''}`)
-    } else {
-      message.error(res.msg || '物理删除失败')
-    }
-  } catch (e) {
-    message.error('请求异常')
-  } finally {
-    physicalExecuting.value = false
-  }
-}
-
-const handleRestoreExecute = async () => {
-  await restoreFormRef.value?.validate()
-  restoreExecuting.value = true
-  try {
-    const stock_id = parseInt(String(restoreForm.value.stock_id).trim(), 10)
-    const operator_id = parseInt(String(restoreForm.value.operatorId).trim(), 10)
-    const res = await api.restoreWmsDocumentLogical({ stock_id, operator_id })
+    const res = await api.queryPrice({
+      stock_code: priceForm.value.stock_code,
+      material_name: priceForm.value.material_name,
+      new_price: priceForm.value.new_price,
+    })
     if (res.code === 200) {
-      message.success('逻辑删除恢复成功')
+      priceResults.value = res.data || []
+      if (priceResults.value.length === 0) {
+        message.warning('未查询到符合条件的记录')
+      } else if (priceResults.value.length > 1) {
+        message.warning('查询到多条记录，请缩小查询范围')
+      } else {
+        message.success('查询成功')
+      }
     } else {
-      message.error(res.msg || '逻辑删除恢复失败')
+      message.error(res.msg || '查询失败')
     }
   } catch (e) {
     message.error('请求异常')
   } finally {
-    restoreExecuting.value = false
+    priceQuerying.value = false
   }
+}
+
+const handlePriceModify = async () => {
+  if (priceResults.value.length !== 1) {
+    message.error('请先查询出唯一一条记录')
+    return
+  }
+  
+  priceModifying.value = true
+  try {
+    const detail = priceResults.value[0]
+    const res = await api.modifyPrice({
+      detail_id: detail.detail_id,
+      new_price: priceForm.value.new_price,
+    })
+    if (res.code === 200) {
+      message.success('价格修改成功')
+      // 重新查询以更新结果
+      await handlePriceQuery()
+    } else {
+      message.error(res.msg || '价格修改失败')
+    }
+  } catch (e) {
+    message.error('请求异常')
+  } finally {
+    priceModifying.value = false
+  }
+}
+
+const handlePriceReset = () => {
+  priceForm.value = { stock_code: '', material_name: '', new_price: '' }
+  priceResults.value = []
 }
 </script>

@@ -109,6 +109,7 @@ const $message = useMessage()
 const dbTypeOptions = [
   { label: 'MySQL', value: 'mysql' },
   { label: 'PostgreSQL', value: 'postgresql' },
+  { label: 'SQL Server', value: 'sqlserver' },
 ]
 
 // 连接状态选项
@@ -489,12 +490,16 @@ watch(
   (val, old) => {
     if (!modalForm.value) return
     if (val === 'mysql') {
-      if (!modalForm.value.port || modalForm.value.port === 5432) {
+      if (!modalForm.value.port || modalForm.value.port === 5432 || modalForm.value.port === 1433) {
         modalForm.value.port = 3306
       }
     } else if (val === 'postgresql') {
-      if (!modalForm.value.port || modalForm.value.port === 3306) {
+      if (!modalForm.value.port || modalForm.value.port === 3306 || modalForm.value.port === 1433) {
         modalForm.value.port = 5432
+      }
+    } else if (val === 'sqlserver') {
+      if (!modalForm.value.port || modalForm.value.port === 3306 || modalForm.value.port === 5432) {
+        modalForm.value.port = 1433
       }
     }
   }

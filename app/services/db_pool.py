@@ -3,13 +3,14 @@ from typing import Dict, Optional, Union
 
 import asyncpg
 import aiomysql
+import aioodbc
 
 
 class DBPoolManager:
     """数据库连接池管理服务"""
 
     def __init__(self):
-        self._pools: Dict[int, Union[asyncpg.Pool, aiomysql.Pool]] = {}
+        self._pools: Dict[int, Union[asyncpg.Pool, aiomysql.Pool, aioodbc.Pool]] = {}
 
     async def register_pool(
         self,
@@ -49,9 +50,32 @@ class DBPoolManager:
             )
             self._pools[conn_id] = pool
             return pool
+        if db_type == "sqlserver":
+            # SQL Server使用ODBC连接字符串
+            # 格式: DRIVER={ODBC Driver 18 for SQL Server};SERVER=host,port;DATABASE=database;UID=username;PWD=password
+            # Encrypt=no 和 TrustServerCertificate=yes 用于解决 ODBC Driver 18 的 SSL 证书验证问题
+            conn_str = (
+                f"DRIVER={{ODBC Driver 18 for SQL Server}};"
+                f"SERVER={host},{port};"
+                f"DATABASE={database};"
+                f"UID={username};"
+                f"PWD={password};"
+                f"Encrypt=no;"
+                f"TrustServerCertificate=yes"
+            )
+            if params:
+                conn_str += f";{params}"
+            
+            pool = await aioodbc.create_pool(
+                dsn=conn_str,
+                minsize=min_size,
+                maxsize=max_size,
+            )
+            self._pools[conn_id] = pool
+            return pool
         raise ValueError("不支持的数据库类型")
 
-    def get_pool(self, conn_id: int) -> Optional[Union[asyncpg.Pool, aiomysql.Pool]]:
+    def get_pool(self, conn_id: int) -> Optional[Union[asyncpg.Pool, aiomysql.Pool, aioodbc.Pool]]:
         """获取已注册连接池"""
         return self._pools.get(conn_id)
 

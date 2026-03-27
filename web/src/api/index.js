@@ -116,4 +116,13 @@ export default {
   deleteWmsDocumentsLogicalBatch: (data = {}) => request.post('/wms/wms_curd/delete_logical_batch', data),
   deleteWmsDocumentsPhysicalBatch: (data = {}) => request.post('/wms/wms_curd/delete_physical_batch', data),
   restoreWmsDocumentLogical: (data = {}) => request.post('/wms/wms_curd/restore_logical', data),
+  validateWmsDocuments: (data = {}) => request.post('/wms/wms_curd/validate_stock', data),
+  // wms - 价格查询与修改
+  queryPrice: (data = {}) => request.post('/wms/wms_curd/price_query', data),
+  modifyPrice: (data = {}) => request.post('/wms/wms_curd/price_modify', data),
+  // wms - FCC关联功能
+  fccParse: (data = {}) => request.post('/wms/fcc/parse', data),
+  fccValidate: (data = {}) => request.post('/wms/fcc/validate', data),
+  fccSubmit: (data = {}) => request.post('/wms/fcc/submit', data),
+  fccGetTaskStatus: (taskId) => request.get(`/wms/fcc/task/${taskId}`),
 }

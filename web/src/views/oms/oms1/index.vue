@@ -30,22 +30,22 @@ const executing = ref(false)
 
 const rules = {
   orderIds: [
-    { required: true, message: '请输入订单Id', trigger: ['blur', 'input'] },
+    { required: true, message: '请输入订单Id' },
     {
       validator: (_, value) => {
-        if (!value) return false
+        if (!value) return new Error('请输入订单Id')
         const ids = value
           .split(',')
           .map((s) => s.trim())
           .filter((s) => s.length)
-        if (!ids.length) return false
+        if (!ids.length) return new Error('请输入订单Id')
         const allNumeric = ids.every((s) => /^\d+$/.test(s))
-        return allNumeric || '订单Id需为数字，逗号分隔'
+        if (!allNumeric) return new Error('订单Id需为数字，逗号分隔')
+        return true
       },
-      trigger: ['blur', 'input'],
     },
   ],
-  auditTime: [{ required: true, message: '请选择修改时间', trigger: ['change', 'blur'] }],
+  auditTime: [{ required: true, message: '请选择修改时间' }],
 }
 
 const handleReset = () => {

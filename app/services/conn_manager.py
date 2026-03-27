@@ -2,6 +2,7 @@ from typing import Dict, Optional, List, Any, Tuple
 from tortoise import connections
 import asyncpg
 import aiomysql
+import aioodbc
 from app.log import logger
 
 
@@ -126,6 +127,36 @@ class DBConnector:
             return False, f"连接失败: {str(e)}"
 
     @staticmethod
+    async def test_sqlserver_connection(
+        host: str, port: int, username: str, password: str, database: str, params: Optional[str] = None
+    ) -> Tuple[bool, str]:
+        """
+        测试SQL Server连接
+        """
+        try:
+            # 构建ODBC连接字符串
+            # Encrypt=no 和 TrustServerCertificate=yes 用于解决 ODBC Driver 18 的 SSL 证书验证问题
+            conn_str = (
+                f"DRIVER={{ODBC Driver 18 for SQL Server}};"
+                f"SERVER={host},{port};"
+                f"DATABASE={database};"
+                f"UID={username};"
+                f"PWD={password};"
+                f"Encrypt=no;"
+                f"TrustServerCertificate=yes"
+            )
+            if params:
+                conn_str += f";{params}"
+            
+            conn = await aioodbc.connect(dsn=conn_str, timeout=5)
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT 1")
+            await conn.close()
+            return True, "连接成功"
+        except Exception as e:
+            return False, f"连接失败: {str(e)}"
+
+    @staticmethod
     async def test_connection(
         db_type: str, host: str, port: int, username: str, password: str, database: str, params: Optional[str] = None
     ) -> Tuple[bool, str]:
@@ -136,6 +167,8 @@ class DBConnector:
             return await DBConnector.test_postgresql_connection(host, port, username, password, database, params)
         elif db_type == "mysql":
             return await DBConnector.test_mysql_connection(host, port, username, password, database, params)
+        elif db_type == "sqlserver":
+            return await DBConnector.test_sqlserver_connection(host, port, username, password, database, params)
         else:
             return False, f"不支持的数据库类型: {db_type}"
 

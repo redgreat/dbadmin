@@ -68,36 +68,44 @@ const restoreExecuting = ref(false)
 
 const rules = {
   orderIds: [
-    { required: true, message: '请输入订单Id', trigger: ['blur', 'input'] },
+    { required: true, message: '请输入订单Id' },
     {
       validator: (_, value) => {
-        if (!value) return false
+        if (!value) return new Error('请输入订单Id')
         const ids = value
           .split(',')
           .map((s) => s.trim())
           .filter((s) => s.length)
-        if (!ids.length) return false
+        if (!ids.length) return new Error('请输入订单Id')
         const allNumeric = ids.every((s) => /^\d+$/.test(s))
-        return allNumeric || '订单Id需为数字，逗号分隔'
+        if (!allNumeric) return new Error('订单Id需为数字，逗号分隔')
+        return true
       },
-      trigger: ['blur', 'input'],
     },
   ],
 }
 
 const restoreRules = {
   orderId: [
-    { required: true, message: '请输入订单Id', trigger: ['blur', 'input'] },
+    { required: true, message: '请输入订单Id' },
     {
-      validator: (_, value) => /^\d+$/.test(String(value || '').trim()) || '订单Id需为数字',
-      trigger: ['blur', 'input'],
+      validator: (_, value) => {
+        if (!/^\d+$/.test(String(value || '').trim())) {
+          return new Error('订单Id需为数字')
+        }
+        return true
+      },
     },
   ],
   operatorId: [
-    { required: true, message: '请输入删除人Id', trigger: ['blur', 'input'] },
+    { required: true, message: '请输入删除人Id' },
     {
-      validator: (_, value) => /^\d+$/.test(String(value || '').trim()) || '删除人Id需为数字',
-      trigger: ['blur', 'input'],
+      validator: (_, value) => {
+        if (!/^\d+$/.test(String(value || '').trim())) {
+          return new Error('删除人Id需为数字')
+        }
+        return true
+      },
     },
   ],
 }
