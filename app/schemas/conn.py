@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class DBConnectionBase(BaseModel):
     """数据库连接基础模式"""
     name: str = Field(..., description="连接名称")
+    alias: str = Field(..., description="连接别名（必填，不可修改）")
     db_type: str = Field(..., description="数据库类型：mysql, postgresql, sqlite, oracle, sqlserver")
     host: str = Field(..., description="主机地址")
     port: int = Field(..., description="端口")
@@ -26,6 +27,7 @@ class DBConnectionUpdate(BaseModel):
     """更新数据库连接请求模式"""
     id: int
     name: Optional[str] = Field(None, description="连接名称")
+    alias: Optional[str] = Field(None, description="连接别名（不可修改）")
     db_type: Optional[str] = Field(None, description="数据库类型：mysql, postgresql, sqlite, oracle, sqlserver")
     host: Optional[str] = Field(None, description="主机地址")
     port: Optional[int] = Field(None, description="端口")

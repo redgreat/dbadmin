@@ -99,23 +99,71 @@ class Settings:
     def DB_PASSWORD_SALT(self) -> str:
         return self._config.app.db_password_salt
 
-    @property
-    def SIM_CONN_ID(self) -> int:
-        # 保持原有的硬编码值（可以后续移到配置文件）
-        return 5
-
-    @property
-    def ORDER_CONN_ID(self) -> int:
-        # 保持原有的硬编码值（可以后续移到配置文件）
-        return 4
-
-    @property
-    def WMS_CONN_ID(self) -> int:
-        # 仓储中心数据库连接ID（需要用户配置）
-        return 6
-
-    @property
-    def FCC_CONN_ID(self) -> int:
-        # FCC数据库连接ID（需要用户配置）
-        return 7
+    async def SIM_CONN_ID(self) -> int:
+        """SIM数据库连接ID（从数据库读取）"""
+        return await self._get_conn_id_by_alias('SIM_CONN')
+    
+    async def ORDER_CONN_ID(self) -> int:
+        """订单数据库连接ID（从数据库读取）"""
+        return await self._get_conn_id_by_alias('ORDER_CONN')
+    
+    async def WMS_CONN_ID(self) -> int:
+        """仓储中心数据库连接ID（从数据库读取）"""
+        return await self._get_conn_id_by_alias('WMS_CONN')
+    
+    async def FCC_CONN_ID(self) -> int:
+        """FCC数据库连接ID（从数据库读取）"""
+        return await self._get_conn_id_by_alias('FCC_CONN')
+    
+    async def _get_conn_id_by_alias(self, alias: str) -> int:
+        """
+        根据连接别名从数据库获取连接ID（使用Tortoise ORM连接池）
+        
+        Args:
+            alias: 连接别名
+            
+        Returns:
+            连接ID，如果不存在则返回0
+        """
+        import logging
+        from tortoise import Tortoise
+        
+        logger = logging.getLogger(__name__)
+        
+        # 使用缓存避免重复查询
+        cache_key = f'_conn_id_cache_{alias}'
+        if hasattr(self, cache_key):
+            cached_value = getattr(self, cache_key)
+            logger.info(f"[连接别名] 从缓存读取: alias={alias}, conn_id={cached_value}")
+            return cached_value
+            
+        try:
+            logger.info(f"[连接别名] 开始查询数据库: alias={alias}")
+            conn = Tortoise.get_connection("default")
+            logger.info(f"[连接别名] 获取到数据库连接: {conn}")
+            
+            # 执行SQL查询
+            result = await conn.execute_query(
+                "SELECT id FROM conn WHERE alias = $1 AND status = 1",
+                [alias]
+            )
+            
+            # 解析结果
+            conn_id = 0
+            if result and len(result) > 1 and result[1]:
+                rows = result[1]
+                if rows and len(rows) > 0:
+                    conn_id = rows[0]['id']
+                    logger.info(f"[连接别名] 数据库查询结果: alias={alias}, conn_id={conn_id}")
+            else:
+                logger.warning(f"[连接别名] 未找到连接: alias={alias}")
+                
+            # 缓存结果
+            setattr(self, cache_key, conn_id)
+            logger.info(f"[连接别名] 查询完成并缓存: alias={alias}, conn_id={conn_id}")
+            return conn_id
+            
+        except Exception as e:
+            logger.error(f"[连接别名] 获取连接ID失败: alias={alias}, error={e}", exc_info=True)
+            return 0
 settings = Settings()

@@ -1,5 +1,5 @@
 # 本地调试Docker镜像启动脚本
-# 功能：构建前端 -> 停止旧容器 -> 删除旧镜像 -> 构建新镜像 -> 启动新容器
+# 功能：构建前端 -> 停止旧容器 -> 删除旧镜像 -> 清空日志 -> 构建新镜像 -> 启动新容器
 
 # 设置控制台编码为UTF-8
 $OutputEncoding = [System.Text.Encoding]::UTF8
@@ -15,7 +15,7 @@ Write-Host "========================================" -ForegroundColor Green
 
 # 0. 构建前端
 Write-Host ""
-Write-Host "[0/5] 构建前端..." -ForegroundColor Yellow
+Write-Host "[0/6] 构建前端..." -ForegroundColor Yellow
 Set-Location web
 
 # 检查 node_modules 是否存在
@@ -41,7 +41,7 @@ Write-Host "√ 前端构建完成" -ForegroundColor Green
 
 # 1. 停止并删除旧容器
 Write-Host ""
-Write-Host "[1/5] 停止并删除旧容器..." -ForegroundColor Yellow
+Write-Host "[1/6] 停止并删除旧容器..." -ForegroundColor Yellow
 $containers = docker-compose -f docker-compose-local.yml ps -q 2>$null
 if ($containers) {
     docker-compose -f docker-compose-local.yml down
@@ -52,7 +52,7 @@ if ($containers) {
 
 # 2. 删除旧镜像
 Write-Host ""
-Write-Host "[2/5] 删除旧镜像..." -ForegroundColor Yellow
+Write-Host "[2/6] 删除旧镜像..." -ForegroundColor Yellow
 $imageExists = docker images dbadmin:local --format "{{.ID}}" 2>$null
 if ($imageExists) {
     docker rmi -f dbadmin:local
@@ -61,9 +61,26 @@ if ($imageExists) {
     Write-Host "! 没有找到旧镜像" -ForegroundColor Yellow
 }
 
-# 3. 构建新镜像
+# 3. 清空日志文件夹
 Write-Host ""
-Write-Host "[3/5] 构建新镜像..." -ForegroundColor Yellow
+Write-Host "[3/6] 清空日志文件夹..." -ForegroundColor Yellow
+$logPath = Join-Path $ProjectRoot "log"
+if (Test-Path $logPath) {
+    # 删除日志文件夹中的所有文件
+    $logFiles = Get-ChildItem -Path $logPath -File -ErrorAction SilentlyContinue
+    if ($logFiles) {
+        $logFiles | Remove-Item -Force -ErrorAction SilentlyContinue
+        Write-Host "√ 已清空 $($logFiles.Count) 个日志文件" -ForegroundColor Green
+    } else {
+        Write-Host "! 日志文件夹为空" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "! 日志文件夹不存在" -ForegroundColor Yellow
+}
+
+# 4. 构建新镜像
+Write-Host ""
+Write-Host "[4/6] 构建新镜像..." -ForegroundColor Yellow
 docker-compose -f docker-compose-local.yml build
 # 取消缓存机制构建
 # docker-compose -f docker-compose-local.yml build --no-cache
@@ -73,9 +90,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "√ 新镜像构建完成" -ForegroundColor Green
 
-# 4. 启动新容器
+# 5. 启动新容器
 Write-Host ""
-Write-Host "[4/5] 启动新容器..." -ForegroundColor Yellow
+Write-Host "[5/6] 启动新容器..." -ForegroundColor Yellow
 docker-compose -f docker-compose-local.yml up -d
 if ($LASTEXITCODE -ne 0) {
     Write-Host "× 容器启动失败！" -ForegroundColor Red

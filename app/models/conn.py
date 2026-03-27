@@ -15,6 +15,7 @@ class DBType:
 class DBConnection(BaseModel, TimestampMixin):
     """数据库连接模型"""
     name = fields.CharField(max_length=100, description="连接名称", index=True)
+    alias = fields.CharField(max_length=50, description="连接别名（必填，不可修改）", unique=True)
     db_type = fields.CharField(max_length=20, description="数据库类型", index=True)
     host = fields.CharField(max_length=200, description="主机地址")
     port = fields.IntField(description="端口")

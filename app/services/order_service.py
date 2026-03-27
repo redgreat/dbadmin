@@ -6,18 +6,24 @@ from app.services.db_pool import db_pool
 from app.controllers.conn import conn_controller
 from app.settings.config import settings
 
-# 订单固定连接的Id
-conn_id = settings.ORDER_CONN_ID
+# 订单固定连接的Id（延迟获取，避免模块加载时Tortoise未初始化）
+_order_conn_id = None
+
+async def _get_conn_id():
+    global _order_conn_id
+    if _order_conn_id is None:
+        _order_conn_id = await settings.ORDER_CONN_ID()
+    return _order_conn_id
 
 class OrderService:
     """订单业务服务"""
 
     async def _ensure_pool(self) -> None:
         """确保连接池已注册"""
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is not None:
             return
-        conn = await conn_controller.get_decrypted_connection(conn_id)
+        conn = await conn_controller.get_decrypted_connection(await _get_conn_id())
         if not conn:
             raise ValueError("连接池不存在")
         await db_pool.register_pool(
@@ -34,7 +40,7 @@ class OrderService:
     async def fetch_audit_time_map(self, order_ids: List[str]) -> Dict[str, Optional[str]]:
         """根据订单Id获取审核时间（使用指定连接池）"""
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         ids_int = [int(x) for x in order_ids]
@@ -51,7 +57,7 @@ class OrderService:
     async def update_audit_time_batch(self, order_ids: List[str], new_time) -> int:
         """批量更新订单审核时间（使用指定连接池）"""
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         ids_int = [int(x) for x in order_ids]
@@ -67,7 +73,7 @@ class OrderService:
     async def delete_logical_batch(self, order_ids: List[str]) -> Tuple[int, List[str]]:
         """批量逻辑删除订单（逐行调用存储过程）"""
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         success = 0
@@ -89,7 +95,7 @@ class OrderService:
     async def delete_physical_batch(self, order_ids: List[str]) -> Tuple[int, List[str]]:
         """批量物理删除订单（逐行调用存储过程）"""
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         success = 0
@@ -111,7 +117,7 @@ class OrderService:
     async def restore_logical(self, order_id: int, operator_id: int) -> bool:
         """恢复逻辑删除的订单"""
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         if isinstance(pool, aiomysql.Pool):

@@ -15,9 +15,21 @@ from app.settings.config import settings
 
 logger = logging.getLogger(__name__)
 
-# 数据库连接ID
-WMS_CONN_ID = settings.WMS_CONN_ID
-FCC_CONN_ID = settings.FCC_CONN_ID
+# 数据库连接ID（延迟获取，避免模块加载时Tortoise未初始化）
+_wms_conn_id = None
+_fcc_conn_id = None
+
+async def _get_wms_conn_id():
+    global _wms_conn_id
+    if _wms_conn_id is None:
+        _wms_conn_id = await settings.WMS_CONN_ID()
+    return _wms_conn_id
+
+async def _get_fcc_conn_id():
+    global _fcc_conn_id
+    if _fcc_conn_id is None:
+        _fcc_conn_id = await settings.FCC_CONN_ID()
+    return _fcc_conn_id
 
 
 class FccRelationService:
@@ -28,10 +40,10 @@ class FccRelationService:
     
     async def _ensure_wms_pool(self) -> None:
         """确保仓储中心连接池已注册"""
-        pool = db_pool.get_pool(WMS_CONN_ID)
+        pool = db_pool.get_pool(await _get_wms_conn_id())
         if pool is not None:
             return
-        conn = await conn_controller.get_decrypted_connection(WMS_CONN_ID)
+        conn = await conn_controller.get_decrypted_connection(await _get_wms_conn_id())
         if not conn:
             raise ValueError("仓储中心连接池不存在")
         await db_pool.register_pool(
@@ -47,10 +59,10 @@ class FccRelationService:
     
     async def _ensure_fcc_pool(self) -> None:
         """确保FCC连接池已注册"""
-        pool = db_pool.get_pool(FCC_CONN_ID)
+        pool = db_pool.get_pool(await _get_fcc_conn_id())
         if pool is not None:
             return
-        conn = await conn_controller.get_decrypted_connection(FCC_CONN_ID)
+        conn = await conn_controller.get_decrypted_connection(await _get_fcc_conn_id())
         if not conn:
             raise ValueError("FCC连接池不存在")
         await db_pool.register_pool(
@@ -131,8 +143,8 @@ class FccRelationService:
         await self._ensure_wms_pool()
         await self._ensure_fcc_pool()
         
-        wms_pool = db_pool.get_pool(WMS_CONN_ID)
-        fcc_pool = db_pool.get_pool(FCC_CONN_ID)
+        wms_pool = db_pool.get_pool(await _get_wms_conn_id())
+        fcc_pool = db_pool.get_pool(await _get_fcc_conn_id())
         
         if not wms_pool or not fcc_pool:
             raise ValueError("数据库连接池不存在")
@@ -201,8 +213,8 @@ class FccRelationService:
             await self._ensure_wms_pool()
             await self._ensure_fcc_pool()
             
-            wms_pool = db_pool.get_pool(WMS_CONN_ID)
-            fcc_pool = db_pool.get_pool(FCC_CONN_ID)
+            wms_pool = db_pool.get_pool(await _get_wms_conn_id())
+            fcc_pool = db_pool.get_pool(await _get_fcc_conn_id())
             
             if not wms_pool or not fcc_pool:
                 raise ValueError("数据库连接池不存在")

@@ -51,6 +51,14 @@
         <n-form-item label="连接名称" path="name">
           <n-input v-model:value="modalForm.name" clearable placeholder="请输入连接名称" />
         </n-form-item>
+        <n-form-item label="连接别名" path="alias">
+          <n-input 
+            v-model:value="modalForm.alias" 
+            :disabled="!!modalForm.id"
+            clearable 
+            placeholder="请输入连接别名（创建后不可修改）" 
+          />
+        </n-form-item>
 
         <n-form-item label="主机地址" path="host">
           <n-input v-model:value="modalForm.host" clearable placeholder="请输入主机地址" />
@@ -206,6 +214,31 @@ const columns = [
       )
     }
   },
+  { 
+    title: '连接别名', 
+    key: 'alias', 
+    width: 120,
+    render(row) {
+      return h(
+        'div',
+        {
+          style: {
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer',
+            color: '#2080f0',
+            fontWeight: 'bold'
+          },
+          title: row.alias,
+          onClick: () => {
+            window.$message.info(row.alias)
+          }
+        },
+        row.alias || '-'
+      )
+    }
+  },
 
   { 
     title: '主机地址', 
@@ -346,6 +379,7 @@ const {
   name: '数据库连接',
   initForm: {
     name: '',
+    alias: '',
     dbType: 'postgresql',
     host: 'localhost',
     port: 5432,
@@ -359,6 +393,7 @@ const {
     try {
       const apiData = {
         name: data.name,
+        alias: data.alias,
         db_type: data.dbType,
         host: data.host,
         port: data.port,
@@ -387,6 +422,7 @@ const {
       const apiData = {
         id: data.id,
         name: data.name,
+        alias: data.alias,
         db_type: data.dbType,
         host: data.host,
         port: data.port,
@@ -432,6 +468,13 @@ const {
 // 表单校验规则（函数级中文注释）
 const rules = {
   name: [{ required: true, message: '请输入连接名称' }],
+  alias: [
+    { required: true, message: '请输入连接别名' },
+    { 
+      pattern: /^[A-Z_0-9]+$/, 
+      message: '连接别名只能包含大写字母、下划线和数字' 
+    }
+  ],
   dbType: [{ required: true, message: '请选择数据库类型' }],
   host: [{ required: true, message: '请输入主机地址' }],
   port: [

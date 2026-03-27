@@ -5,8 +5,14 @@ from app.services.db_pool import db_pool
 from app.controllers.conn import conn_controller
 from app.settings.config import settings
 
-# 仓储中心固定连接的Id（需要用户配置）
-conn_id = settings.WMS_CONN_ID
+# 仓储中心固定连接的Id（延迟获取，避免模块加载时Tortoise未初始化）
+_wms_conn_id = None
+
+async def _get_conn_id():
+    global _wms_conn_id
+    if _wms_conn_id is None:
+        _wms_conn_id = await settings.WMS_CONN_ID()
+    return _wms_conn_id
 
 
 class WmsService:
@@ -14,10 +20,10 @@ class WmsService:
 
     async def _ensure_pool(self) -> None:
         """确保连接池已注册"""
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is not None:
             return
-        conn = await conn_controller.get_decrypted_connection(conn_id)
+        conn = await conn_controller.get_decrypted_connection(await _get_conn_id())
         if not conn:
             raise ValueError("连接池不存在")
         await db_pool.register_pool(
@@ -43,7 +49,7 @@ class WmsService:
             验证结果字典
         """
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
 
@@ -148,7 +154,7 @@ class WmsService:
     async def delete_logical_batch(self, stock_ids: List[str], operator_id: str) -> Tuple[int, List[str]]:
         """批量逻辑删除单据（逐行调用存储过程）"""
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         success = 0
@@ -170,7 +176,7 @@ class WmsService:
     async def delete_physical_batch(self, stock_ids: List[str], operator_id: str) -> Tuple[int, List[str]]:
         """批量物理删除单据（逐行调用存储过程）"""
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         success = 0
@@ -192,7 +198,7 @@ class WmsService:
     async def restore_logical(self, stock_id: str, operator_id: str) -> bool:
         """恢复逻辑删除的单据"""
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         if isinstance(pool, aiomysql.Pool):
@@ -216,7 +222,7 @@ class WmsService:
             查询结果列表
         """
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
 
@@ -266,7 +272,7 @@ class WmsService:
             是否修改成功
         """
         await self._ensure_pool()
-        pool = db_pool.get_pool(conn_id)
+        pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
 

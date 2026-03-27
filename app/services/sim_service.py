@@ -7,8 +7,14 @@ from app.services.db_pool import db_pool
 from app.controllers.conn import conn_controller
 from app.settings.config import settings
 
-# SIM导入固定连接的Id
-sim_conn_id = settings.SIM_CONN_ID
+# SIM导入固定连接的Id（延迟获取，避免模块加载时Tortoise未初始化）
+_sim_conn_id = None
+
+async def _get_sim_conn_id():
+    global _sim_conn_id
+    if _sim_conn_id is None:
+        _sim_conn_id = await settings.SIM_CONN_ID()
+    return _sim_conn_id
 
 _PROGRESS: Dict[str, Dict[str, Any]] = {}
 
@@ -45,7 +51,7 @@ class SIMService:
 
     async def _ensure_pool(self) -> None:
         """确保连接池已注册"""
-        pool = db_pool.get_pool(sim_conn_id)
+        pool = db_pool.get_pool(await _get_sim_conn_id())
         if pool is not None:
             try:
                 if hasattr(pool, "closed") and pool.closed:
@@ -56,7 +62,7 @@ class SIMService:
                 pool = None
         if pool is not None:
             return
-        conn = await conn_controller.get_decrypted_connection(sim_conn_id)
+        conn = await conn_controller.get_decrypted_connection(await _get_sim_conn_id())
         if not conn:
             raise ValueError("连接记录不存在或密码无法解密，请在连接管理重新保存密码")
         await db_pool.register_pool(
@@ -76,7 +82,7 @@ class SIMService:
             return 0
         await self._ensure_pool()
         self._progress_update(stamp, stage="writing", total=len(rows), current=0, message="写入临时表")
-        pool = db_pool.get_pool(sim_conn_id)
+        pool = db_pool.get_pool(await _get_sim_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         if isinstance(pool, aiomysql.Pool):
@@ -140,7 +146,7 @@ class SIMService:
     async def process_tmp(self, stamp: str) -> None:
         """调用存储过程处理临时表数据"""
         await self._ensure_pool()
-        pool = db_pool.get_pool(sim_conn_id)
+        pool = db_pool.get_pool(await _get_sim_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         if isinstance(pool, aiomysql.Pool):
