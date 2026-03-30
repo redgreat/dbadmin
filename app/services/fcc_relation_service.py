@@ -162,12 +162,20 @@ class FccRelationService:
         async with fcc_pool.acquire() as conn:
             async with conn.cursor() as cur:
                 for fcc_no in all_fcc_nos:
-                    # SQL1: 验证FCC报销单是否存在
-                    sql = "SELECT COUNT(*) FROM [dbo].[fms.reimbursement_info] WHERE CodeNumber = ? AND Deleted=0"
-                    await cur.execute(sql, (fcc_no,))
-                    result = await cur.fetchone()
-                    if not result or result[0] == 0:
-                        not_found_fcc.append(fcc_no)
+                    # SQL1: 验证FCC单（报销单或还款单）是否存在
+                    sql_reim = "SELECT COUNT(*) FROM [dbo].[fms.reimbursement_info] WHERE CodeNumber = ? AND Deleted=0"
+                    await cur.execute(sql_reim, (fcc_no,))
+                    res_reim = await cur.fetchone()
+                    
+                    if not res_reim or res_reim[0] == 0:
+                        # 报销单里没查到，继续查借款单
+                        sql_loan = "SELECT COUNT(*) FROM [dbo].[fms.Loan_Info] WHERE CodeNumber = ? AND Deleted=0"
+                        await cur.execute(sql_loan, (fcc_no,))
+                        res_loan = await cur.fetchone()
+                        
+                        # 两个表都没有记录，才能判定它没有
+                        if not res_loan or res_loan[0] == 0:
+                            not_found_fcc.append(fcc_no)
         
         # 验证仓储对账单（MySQL）
         if isinstance(wms_pool, aiomysql.Pool):
@@ -201,7 +209,7 @@ class FccRelationService:
                                       WHERE a.Deleted=0
                                         AND c.ReconcNo = %s
                                       GROUP BY a.OwingId
-                                      HAVING SUM(a.ReconcNum)!=b.StockNum
+                                      HAVING ABS(SUM(a.ReconcNum))!=b.StockNum
                                    """
                         await cur.execute(sql_full, (wms_no,))
                         result_full = await cur.fetchone()
