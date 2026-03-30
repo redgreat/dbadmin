@@ -216,31 +216,13 @@ async def get_generation_list(
 ):
     """获取报表生成记录列表"""
     try:
-        query = ReportGeneration.filter_active()
-
-        # 状态过滤
-        if status:
-            query = query.filter(status=status)
-
-        # 报表名称模糊查询
-        if report_name:
-            query = query.filter(report_name__contains=report_name)
-
-        # 系统名称查询（需要关联报表配置表）
-        if system_name:
-            # 先查询符合条件的报表配置ID
-            config_ids = await ReportConfig.filter(system_name=system_name).values_list('id', flat=True)
-            if config_ids:
-                query = query.filter(report_config_id__in=config_ids)
-            else:
-                # 如果没有匹配的配置，返回空结果
-                return SuccessExtra(data=[], total=0, page=page, page_size=page_size)
-
-        # 总数
-        total = await query.count()
-
-        # 分页查询，按生成时间倒序
-        items = await query.offset((page - 1) * page_size).limit(page_size).order_by("-generated_at").all()
+        items, total = await ReportService.get_generation_list(
+            page=page,
+            page_size=page_size,
+            system_name=system_name,
+            report_name=report_name,
+            status=status
+        )
 
         # 转换为字典列表
         data = [await item.to_dict() for item in items]

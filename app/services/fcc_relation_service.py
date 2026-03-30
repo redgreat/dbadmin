@@ -151,6 +151,8 @@ class FccRelationService:
         
         not_found_fcc = []
         not_found_wms = []
+        paid_wms = []
+        not_full_reconc_wms = []
         
         # 收集所有单号
         all_fcc_nos = list(set(r['fcc_no'] for r in relations))
@@ -161,7 +163,7 @@ class FccRelationService:
             async with conn.cursor() as cur:
                 for fcc_no in all_fcc_nos:
                     # SQL1: 验证FCC报销单是否存在
-                    sql = "SELECT COUNT(*) FROM [dbo].[fms.reimbursement_info] WHERE CodeNumber = ?"
+                    sql = "SELECT COUNT(*) FROM [dbo].[fms.reimbursement_info] WHERE CodeNumber = ? AND Deleted=0"
                     await cur.execute(sql, (fcc_no,))
                     result = await cur.fetchone()
                     if not result or result[0] == 0:
@@ -173,13 +175,43 @@ class FccRelationService:
                 async with conn.cursor() as cur:
                     for wms_no in all_wms_nos:
                         # SQL2: 验证仓储对账单是否存在
-                        sql = "SELECT COUNT(*) FROM tb_reconcinfo WHERE ReconcNo = %s"
+                        sql = "SELECT COUNT(*) FROM tb_reconcinfo WHERE ReconcNo = %s AND Deleted=0"
                         await cur.execute(sql, (wms_no,))
                         result = await cur.fetchone()
                         if not result or result[0] == 0:
                             not_found_wms.append(wms_no)
+                            continue
+                        
+                        # SQL3: 验证仓储对账单是否已付款
+                        sql_paid = "SELECT 1 FROM tb_reconcinfo a WHERE ReconcNo = %s AND a.PayStatus=3 AND a.Deleted=0"
+                        await cur.execute(sql_paid, (wms_no,))
+                        result_paid = await cur.fetchone()
+                        if result_paid:
+                            paid_wms.append(wms_no)
+
+                        # SQL4: 验证对账单是否均为全部对账的应付单
+                        sql_full = """SELECT 1
+                                      FROM tb_reconcdetail a
+                                      JOIN tb_owinginfo b
+                                        ON b.Id=a.OwingId
+                                        AND b.Deleted=0
+                                      JOIN tb_reconcinfo c
+                                        ON c.Id=a.ReconcId
+                                        AND c.Deleted=0
+                                      WHERE a.Deleted=0
+                                        AND c.ReconcNo = %s
+                                      GROUP BY a.OwingId
+                                      HAVING SUM(a.ReconcNum)!=b.StockNum
+                                   """
+                        await cur.execute(sql_full, (wms_no,))
+                        result_full = await cur.fetchone()
+                        if result_full:
+                            not_full_reconc_wms.append(wms_no)
         
-        valid = len(not_found_fcc) == 0 and len(not_found_wms) == 0
+        valid = (len(not_found_fcc) == 0 and 
+                 len(not_found_wms) == 0 and 
+                 len(paid_wms) == 0 and 
+                 len(not_full_reconc_wms) == 0)
         
         if valid:
             message = "所有单据验证通过"
@@ -189,12 +221,18 @@ class FccRelationService:
                 parts.append(f"{len(not_found_fcc)} 个FCC报销单不存在")
             if not_found_wms:
                 parts.append(f"{len(not_found_wms)} 个仓储对账单不存在")
+            if paid_wms:
+                parts.append(f"{len(paid_wms)} 个仓储对账单已付款")
+            if not_full_reconc_wms:
+                parts.append(f"{len(not_full_reconc_wms)} 个仓储对账单对应应付单非全部对账(需手动处理)")
             message = "，".join(parts)
         
         return {
             'valid': valid,
             'not_found_fcc': not_found_fcc,
             'not_found_wms': not_found_wms,
+            'paid_wms': paid_wms,
+            'not_full_reconc_wms': not_full_reconc_wms,
             'message': message
         }
     

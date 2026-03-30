@@ -112,8 +112,47 @@ class ReportService:
         # 总数
         total = await query.count()
 
-        # 分页
-        items = await query.offset((page - 1) * page_size).limit(page_size).all()
+        # 分页查询，按ID倒序
+        items = await query.offset((page - 1) * page_size).limit(page_size).order_by("-id").all()
+
+        return items, total
+
+    @staticmethod
+    async def get_generation_list(
+        page: int = 1,
+        page_size: int = 10,
+        system_name: Optional[str] = None,
+        report_name: Optional[str] = None,
+        status: Optional[str] = None
+    ) -> Tuple[List[ReportGeneration], int]:
+        """
+        获取报表生成记录列表
+        """
+        query = ReportGeneration.filter_active()
+
+        # 状态过滤
+        if status:
+            query = query.filter(status=status)
+
+        # 报表名称模糊查询
+        if report_name:
+            query = query.filter(report_name__contains=report_name)
+
+        # 系统名称查询（需要关联报表配置表）
+        if system_name:
+            # 先查询符合条件的报表配置ID
+            config_ids = await ReportConfig.filter(system_name=system_name).values_list('id', flat=True)
+            if config_ids:
+                query = query.filter(report_config_id__in=config_ids)
+            else:
+                # 如果没有匹配的配置，返回空结果
+                return [], 0
+
+        # 总数
+        total = await query.count()
+
+        # 分页查询，按ID倒序
+        items = await query.offset((page - 1) * page_size).limit(page_size).order_by("-id").all()
 
         return items, total
 
