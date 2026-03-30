@@ -300,7 +300,7 @@ async def delete_generation(
             return Fail(msg="报表生成记录不存在")
 
         # 判断是否为管理员
-        is_admin = "admin" in current_user.roles
+        is_admin = current_user.is_superuser
 
         # 权限验证：管理员可删除所有，普通用户只能删除自己生成的
         if not is_admin and generation.generator != current_user.username:
