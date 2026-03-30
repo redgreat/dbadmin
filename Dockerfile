@@ -104,6 +104,9 @@ RUN echo '#!/bin/bash\n\
     # 创建符号链接\n\
     ln -sf /etc/nginx/sites-available/web.conf /etc/nginx/sites-enabled/\n\
     \n\
+    # 修复挂载目录的权限，确保 appuser 可写\n\
+    chown -R appuser:appuser /opt/dbadmin/data /opt/dbadmin/log 2>/dev/null || true\n\
+    \n\
     # 启动 supervisor\n\
     exec supervisord -c /etc/supervisor/supervisord.conf\n\
     ' > /opt/dbadmin/docker-entrypoint.sh && chmod +x /opt/dbadmin/docker-entrypoint.sh
