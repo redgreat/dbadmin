@@ -190,7 +190,7 @@ class FccRelationService:
                             paid_wms.append(wms_no)
 
                         # SQL4: 验证对账单是否均为全部对账的应付单
-                        sql_full = """SELECT 1
+                        sql_full = """SELECT a.OwingId,SUM(a.ReconcNum),b.StockNum
                                       FROM tb_reconcdetail a
                                       JOIN tb_owinginfo b
                                         ON b.Id=a.OwingId
