@@ -3,8 +3,8 @@
     <n-space vertical size="large">
       <n-card title="单据逻辑删除" size="small">
         <n-form ref="logicalFormRef" :model="logicalForm" :rules="logicalRules" label-placement="left" :label-width="100">
-          <n-form-item label="单据Id" path="stock_ids">
-            <n-input v-model:value="logicalForm.stock_ids" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据Id，逗号分隔" />
+          <n-form-item label="单据编码" path="stock_nos">
+            <n-input v-model:value="logicalForm.stock_nos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据编码，逗号分隔" />
           </n-form-item>
           <n-form-item label="操作人Id" path="operatorId">
             <n-input v-model:value="logicalForm.operatorId" clearable placeholder="输入操作人Id" />
@@ -18,8 +18,8 @@
 
       <n-card title="单据物理删除" size="small">
         <n-form ref="physicalFormRef" :model="physicalForm" :rules="physicalRules" label-placement="left" :label-width="100">
-          <n-form-item label="单据Id" path="stock_ids">
-            <n-input v-model:value="physicalForm.stock_ids" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据Id，逗号分隔" />
+          <n-form-item label="单据编码" path="stock_nos">
+            <n-input v-model:value="physicalForm.stock_nos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据编码，逗号分隔" />
           </n-form-item>
           <n-space>
             <n-button type="error" :loading="physicalExecuting" @click="handlePhysicalExecute">执行物理删除</n-button>
@@ -30,8 +30,8 @@
 
       <n-card title="单据逻辑删除恢复" size="small">
         <n-form ref="restoreFormRef" :model="restoreForm" :rules="restoreRules" label-placement="left" :label-width="100">
-          <n-form-item label="单据Id" path="stock_id">
-            <n-input v-model:value="restoreForm.stock_id" clearable placeholder="输入单个单据Id" />
+          <n-form-item label="单据编码" path="stock_no">
+            <n-input v-model:value="restoreForm.stock_no" clearable placeholder="输入单个单据编码" />
           </n-form-item>
           <n-form-item label="删除人Id" path="operatorId">
             <n-input v-model:value="restoreForm.operatorId" clearable placeholder="输入删除人Id" />
@@ -61,25 +61,27 @@ const logicalFormRef = ref(null)
 const physicalFormRef = ref(null)
 const restoreFormRef = ref(null)
 
-const logicalForm = ref({ stock_ids: '', operatorId: '' })
-const physicalForm = ref({ stock_ids: '' })
-const restoreForm = ref({ stock_id: '', operatorId: '' })
+const logicalForm = ref({ stock_nos: '', operatorId: '' })
+const physicalForm = ref({ stock_nos: '' })
+const restoreForm = ref({ stock_no: '', operatorId: '' })
 
 const logicalExecuting = ref(false)
 const physicalExecuting = ref(false)
 const restoreExecuting = ref(false)
 
-const rules = {
-  stock_ids: [
-    { required: true, message: '请输入单据Id' },
+const guidValidator = (value) => {
+  const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return guidRegex.test(String(value || '').trim())
+}
+
+const logicalRules = {
+  stock_nos: [
+    { required: true, message: '请输入单据编码' },
     {
       validator: (_, value) => {
-        if (!value) return new Error('请输入单据Id')
-        const ids = value
-          .split(',')
-          .map((s) => s.trim())
-          .filter((s) => s.length)
-        if (!ids.length) return new Error('请输入单据Id')
+        if (!value) return new Error('请输入单据编码')
+        const nos = value.split(',').map((s) => s.trim()).filter((s) => s.length)
+        if (!nos.length) return new Error('请输入单据编码')
         return true
       },
     },
@@ -88,8 +90,7 @@ const rules = {
     { required: true, message: '请输入操作人Id' },
     {
       validator: (_, value) => {
-        const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-        if (!guidRegex.test(String(value || '').trim())) {
+        if (!guidValidator(value)) {
           return new Error('操作人Id需为GUID格式（如：550e8400-e29b-41d4-a716-446655440000）')
         }
         return true
@@ -98,19 +99,14 @@ const rules = {
   ],
 }
 
-const logicalRules = rules
-
 const physicalRules = {
-  stock_ids: [
-    { required: true, message: '请输入单据Id' },
+  stock_nos: [
+    { required: true, message: '请输入单据编码' },
     {
       validator: (_, value) => {
-        if (!value) return new Error('请输入单据Id')
-        const ids = value
-          .split(',')
-          .map((s) => s.trim())
-          .filter((s) => s.length)
-        if (!ids.length) return new Error('请输入单据Id')
+        if (!value) return new Error('请输入单据编码')
+        const nos = value.split(',').map((s) => s.trim()).filter((s) => s.length)
+        if (!nos.length) return new Error('请输入单据编码')
         return true
       },
     },
@@ -118,15 +114,14 @@ const physicalRules = {
 }
 
 const restoreRules = {
-  stock_id: [
-    { required: true, message: '请输入单据Id' },
+  stock_no: [
+    { required: true, message: '请输入单据编码' },
   ],
   operatorId: [
     { required: true, message: '请输入删除人Id' },
     {
       validator: (_, value) => {
-        const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-        if (!guidRegex.test(String(value || '').trim())) {
+        if (!guidValidator(value)) {
           return new Error('删除人Id需为GUID格式（如：550e8400-e29b-41d4-a716-446655440000）')
         }
         return true
@@ -135,18 +130,18 @@ const restoreRules = {
   ],
 }
 
-const parseIds = (text) => text.split(',').map((s) => s.trim()).filter((s) => s.length)
+const parseNos = (text) => text.split(',').map((s) => s.trim()).filter((s) => s.length)
 
 const handleLogicalReset = () => {
-  logicalForm.value = { stock_ids: '', operatorId: '' }
+  logicalForm.value = { stock_nos: '', operatorId: '' }
 }
 
 const handlePhysicalReset = () => {
-  physicalForm.value = { stock_ids: '' }
+  physicalForm.value = { stock_nos: '' }
 }
 
 const handleRestoreReset = () => {
-  restoreForm.value = { stock_id: '', operatorId: '' }
+  restoreForm.value = { stock_no: '', operatorId: '' }
 }
 
 const handleLogicalExecute = async () => {
@@ -155,43 +150,18 @@ const handleLogicalExecute = async () => {
   } catch (e) {
     return
   }
-  const ids = parseIds(logicalForm.value.stock_ids)
+  const nos = parseNos(logicalForm.value.stock_nos)
   const operator_id = String(logicalForm.value.operatorId).trim()
-  if (!operator_id) {
-    message.error('操作人Id不能为空')
-    return
-  }
 
-  // 先验证单据状态
   logicalExecuting.value = true
   try {
-    const validateRes = await api.validateWmsDocuments({ stock_ids: ids, validate_type: 'logical_delete' })
-    if (validateRes.code !== 0 && validateRes.code !== 200) {
-      message.error(validateRes.msg || '验证失败')
-      return
-    }
-
-    if (!validateRes.data.success) {
-      const { not_found_docs = [], invalid_docs = [] } = validateRes.data
-      let errorMsg = validateRes.data.message
-      if (not_found_docs.length > 0) {
-        errorMsg += `\n不存在的单据: ${not_found_docs.join(', ')}`
-      }
-      if (invalid_docs.length > 0) {
-        errorMsg += `\n状态不符的单据: ${invalid_docs.map(d => `${d.stock_id}(${d.reason})`).join(', ')}`
-      }
-      message.error(errorMsg)
-      return
-    }
-
-    // 验证通过,执行删除
-    const res = await api.deleteWmsDocumentsLogicalBatch({ stock_ids: ids, operator_id })
-    if (res.code === 0 || res.code === 200) {
+    const res = await api.deleteWmsDocumentsLogicalBatch({ stock_nos: nos, operator_id })
+    if (res.code === 200 || res.code === 0) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
       if (failed_ids.length > 0) {
-        message.warning(`逻辑删除完成：成功 ${success_count} 条，失败 ${failed_ids.length} 条，失败ID：${failed_ids.join(', ')}`)
+        message.warning(res.msg || `逻辑删除完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`)
       } else {
-        message.success(`逻辑删除成功：${success_count} 条`)
+        message.success(res.msg || `逻辑删除成功：${success_count} 条`)
       }
     } else {
       message.error(res.msg || '逻辑删除失败')
@@ -209,35 +179,17 @@ const handlePhysicalExecute = async () => {
   } catch (e) {
     return
   }
-  const ids = parseIds(physicalForm.value.stock_ids)
+  const nos = parseNos(physicalForm.value.stock_nos)
 
-  // 先验证单据是否存在
   physicalExecuting.value = true
   try {
-    const validateRes = await api.validateWmsDocuments({ stock_ids: ids, validate_type: 'physical_delete' })
-    if (validateRes.code !== 0 && validateRes.code !== 200) {
-      message.error(validateRes.msg || '验证失败')
-      return
-    }
-
-    if (!validateRes.data.success) {
-      const { not_found_docs = [] } = validateRes.data
-      let errorMsg = validateRes.data.message
-      if (not_found_docs.length > 0) {
-        errorMsg += `\n不存在的单据: ${not_found_docs.join(', ')}`
-      }
-      message.error(errorMsg)
-      return
-    }
-
-    // 验证通过,执行删除
-    const res = await api.deleteWmsDocumentsPhysicalBatch({ stock_ids: ids })
-    if (res.code === 0 || res.code === 200) {
+    const res = await api.deleteWmsDocumentsPhysicalBatch({ stock_nos: nos })
+    if (res.code === 200 || res.code === 0) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
       if (failed_ids.length > 0) {
-        message.warning(`物理删除完成：成功 ${success_count} 条，失败 ${failed_ids.length} 条，失败ID：${failed_ids.join(', ')}`)
+        message.warning(res.msg || `物理删除完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`)
       } else {
-        message.success(`物理删除成功：${success_count} 条`)
+        message.success(res.msg || `物理删除成功：${success_count} 条`)
       }
     } else {
       message.error(res.msg || '物理删除失败')
@@ -255,39 +207,19 @@ const handleRestoreExecute = async () => {
   } catch (e) {
     return
   }
-  const stock_id = String(restoreForm.value.stock_id).trim()
+  const stock_no = String(restoreForm.value.stock_no).trim()
   const operator_id = String(restoreForm.value.operatorId).trim()
-  if (!operator_id) {
-    message.error('删除人Id不能为空')
-    return
-  }
 
-  // 先验证单据状态
   restoreExecuting.value = true
   try {
-    const validateRes = await api.validateWmsDocuments({ stock_ids: [stock_id], validate_type: 'restore' })
-    if (validateRes.code !== 0 && validateRes.code !== 200) {
-      message.error(validateRes.msg || '验证失败')
-      return
-    }
-
-    if (!validateRes.data.success) {
-      const { not_found_docs = [], invalid_docs = [] } = validateRes.data
-      let errorMsg = validateRes.data.message
-      if (not_found_docs.length > 0) {
-        errorMsg += `\n不存在的单据: ${not_found_docs.join(', ')}`
+    const res = await api.restoreWmsDocumentLogical({ stock_no, operator_id })
+    if (res.code === 200 || res.code === 0) {
+      const { restored = false } = res.data || {}
+      if (restored) {
+        message.success(res.msg || '逻辑删除恢复成功')
+      } else {
+        message.warning(res.msg || '单据无需恢复')
       }
-      if (invalid_docs.length > 0) {
-        errorMsg += `\n状态不符的单据: ${invalid_docs.map(d => `${d.stock_id}(${d.reason})`).join(', ')}`
-      }
-      message.error(errorMsg)
-      return
-    }
-
-    // 验证通过,执行恢复
-    const res = await api.restoreWmsDocumentLogical({ stock_id, operator_id })
-    if (res.code === 200) {
-      message.success('逻辑删除恢复成功')
     } else {
       message.error(res.msg || '逻辑删除恢复失败')
     }

@@ -153,6 +153,7 @@ class FccRelationService:
         not_found_wms = []
         paid_wms = []
         not_full_reconc_wms = []
+        existing_relations = []  # 已存在的对应关系
         
         # 收集所有单号
         all_fcc_nos = list(set(r['fcc_no'] for r in relations))
@@ -173,9 +174,28 @@ class FccRelationService:
                         await cur.execute(sql_loan, (fcc_no,))
                         res_loan = await cur.fetchone()
                         
-                        # 两个表都没有记录，才能判定它没有
                         if not res_loan or res_loan[0] == 0:
-                            not_found_fcc.append(fcc_no)
+                            # 借款单里也没查到，继续查还款核销单
+                            sql_repay = "SELECT COUNT(*) FROM [dbo].[fms.LoanRepaymentOrVerification_Info] WHERE CodeNumber = ? AND Deleted=0"
+                            await cur.execute(sql_repay, (fcc_no,))
+                            res_repay = await cur.fetchone()
+                            
+                            # 三个表都没有记录，才能判定它不存在
+                            if not res_repay or res_repay[0] == 0:
+                                not_found_fcc.append(fcc_no)
+                
+                # 验证是否已存在对应关系（查询fms_costdetail_reconcinfo）
+                for relation in relations:
+                    fcc_no = relation['fcc_no']
+                    for wms_no in relation['wms_nos']:
+                        sql_exist = """
+                            SELECT COUNT(*) FROM [dbo].[fms_costdetail_reconcinfo] 
+                            WHERE CodeNumber = ? AND ReconcNo = ? AND Deleted = 0
+                        """
+                        await cur.execute(sql_exist, (fcc_no, wms_no))
+                        res_exist = await cur.fetchone()
+                        if res_exist and res_exist[0] > 0:
+                            existing_relations.append({'fcc_no': fcc_no, 'wms_no': wms_no})
         
         # 验证仓储对账单（MySQL）
         if isinstance(wms_pool, aiomysql.Pool):
@@ -219,7 +239,8 @@ class FccRelationService:
         valid = (len(not_found_fcc) == 0 and 
                  len(not_found_wms) == 0 and 
                  len(paid_wms) == 0 and 
-                 len(not_full_reconc_wms) == 0)
+                 len(not_full_reconc_wms) == 0 and
+                 len(existing_relations) == 0)
         
         if valid:
             message = "所有单据验证通过"
@@ -233,6 +254,8 @@ class FccRelationService:
                 parts.append(f"{len(paid_wms)} 个仓储对账单已付款")
             if not_full_reconc_wms:
                 parts.append(f"{len(not_full_reconc_wms)} 个仓储对账单对应应付单非全部对账(需手动处理)")
+            if existing_relations:
+                parts.append(f"{len(existing_relations)} 个对应关系已存在")
             message = "，".join(parts)
         
         return {
@@ -241,6 +264,7 @@ class FccRelationService:
             'not_found_wms': not_found_wms,
             'paid_wms': paid_wms,
             'not_full_reconc_wms': not_full_reconc_wms,
+            'existing_relations': existing_relations,
             'message': message
         }
     
@@ -330,9 +354,12 @@ class FccRelationService:
                                 """
                                 await cur.execute(insert_sql)
                             
-                            # 步骤3: 写入FCC对应关系表（SQL5）
+                            # 步骤3: 写入FCC对应关系表
+                            # 需要先判断FCC单据类型：报销单(ApplicationType=1)、借款单(ApplicationType=2)、还款核销单(ApplicationType=3)
                             placeholders = ','.join(['?'] * len(wms_nos))
-                            sql5 = f"""
+                            
+                            # SQL5-1: ApplicationType=1 报销单
+                            sql5_1 = f"""
                                 SELECT NEWID() AS Id,1 AS ApplicationType,B.Id AS ApplicationId,B.CodeNumber,C.Id AS CostDetailId,
                                        A.ReconcId,A.ReconcNo,A.SupplierId,A.SupplierName,
                                        D.CompanyId AS OwnerId,
@@ -351,15 +378,71 @@ class FccRelationService:
                                   LEFT JOIN membership_userbaseinfo E ON B.CreatedById=E.Id
                                  WHERE 1=1
                                    AND A.ReconcNo IN ({placeholders})
+                                   AND B.Id IS NOT NULL
                                  ORDER BY A.ApplyTime
                             """
+                            
+                            # SQL5-2: ApplicationType=2 借款单
+                            sql5_2 = f"""
+                                SELECT NEWID() AS Id,2 AS ApplicationType,B.Id AS ApplicationId,B.CodeNumber,C.Id AS CostDetailId,
+                                       A.ReconcId,A.ReconcNo,A.SupplierId,A.SupplierName,
+                                       D.CompanyId AS OwnerId,
+                                       D.OwnerId AS WareHouseOwnerId,D.OwnerName,
+                                       A.ApplyTime,
+                                       A.ReconcPrice,
+                                       A.ReconcPrice AS InvoiceSurplusPrice,
+                                       A.ReconcPrice,
+                                       (CAST(FORMAT(GETDATE(),'yyyy-MM-dd') AS VARCHAR)+' 手动刷数') AS Remark,
+                                       A.ReconcPersonCode,A.ReconcPersonName,
+                                       NULL,GETDATE(),NULL,GETDATE(),NULL,NULL,0,A.ReconcNum
+                                  FROM tm_wh_reconcinfo A
+                                  LEFT JOIN dbo.[fms.loan_info] B ON B.CodeNumber=?
+                                  LEFT JOIN dbo.[fms.costdetail_info] C ON B.Id=C.ReimbursementId AND C.Deleted=0
+                                  LEFT JOIN dbo.[fms_warehouse_ownerinfo] D ON D.OwnerId=A.OwnerId
+                                  LEFT JOIN membership_userbaseinfo E ON B.CreatedById=E.Id
+                                 WHERE 1=1
+                                   AND A.ReconcNo IN ({placeholders})
+                                   AND B.Id IS NOT NULL
+                                 ORDER BY A.ApplyTime
+                            """
+                            
+                            # SQL5-3: ApplicationType=3 还款核销单
+                            sql5_3 = f"""
+                                SELECT NEWID() AS Id,3 AS ApplicationType,B.Id AS ApplicationId,B.CodeNumber,C.Id AS CostDetailId,
+                                       A.ReconcId,A.ReconcNo,A.SupplierId,A.SupplierName,
+                                       D.CompanyId AS OwnerId,
+                                       D.OwnerId AS WareHouseOwnerId,D.OwnerName,
+                                       A.ApplyTime,
+                                       A.ReconcPrice,
+                                       A.ReconcPrice AS InvoiceSurplusPrice,
+                                       A.ReconcPrice AS ThisInvoicePrice,
+                                       (CAST(FORMAT(GETDATE(),'yyyy-MM-dd') AS VARCHAR)+' 手动刷数') AS Remark,
+                                       A.ReconcPersonCode,A.ReconcPersonName,
+                                       NULL,GETDATE(),NULL,GETDATE(),NULL,NULL,0,A.ReconcNum
+                                  FROM tm_wh_reconcinfo A
+                                  LEFT JOIN dbo.[fms.LoanRepaymentOrVerification_Info] B ON B.CodeNumber=?
+                                  LEFT JOIN dbo.[fms.costdetail_info] C ON B.Id=C.ReimbursementId AND C.Deleted=0
+                                  LEFT JOIN dbo.[fms_warehouse_ownerinfo] D ON D.OwnerId=A.OwnerId
+                                  LEFT JOIN membership_userbaseinfo E ON B.CreatedById=E.Id
+                                 WHERE 1=1
+                                   AND A.ReconcNo IN ({placeholders})
+                                   AND B.Id IS NOT NULL
+                                 ORDER BY A.ApplyTime
+                            """
+                            
                             params = [fcc_no] + wms_nos
-                            await cur.execute(sql5, params)
-                            relation_data = await cur.fetchall()
+                            all_relation_data = []
+                            
+                            # 执行三条SQL并合并结果
+                            for sql5 in [sql5_1, sql5_2, sql5_3]:
+                                await cur.execute(sql5, params)
+                                relation_data = await cur.fetchall()
+                                if relation_data:
+                                    all_relation_data.extend(relation_data)
                             
                             # 插入到正式表
-                            if relation_data:
-                                for rel_row in relation_data:
+                            if all_relation_data:
+                                for rel_row in all_relation_data:
                                     # 这里需要根据实际表结构构建INSERT语句
                                     # 暂时记录日志
                                     logger.info(f"关联数据: {rel_row}")

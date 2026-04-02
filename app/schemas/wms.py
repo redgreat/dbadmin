@@ -6,20 +6,21 @@ from pydantic import BaseModel, Field, validator
 
 class WmsDeleteBatchIn(BaseModel):
     """批量删除入参"""
-    stock_ids: List[str] = Field(default_factory=list, description="单据Id列表，逗号分隔后端已拆分")
+    stock_nos: List[str] = Field(default_factory=list, description="单据编码列表")
     operator_id: str = Field(default="", description="操作人Id（GUID格式）")
 
 
 class WmsRestoreLogicalIn(BaseModel):
     """逻辑删除恢复入参"""
-    stock_id: str = Field(..., description="单据Id")
+    stock_no: str = Field(..., description="单据编码")
     operator_id: str = Field(..., description="删除人Id（GUID格式）")
 
 
 class WmsValidateRequest(BaseModel):
     """单据验证请求"""
-    stock_ids: List[str] = Field(default_factory=list, description="单据Id列表")
+    stock_nos: List[str] = Field(default_factory=list, description="单据编码列表")
     validate_type: str = Field(..., description="验证类型: logical_delete, physical_delete, restore")
+    operator_id: str = Field(default="", description="删除人Id（恢复时需要）")
 
 
 class PriceQueryIn(BaseModel):

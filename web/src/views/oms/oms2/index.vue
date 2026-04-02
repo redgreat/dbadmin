@@ -10,12 +10,12 @@
         :model="batchForm"
         :rules="batchFormRules"
       >
-        <n-form-item label="订单ID或编码" path="orderIds">
+        <n-form-item label="订单编码" path="orderNos">
           <n-input
-            v-model:value="batchForm.orderIds"
+            v-model:value="batchForm.orderNos"
             type="textarea"
             :rows="6"
-            placeholder="请输入订单ID，多个用逗号分隔，例如：&#10;OI9971420165,&#10;OI9971420167"
+            placeholder="请输入订单编码，多个用逗号分隔，例如：&#10;OI9971420165,&#10;OI9971420167"
           />
         </n-form-item>
         <n-form-item label="删除原因" path="reason">
@@ -143,15 +143,15 @@ const loading = ref(false)
 
 // 批量删除表单
 const batchForm = ref({
-  orderIds: '',
+  orderNos: '',
   reason: ''
 })
 
 // 表单验证规则
 const batchFormRules = {
-  orderIds: {
+  orderNos: {
     required: true,
-    message: '请输入订单ID',
+    message: '请输入订单编码',
     trigger: ['blur']
   },
   reason: {
@@ -163,35 +163,35 @@ const batchFormRules = {
 
 
 
-// 解析订单ID字符串
-const parseOrderIds = (orderIdsStr) => {
-  if (!orderIdsStr) return []
-  return orderIdsStr.split(',').map(id => id.trim()).filter(id => id)
+// 解析订单编码字符串
+const parseOrderNos = (orderNosStr) => {
+  if (!orderNosStr) return []
+  return orderNosStr.split(',').map(no => no.trim()).filter(no => no)
 }
 
 // 数据校验处理
 const handleValidate = async () => {
-  if (!batchForm.value.orderIds) {
-    message.warning('请先填写订单ID或编码')
+  if (!batchForm.value.orderNos) {
+    message.warning('请先填写订单编码')
     return
   }
 
-  const orderIds = parseOrderIds(batchForm.value.orderIds)
-  if (orderIds.length === 0) {
-    message.warning('请输入有效的订单ID或编码')
+  const orderNos = parseOrderNos(batchForm.value.orderNos)
+  if (orderNos.length === 0) {
+    message.warning('请输入有效的订单编码')
     return
   }
 
   try {
     loading.value = true
     const response = await api.validateOrdersForDelete({
-      order_ids: orderIds.join(','),
+      order_nos: orderNos.join(','),
       conn_id: 5
     })
-    
+
     validationResult.value = response.data
     deleteResult.value = null // 清空之前的删除结果
-    
+
     if (response.data.success) {
       message.success('数据校验通过')
     } else {
@@ -200,22 +200,22 @@ const handleValidate = async () => {
   } catch (error) {
     console.error('验证失败:', error)
     // 模拟验证结果
-    const foundOrders = orderIds.slice(0, Math.floor(orderIds.length * 0.8)).map((id, index) => ({
-      id: id,
-      orderNo: id,
+    const foundOrders = orderNos.slice(0, Math.floor(orderNos.length * 0.8)).map((no, index) => ({
+      id: 1000 + index,
+      orderNo: no,
       status: index % 3 === 0 ? '待审核' : index % 3 === 1 ? '已审核' : '已完成',
       createTime: '2023-05-01 10:00:00'
     }))
-    
-    const notFoundIds = orderIds.slice(Math.floor(orderIds.length * 0.8))
-    
+
+    const notFoundIds = orderNos.slice(Math.floor(orderNos.length * 0.8))
+
     validationResult.value = {
       success: notFoundIds.length === 0,
       foundOrders,
       notFoundIds,
       message: notFoundIds.length > 0 ? `有 ${notFoundIds.length} 个订单未找到` : ''
     }
-    
+
     if (notFoundIds.length === 0) {
       message.success('数据校验通过')
     } else {
@@ -252,39 +252,39 @@ const handleBatchDelete = async () => {
     if (!confirmed) return
     
     loading.value = true
-    
+
     // 执行批量删除
     const response = await api.batchDeleteOrders({
-      order_ids: parseOrderIds(batchForm.value.orderIds).join(','),
+      order_nos: parseOrderNos(batchForm.value.orderNos).join(','),
       reason: batchForm.value.reason,
       conn_id: 5
     })
-    
+
     deleteResult.value = response.data
-    
+
     if (response.data.success) {
       message.success(`批量删除成功，共删除 ${response.data.deleted_count} 条订单`)
       // 重置表单
       batchForm.value = {
-        orderIds: '',
+        orderNos: '',
         reason: ''
       }
       validationResult.value = null
     } else {
       message.error('批量删除失败：' + response.data.message)
     }
-    
+
   } catch (error) {
     console.error('批量删除失败:', error)
     // 模拟删除结果
-    const orderIds = parseOrderIds(batchForm.value.orderIds)
+    const orderNos = parseOrderNos(batchForm.value.orderNos)
     deleteResult.value = {
       success: false,
       message: error.response?.data?.message || error.message,
       deleted_count: 0,
-      details: orderIds.map(id => ({
-        orderId: id,
-        orderNo: id,
+      details: orderNos.map(no => ({
+        orderId: null,
+        orderNo: no,
         deleteTime: new Date().toLocaleString(),
         success: false,
         message: error.response?.data?.message || error.message

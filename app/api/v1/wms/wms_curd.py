@@ -24,39 +24,38 @@ router = APIRouter()
 async def validate_stock(body: WmsValidateRequest):
     """验证单据状态"""
     try:
-        ids: List[str] = [s.strip() for s in body.stock_ids if s and s.strip()]
-        if not ids:
-            return Fail(code=400, msg="单据Id不能为空")
+        nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
+        if not nos:
+            return Fail(code=400, msg="单据编码不能为空")
 
-        result = await wms_service.validate_stock(ids, body.validate_type)
+        result = await wms_service.validate_stock(nos, body.validate_type, body.operator_id)
         return Success(data=result, msg=result["message"])
     except Exception as e:
         logger.error(f"验证单据失败: {e}")
         return Fail(code=500, msg=f"验证失败: {str(e)}")
 
 
-@router.post("/wms_curd/delete_logical_batch", summary="按单据Id批量逻辑删除")
+@router.post("/wms_curd/delete_logical_batch", summary="按单据编码批量逻辑删除")
 async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
     """批量逻辑删除单据"""
     try:
-        ids: List[str] = [s.strip() for s in body.stock_ids if s and s.strip()]
-        if not ids:
-            return Fail(code=400, msg="单据Id不能为空")
+        nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
+        if not nos:
+            return Fail(code=400, msg="单据编码不能为空")
 
         # 先验证单据状态
-        validation = await wms_service.validate_stock(ids, "logical_delete")
+        validation = await wms_service.validate_stock(nos, "logical_delete")
         if not validation["success"]:
-            return Fail(
-                code=400, 
+            return Success(
                 msg=f"验证失败: {validation['message']}",
                 data={
-                    "not_found_docs": validation["not_found_docs"],
-                    "invalid_docs": validation["invalid_docs"]
+                    "success_count": 0,
+                    "failed_ids": validation["not_found_docs"] + [d["stock_no"] for d in validation["invalid_docs"]]
                 }
             )
 
         try:
-            success_count, failed_ids = await wms_service.delete_logical_batch(ids, body.operator_id)
+            success_count, failed_ids = await wms_service.delete_logical_batch(nos, body.operator_id)
         except Exception as e:
             logger.error(f"逻辑删除失败: {e}")
             return Fail(code=500, msg=f"执行失败: {str(e)}")
@@ -72,14 +71,14 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
             user_id = 0
             username = ""
 
-        for did in ids:
-            status = 200 if did not in failed_ids else 500
+        for dno in nos:
+            status = 200 if dno not in failed_ids else 500
             try:
                 await AuditLog.create(
                     user_id=user_id,
                     username=username,
                     module="WMS",
-                    summary=f"单据逻辑删除: id={did}",
+                    summary=f"单据逻辑删除: stock_no={dno}",
                     method="POST",
                     path="/api/v1/wms/wms_curd/delete_logical_batch",
                     status=status,
@@ -88,33 +87,35 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
             except Exception as e:
                 logger.warning(f"审计日志记录失败: {e}")
 
-        return Success(data={"success_count": success_count, "failed_ids": failed_ids})
+        if failed_ids:
+            return Success(msg=f"部分删除失败，成功 {success_count} 条，失败 {len(failed_ids)} 条", data={"success_count": success_count, "failed_ids": failed_ids})
+        return Success(msg=f"删除成功，共 {success_count} 条", data={"success_count": success_count, "failed_ids": []})
     except Exception as e:
         logger.error(f"接口异常: {e}")
         return Fail(code=500, msg="服务异常")
 
 
-@router.post("/wms_curd/delete_physical_batch", summary="按单据Id批量物理删除")
+@router.post("/wms_curd/delete_physical_batch", summary="按单据编码批量物理删除")
 async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
     """批量物理删除单据"""
     try:
-        ids: List[str] = [s.strip() for s in body.stock_ids if s and s.strip()]
-        if not ids:
-            return Fail(code=400, msg="单据Id不能为空")
+        nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
+        if not nos:
+            return Fail(code=400, msg="单据编码不能为空")
 
         # 先验证单据是否存在
-        validation = await wms_service.validate_stock(ids, "physical_delete")
+        validation = await wms_service.validate_stock(nos, "physical_delete")
         if not validation["success"]:
-            return Fail(
-                code=400, 
+            return Success(
                 msg=f"验证失败: {validation['message']}",
                 data={
-                    "not_found_docs": validation["not_found_docs"]
+                    "success_count": 0,
+                    "failed_ids": validation["not_found_docs"]
                 }
             )
 
         try:
-            success_count, failed_ids = await wms_service.delete_physical_batch(ids, body.operator_id)
+            success_count, failed_ids = await wms_service.delete_physical_batch(nos, body.operator_id)
         except Exception as e:
             logger.error(f"物理删除失败: {e}")
             return Fail(code=500, msg=f"执行失败: {str(e)}")
@@ -130,14 +131,14 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
             user_id = 0
             username = ""
 
-        for did in ids:
-            status = 200 if did not in failed_ids else 500
+        for dno in nos:
+            status = 200 if dno not in failed_ids else 500
             try:
                 await AuditLog.create(
                     user_id=user_id,
                     username=username,
                     module="WMS",
-                    summary=f"单据物理删除: id={did}",
+                    summary=f"单据物理删除: stock_no={dno}",
                     method="POST",
                     path="/api/v1/wms/wms_curd/delete_physical_batch",
                     status=status,
@@ -146,7 +147,9 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
             except Exception as e:
                 logger.warning(f"审计日志记录失败: {e}")
 
-        return Success(data={"success_count": success_count, "failed_ids": failed_ids})
+        if failed_ids:
+            return Success(msg=f"部分删除失败，成功 {success_count} 条，失败 {len(failed_ids)} 条", data={"success_count": success_count, "failed_ids": failed_ids})
+        return Success(msg=f"删除成功，共 {success_count} 条", data={"success_count": success_count, "failed_ids": []})
     except Exception as e:
         logger.error(f"接口异常: {e}")
         return Fail(code=500, msg="服务异常")
@@ -157,19 +160,12 @@ async def restore_logical(req: Request, body: WmsRestoreLogicalIn):
     """恢复被逻辑删除的单据"""
     try:
         # 先验证单据状态
-        validation = await wms_service.validate_stock([body.stock_id], "restore")
+        validation = await wms_service.validate_stock([body.stock_no], "restore", body.operator_id)
         if not validation["success"]:
-            return Fail(
-                code=400, 
-                msg=f"验证失败: {validation['message']}",
-                data={
-                    "not_found_docs": validation["not_found_docs"],
-                    "invalid_docs": validation["invalid_docs"]
-                }
-            )
+            return Success(msg=validation["message"], data={"stock_no": body.stock_no, "restored": False})
 
         try:
-            await wms_service.restore_logical(stock_id=body.stock_id, operator_id=body.operator_id)
+            await wms_service.restore_logical(stock_no=body.stock_no, operator_id=body.operator_id)
         except Exception as e:
             logger.error(f"恢复失败: {e}")
             return Fail(code=500, msg=f"执行失败: {str(e)}")
@@ -190,7 +186,7 @@ async def restore_logical(req: Request, body: WmsRestoreLogicalIn):
                 user_id=user_id,
                 username=username,
                 module="WMS",
-                summary=f"单据逻辑删除恢复: id={body.stock_id}, 操作人={body.operator_id}",
+                summary=f"单据逻辑删除恢复: stock_no={body.stock_no}, 操作人={body.operator_id}",
                 method="POST",
                 path="/api/v1/wms/wms_curd/restore_logical",
                 status=200,
@@ -199,7 +195,7 @@ async def restore_logical(req: Request, body: WmsRestoreLogicalIn):
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")
 
-        return Success(msg="OK")
+        return Success(msg="恢复成功", data={"stock_no": body.stock_no, "restored": True})
     except Exception as e:
         logger.error(f"接口异常: {e}")
         return Fail(code=500, msg="服务异常")
