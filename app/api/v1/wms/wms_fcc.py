@@ -61,14 +61,30 @@ async def submit_task(req: Request, body: FccSubmitIn):
         task_id = await fcc_relation_service.submit_task(relations)
         
         # 记录审计日志
-        current_user = req.state.user
-        if current_user:
+        try:
+            token = req.headers.get("token")
+            user_obj: User = None
+            if token:
+                user_obj = await AuthControl.is_authed(token)
+            user_id = user_obj.id if user_obj else 0
+            username = user_obj.username if user_obj else ""
+        except Exception:
+            user_id = 0
+            username = ""
+
+        try:
             await AuditLog.create(
-                user_id=current_user.id,
-                module="wms_fcc",
-                action="submit",
-                content=f"提交FCC关联任务，任务ID: {task_id}，关联数量: {len(relations)}",
+                user_id=user_id,
+                username=username,
+                module="WMS",
+                summary=f"提交FCC关联任务: task_id={task_id}, 关联数量={len(relations)}",
+                method="POST",
+                path="/api/v1/wms/fcc/submit",
+                status=200,
+                response_time=0,
             )
+        except Exception as e:
+            logger.warning(f"审计日志记录失败: {e}")
         
         return Success(data={'task_id': task_id})
     except Exception as e:

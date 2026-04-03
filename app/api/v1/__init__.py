@@ -18,6 +18,7 @@ from .tool import tool_router
 from .imptask import router as imptask_router
 from .report import report_router
 from .wms import wms_router
+from .alert import alert_router
 from .imptask.imptask import download_sql_file
 
 v1_router = APIRouter()
@@ -37,6 +38,7 @@ v1_router.include_router(sim_router, prefix="/sim", tags=["SIM卡中心"], depen
 v1_router.include_router(tool_router, prefix="/tool", tags=["日常工具"], dependencies=[DependPermisson])
 v1_router.include_router(report_router, prefix="/report", tags=["报表管理"], dependencies=[DependPermisson])
 v1_router.include_router(wms_router, prefix="/wms", tags=["仓储中心"], dependencies=[DependPermisson])
+v1_router.include_router(alert_router, prefix="/alert", tags=["预警管理"], dependencies=[DependPermisson])
 # imptask下载接口 - 单独注册，不需要权限验证（在接口内部验证token）
 v1_router.get("/imptask/download/{task_id}", summary="下载SQL文件")(download_sql_file)
 # imptask其他接口 - 需要权限验证

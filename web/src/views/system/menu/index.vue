@@ -210,7 +210,7 @@ const columns = [
               size: 'tiny',
               quaternary: true,
               type: 'primary',
-              style: `display: ${row.children && row.menu_type !== 'menu' ? '' : 'none'};`,
+              style: `display: ${row.menu_type === 'catalog' ? '' : 'none'};`,
               onClick: () => {
                 initForm.parent_id = row.id
                 initForm.menu_type = 'menu'

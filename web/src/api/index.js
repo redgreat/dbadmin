@@ -112,6 +112,29 @@ export default {
   createDict: (data = {}) => request.post('/dict/create', data),
   updateDict: (data = {}) => request.post('/dict/update', data),
   deleteDict: (params = {}) => request.delete('/dict/delete', { params }),
+  // alert - 预警发送人
+  getAlertSenderList: (params = {}) => request.get('/alert/to/list', { params }),
+  getAlertSenderById: (params = {}) => request.get('/alert/to/get', { params }),
+  createAlertSender: (data = {}) => request.post('/alert/to/create', data),
+  updateAlertSender: (data = {}) => request.post('/alert/to/update', data),
+  deleteAlertSender: (params = {}) => request.delete('/alert/to/delete', { params }),
+  // alert - 预警日志
+  getAlertLogList: (params = {}) => request.get('/alert/log/list', { params }),
+  getAlertLogById: (params = {}) => request.get('/alert/log/get', { params }),
+  createAlertLog: (data = {}) => request.post('/alert/log/create', data),
+  // task - 定时报表发送
+  getReportSendTaskList: (params = {}) => request.get('/task/report-send/list', { params }),
+  createReportSendTask: (data = {}) => request.post('/task/report-send/create', data),
+  updateReportSendTask: (data = {}) => request.post('/task/report-send/update', data),
+  deleteReportSendTask: (params = {}) => request.delete('/task/report-send/delete', { params }),
+  executeReportSendTask: (params = {}) => request.post('/task/report-send/execute', null, { params }),
+  // task - SQL预警
+  getSqlAlertTaskList: (params = {}) => request.get('/task/sql-alert/list', { params }),
+  createSqlAlertTask: (data = {}) => request.post('/task/sql-alert/create', data),
+  updateSqlAlertTask: (data = {}) => request.post('/task/sql-alert/update', data),
+  deleteSqlAlertTask: (params = {}) => request.delete('/task/sql-alert/delete', { params }),
+  executeSqlAlertTask: (params = {}) => request.post('/task/sql-alert/execute', null, { params }),
+  getNotifyTaskLogList: (params = {}) => request.get('/task/notify-log/list', { params }),
   // wms - 仓储中心
   deleteWmsDocumentsLogicalBatch: (data = {}) => request.post('/wms/wms_curd/delete_logical_batch', data),
   deleteWmsDocumentsPhysicalBatch: (data = {}) => request.post('/wms/wms_curd/delete_physical_batch', data),

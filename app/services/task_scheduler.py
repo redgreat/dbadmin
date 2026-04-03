@@ -73,15 +73,54 @@ class TaskScheduler:
             except Exception as e:
                 logger.warning(f"加载任务失败，可能是 Task 表不存在: {str(e)}")
                 logger.info("跳过加载任务，等待数据库表创建后再加载")
+            try:
+                from app.models.task_notify import ReportSendTask, SqlAlertTask
+
+                report_tasks = await ReportSendTask.filter(status=True).all()
+                for task in report_tasks:
+                    await self.add_report_send_job(task)
+                logger.info(f"已加载 {len(report_tasks)} 个定时报表发送任务")
+
+                sql_tasks = await SqlAlertTask.filter(status=True).all()
+                for task in sql_tasks:
+                    await self.add_sql_alert_job(task)
+                logger.info(f"已加载 {len(sql_tasks)} 个SQL预警任务")
+            except Exception as e:
+                logger.warning(f"加载通知任务失败，可能是表不存在: {str(e)}")
         except Exception as e:
             logger.error(f"加载任务时发生错误: {str(e)}")
+
+    def _build_cron_trigger(self, cron: str) -> CronTrigger:
+        cron_parts = (cron or "").split()
+        if len(cron_parts) == 5:
+            minute, hour, day, month, day_of_week = cron_parts
+            return CronTrigger(
+                minute=minute,
+                hour=hour,
+                day=day,
+                month=month,
+                day_of_week=day_of_week,
+                timezone="Asia/Shanghai",
+            )
+        if len(cron_parts) == 6:
+            second, minute, hour, day, month, day_of_week = cron_parts
+            return CronTrigger(
+                second=second,
+                minute=minute,
+                hour=hour,
+                day=day,
+                month=month,
+                day_of_week=day_of_week,
+                timezone="Asia/Shanghai",
+            )
+        raise ValueError("无效的Cron表达式，请使用5位或6位格式")
 
     async def add_job(self, task: Task):
         """添加任务到调度器"""
         job_id = f"task_{task.id}"
 
         # 创建Cron触发器
-        trigger = CronTrigger.from_crontab(task.cron)
+        trigger = self._build_cron_trigger(task.cron)
 
         # 根据任务类型选择执行器
         if task.type == TaskType.PYTHON:
@@ -107,6 +146,60 @@ class TaskScheduler:
             await task.save()
 
         logger.info(f"已添加任务 {job_id} 到调度器，下次执行时间: {task.next_run_time}")
+
+    async def add_report_send_job(self, task):
+        job_id = f"report_send_{task.id}"
+        trigger = self._build_cron_trigger(task.cron)
+        self.scheduler.add_job(
+            self.execute_report_send_task,
+            trigger=trigger,
+            id=job_id,
+            name=task.task_name,
+            executor="default",
+            replace_existing=True,
+            kwargs={"task_id": task.id},
+        )
+        job = self.scheduler.get_job(job_id)
+        if job:
+            task.next_run_time = job.next_run_time
+            await task.save()
+
+    async def remove_report_send_job(self, task_id: int):
+        job_id = f"report_send_{task_id}"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+    async def add_sql_alert_job(self, task):
+        job_id = f"sql_alert_{task.id}"
+        trigger = self._build_cron_trigger(task.cron)
+        self.scheduler.add_job(
+            self.execute_sql_alert_task,
+            trigger=trigger,
+            id=job_id,
+            name=task.task_name,
+            executor="default",
+            replace_existing=True,
+            kwargs={"task_id": task.id},
+        )
+        job = self.scheduler.get_job(job_id)
+        if job:
+            task.next_run_time = job.next_run_time
+            await task.save()
+
+    async def remove_sql_alert_job(self, task_id: int):
+        job_id = f"sql_alert_{task_id}"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+    async def execute_report_send_task(self, task_id: int):
+        from app.services.notify_task_executor import NotifyTaskExecutor
+
+        await NotifyTaskExecutor.execute_report_send_task(task_id=task_id)
+
+    async def execute_sql_alert_task(self, task_id: int):
+        from app.services.notify_task_executor import NotifyTaskExecutor
+
+        await NotifyTaskExecutor.execute_sql_alert_task(task_id=task_id)
 
     async def remove_job(self, task_id: int):
         """从调度器中移除任务"""

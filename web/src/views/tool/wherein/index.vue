@@ -10,7 +10,7 @@
               v-model:value="form.inputData"
               type="textarea"
               :rows="10"
-              placeholder="请输入数据，每行一个值&#10;例如：&#10;ZR25100082&#10;ZR25120094&#10;ZR25100083"
+              placeholder="请输入数据，每行一个值&#10;例如：&#10;ZR16060018&#10;ZR16060018&#10;ZR16060018"
               clearable
             />
           </n-form-item>
