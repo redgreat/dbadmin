@@ -91,6 +91,7 @@ export default {
     request.post('/imptask/create', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  executeExcelImportTask: (data = {}) => request.post('/imptask/execute', data),
   deleteExcelImportTask: (id) => request.delete(`/imptask/delete/${id}`),
 
   // report - 报表管理

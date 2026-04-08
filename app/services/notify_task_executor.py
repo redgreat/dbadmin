@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -15,6 +16,8 @@ from app.services.wecom_bot_service import WecomBotService
 
 
 class NotifyTaskExecutor:
+    MAX_MESSAGE_ROWS = 20
+
     @staticmethod
     async def _create_run_log(task_type: str, task_ref_id: int) -> NotifyTaskRunLog:
         return await NotifyTaskRunLog.create(
@@ -59,6 +62,28 @@ class NotifyTaskExecutor:
         )
 
     @staticmethod
+    def _fill_report_message(template: str, report_name: str) -> str:
+        """渲染定时报表消息模板占位符。"""
+        now = datetime.now()
+        msg = (template or "").strip()
+        if not msg:
+            return (
+                f"定时报表已生成\n"
+                f"报表：{report_name}\n"
+                f"生成时间：{now.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+
+        replacements = {
+            "{{date}}": now.strftime("%Y%m%d"),
+            "{{time}}": now.strftime("%H%M"),
+            "{{month}}": now.strftime("%Y%m"),
+            "{{report_name}}": report_name,
+        }
+        for key, value in replacements.items():
+            msg = msg.replace(key, value)
+        return msg
+
+    @staticmethod
     async def execute_report_send_task(task_id: int) -> Dict[str, Any]:
         run_log = await NotifyTaskExecutor._create_run_log("report_send", task_id)
         task = await ReportSendTask.get_or_none(id=task_id).prefetch_related("report_config", "sender")
@@ -89,16 +114,16 @@ class NotifyTaskExecutor:
             if generation.status != "completed" or not generation.file_path:
                 raise ValueError("报表生成失败")
 
-            message = task.message_template or (
-                f"定时报表已生成\n"
-                f"报表：{report_config.report_name}\n"
-                f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            message = NotifyTaskExecutor._fill_report_message(
+                template=task.message_template or "",
+                report_name=report_config.report_name,
             )
             text_resp = WecomBotService.send_text(sender.channel_target, message)
 
-            file_resp = None
-            if task.send_attachment and generation.file_path and os.path.exists(generation.file_path):
-                file_resp = WecomBotService.send_file(sender.channel_target, generation.file_path)
+            # 定时报表任务强制发送附件（xlsx或zip）
+            if not generation.file_path or not os.path.exists(generation.file_path):
+                raise ValueError("报表文件不存在，无法发送附件")
+            file_resp = WecomBotService.send_file(sender.channel_target, generation.file_path)
 
             task.last_run_time = datetime.now()
             await task.save()
@@ -131,21 +156,41 @@ class NotifyTaskExecutor:
             return {"success": False, "message": str(exc)}
 
     @staticmethod
-    def _fill_message(template: str, first_row: Optional[dict], total: int, template_columns: List[str], total_placeholder: str):
+    def _safe_str(value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, datetime):
+            return value.strftime("%Y-%m-%d %H:%M:%S")
+        return str(value)
+
+    @staticmethod
+    def _build_rows_text(rows: List[dict], max_rows: int = 20) -> str:
+        if not rows:
+            return ""
+        # 列名直接来自SQL查询结果（支持SQL别名，如中文列名）
+        columns = list(rows[0].keys())
+        lines = []
+        display_rows = rows[:max_rows]
+        for row in display_rows:
+            parts = [f"{col}：{NotifyTaskExecutor._safe_str(row.get(col))}" for col in columns]
+            lines.append("，".join(parts))
+        if len(rows) > max_rows:
+            lines.append("...")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _fill_message(template: str, rows: List[dict], total: int):
         msg = template or ""
-        msg = msg.replace(total_placeholder or "{{total}}", str(total))
+        msg = msg.replace("{{total}}", str(total))
         msg = msg.replace("{total}", str(total))
-        if first_row and template_columns and "{}" in msg:
-            values = [first_row.get(col, "") for col in template_columns]
-            try:
-                msg = msg.format(*values)
-            except Exception:
-                pass
-        if first_row:
-            try:
-                msg = msg.format(**first_row, total=total)
-            except Exception:
-                pass
+
+        # 详情占位符：{{rows}} 或 {{detail_rows}}
+        rows_text = NotifyTaskExecutor._build_rows_text(rows=rows, max_rows=NotifyTaskExecutor.MAX_MESSAGE_ROWS)
+        msg = msg.replace("{{rows}}", rows_text)
+        msg = msg.replace("{{detail_rows}}", rows_text)
+
+        # 去掉其他遗留占位符，避免原样发出模板字符
+        msg = re.sub(r"\{\{\s*[^}]+\s*\}\}", "", msg)
         return msg
 
     @staticmethod
@@ -192,14 +237,10 @@ class NotifyTaskExecutor:
                 raise ValueError(validate_msg)
 
             rows, total = await SQLExecutionService.execute_query(db_conn=db_conn, sql=task.sql_statement, offset=0, limit=2000)
-            template_columns = [item.strip() for item in (task.template_columns or "").split(",") if item.strip()]
-            first_row = rows[0] if rows else None
             message = NotifyTaskExecutor._fill_message(
                 template=task.message_template,
-                first_row=first_row,
+                rows=rows,
                 total=total,
-                template_columns=template_columns,
-                total_placeholder=task.total_placeholder or "{{total}}",
             )
             if not message:
                 message = f"SQL预警结果：共 {total} 条"

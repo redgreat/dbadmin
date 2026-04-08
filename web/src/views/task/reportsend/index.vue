@@ -28,7 +28,12 @@
       </template>
     </CrudTable>
 
-    <CrudModal v-model:visible="modalVisible" :title="modalTitle" :loading="modalLoading" @save="handleSave">
+    <CrudModal
+      v-model:visible="modalVisible"
+      :title="modalTitle"
+      :loading="modalLoading"
+      @save="handleSave"
+    >
       <n-form
         ref="modalFormRef"
         label-placement="left"
@@ -59,16 +64,37 @@
         <n-form-item label="Cron表达式" path="cron">
           <n-input v-model:value="modalForm.cron" clearable placeholder="示例: 0 9 * * *" />
         </n-form-item>
-        <n-form-item label="消息模板" path="message_template">
+        <n-form-item path="message_template">
+          <template #label>
+            <span class="inline-flex items-center gap-6px">
+              消息模板
+              <n-popover trigger="click" placement="right-start" style="max-width: 620px">
+                <template #trigger>
+                  <n-button text type="info" size="tiny" style="padding: 0 2px">
+                    <TheIcon icon="material-symbols:help-outline-rounded" :size="16" />
+                  </n-button>
+                </template>
+                <div style="line-height: 1.7; white-space: pre-line">
+                  <div>可用占位符：</div>
+                  <div>1. &#123;&#123;date&#125;&#125;：当日日期（yyyyMMdd）</div>
+                  <div>2. &#123;&#123;time&#125;&#125;：当前时间（HHmm）</div>
+                  <div>3. &#123;&#123;month&#125;&#125;：当月（yyyyMM）</div>
+                  <div>4. &#123;&#123;report_name&#125;&#125;：报表名称</div>
+                  <div>示例：</div>
+                  <div>仓储出库明细_&#123;&#123;date&#125;&#125;_&#123;&#123;time&#125;&#125;</div>
+                  <div>渲染后：[仓储出库明细_20260407_1635]</div>
+                  <div>仓储出库明细_&#123;&#123;month&#125;&#125;</div>
+                  <div>渲染后：[仓储出库明细_202603]</div>
+                </div>
+              </n-popover>
+            </span>
+          </template>
           <n-input
             v-model:value="modalForm.message_template"
             type="textarea"
             :rows="3"
-            placeholder="可留空，系统自动生成默认文案"
+            placeholder="可留空；支持 {{date}} {{time}} {{month}} {{report_name}}"
           />
-        </n-form-item>
-        <n-form-item label="发送附件" path="send_attachment">
-          <n-switch v-model:value="modalForm.send_attachment" />
         </n-form-item>
         <n-form-item label="启用状态" path="status">
           <n-switch v-model:value="modalForm.status" />
@@ -83,7 +109,7 @@
 
 <script setup>
 import { h, onMounted, ref } from 'vue'
-import { NButton, NPopconfirm, NSpace, NTag } from 'naive-ui'
+import { NButton, NPopconfirm, NPopover, NSpace, NTag } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
@@ -131,19 +157,15 @@ const columns = [
   { title: '发送人', key: 'sender_name', width: 160 },
   { title: 'Cron', key: 'cron', width: 140 },
   {
-    title: '附件',
-    key: 'send_attachment',
-    width: 90,
-    render(row) {
-      return row.send_attachment ? '是' : '否'
-    },
-  },
-  {
     title: '状态',
     key: 'status',
     width: 100,
     render(row) {
-      return h(NTag, { type: row.status ? 'success' : 'warning' }, { default: () => (row.status ? '启用' : '禁用') })
+      return h(
+        NTag,
+        { type: row.status ? 'success' : 'warning' },
+        { default: () => (row.status ? '启用' : '禁用') }
+      )
     },
   },
   { title: '上次执行', key: 'last_run_time', width: 180 },
@@ -154,20 +176,33 @@ const columns = [
     width: 240,
     fixed: 'right',
     render(row) {
-      return h(NSpace, { justify: 'center' }, {
-        default: () => [
-          h(NButton, { size: 'small', type: 'primary', onClick: () => handleEdit(row) }, { default: () => '编辑' }),
-          h(NButton, { size: 'small', type: 'info', onClick: () => handleExecute(row.id) }, { default: () => '立即执行' }),
-          h(
-            NPopconfirm,
-            { onPositiveClick: () => handleDelete({ task_id: row.id }) },
-            {
-              trigger: () => h(NButton, { size: 'small', type: 'error' }, { default: () => '删除' }),
-              default: () => h('div', {}, '确认删除该任务吗？'),
-            }
-          ),
-        ],
-      })
+      return h(
+        NSpace,
+        { justify: 'center' },
+        {
+          default: () => [
+            h(
+              NButton,
+              { size: 'small', type: 'primary', onClick: () => handleEdit(row) },
+              { default: () => '编辑' }
+            ),
+            h(
+              NButton,
+              { size: 'small', type: 'info', onClick: () => handleExecute(row.id) },
+              { default: () => '立即执行' }
+            ),
+            h(
+              NPopconfirm,
+              { onPositiveClick: () => handleDelete({ task_id: row.id }) },
+              {
+                trigger: () =>
+                  h(NButton, { size: 'small', type: 'error' }, { default: () => '删除' }),
+                default: () => h('div', {}, '确认删除该任务吗？'),
+              }
+            ),
+          ],
+        }
+      )
     },
   },
 ]
@@ -190,7 +225,6 @@ const {
     sender_id: null,
     cron: '0 9 * * *',
     message_template: '',
-    send_attachment: true,
     status: true,
     remark: '',
   },
@@ -202,7 +236,9 @@ const {
 
 const rules = {
   task_name: [{ required: true, message: '请输入任务名称', trigger: ['input', 'blur'] }],
-  report_config_id: [{ required: true, type: 'number', message: '请选择报表配置', trigger: ['change'] }],
+  report_config_id: [
+    { required: true, type: 'number', message: '请选择报表配置', trigger: ['change'] },
+  ],
   sender_id: [{ required: true, type: 'number', message: '请选择发送人', trigger: ['change'] }],
   cron: [{ required: true, message: '请输入Cron表达式', trigger: ['input', 'blur'] }],
 }
@@ -221,7 +257,12 @@ const loadReportConfigOptions = async () => {
 }
 
 const loadSenderOptions = async () => {
-  const res = await api.getAlertSenderList({ page: 1, page_size: 1000, channel_type: 'wechat_group', is_enabled: true })
+  const res = await api.getAlertSenderList({
+    page: 1,
+    page_size: 1000,
+    channel_type: 'wechat_group',
+    is_enabled: true,
+  })
   senderOptions.value = (res.data || []).map((item) => ({
     label: item.sender_name,
     value: item.id,

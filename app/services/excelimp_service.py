@@ -4,6 +4,7 @@ Excel导入服务 - 从Excel文件生成SQL语句
 from io import BytesIO
 from datetime import datetime, date
 from typing import List, Tuple, Any, Literal, Dict, Optional
+import hashlib
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
 from pypinyin import lazy_pinyin, Style
@@ -40,7 +41,12 @@ def _progress_fail(stamp: str, message: str):
 def _progress_done(stamp: str, sql: str):
     """完成"""
     _progress_update(
-        stamp, stage="done", message="SQL生成完成", success=True, sql=sql
+        stamp,
+        stage="done",
+        message="SQL生成完成",
+        success=True,
+        sql=sql,
+        sql_sha256=hashlib.sha256(sql.encode("utf-8")).hexdigest(),
     )
 
 
@@ -127,8 +133,13 @@ def generate_sql(content: bytes, filename: str, db_type: Literal["mysql", "postg
     # 生成索引语句
     index_sql = _generate_index_statements(table_name, field_names, db_type, primary_key_name)
 
-    # 合并所有SQL语句
-    return f"{create_table_sql}\n\n{insert_sql}\n\n{index_sql}"
+    # 合并所有SQL语句（增加生成签名，执行接口据此校验）
+    return (
+        f"-- GENERATED_BY:EXCELIMP\n"
+        f"-- SOURCE_FILE:{filename}\n"
+        f"-- DB_TYPE:{db_type}\n"
+        f"{create_table_sql}\n\n{insert_sql}\n\n{index_sql}"
+    )
 
 
 def _parse_sheet(sheet: Worksheet) -> Tuple[List[str], List[List[Any]]]:

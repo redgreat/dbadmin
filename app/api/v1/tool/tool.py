@@ -1,13 +1,15 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Request
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from typing import Literal
 import asyncio
 import uuid
+from typing import Optional
 
 from app.schemas.base import Success
 from app.services.excelimp_service import generate_sql, submit_and_generate, get_progress
 from app.services.formatter_service import format_sql
 from app.models.admin import AuditLog, User
-from app.core.dependency import AuthControl
+from app.core.dependency import DependAuth
+from app.controllers.conn import conn_controller
 
 router = APIRouter(tags=["日常工具"])
 
@@ -75,13 +77,18 @@ async def generate_excel_sql(
 
 
 @router.post("/excelimp/submit", summary="异步生成Excel临时表SQL")
-async def submit_excel_sql(req: Request, file: UploadFile = File(...), db_type: str = Form(...)):
+async def submit_excel_sql(
+    file: UploadFile = File(...),
+    target_conn_id: Optional[int] = Form(None),
+    db_type: str = Form("mysql"),
+    current_user: User = DependAuth,
+):
     """
     异步上传Excel文件并生成SQL，返回任务标识
     
     参数:
         file: Excel文件（.xlsx或.xls）
-        db_type: 数据库类型（mysql或postgresql）
+        target_conn_id: 目标连接ID（连接管理中的连接，可选）
     
     返回:
         任务标识file_key，可用于查询进度和下载结果
@@ -108,6 +115,17 @@ async def submit_excel_sql(req: Request, file: UploadFile = File(...), db_type: 
         # 验证文件不为空
         if len(content) == 0:
             raise HTTPException(status_code=400, detail="文件内容为空")
+
+        # 配置连接时由连接决定db_type；未配置时使用默认mysql生成SQL
+        if target_conn_id:
+            conn_info = await conn_controller.get_decrypted_connection(target_conn_id)
+            if not conn_info:
+                raise HTTPException(status_code=400, detail="目标连接不存在或不可用")
+            db_type = conn_info.get("db_type")
+            if db_type not in ("mysql", "postgresql"):
+                raise HTTPException(status_code=400, detail=f"目标连接类型不支持: {db_type}")
+        elif db_type not in ("mysql", "postgresql"):
+            db_type = "mysql"
         
         # 生成任务标识
         file_key = str(uuid.uuid4())
@@ -125,20 +143,9 @@ async def submit_excel_sql(req: Request, file: UploadFile = File(...), db_type: 
         
         # 记录审计日志
         try:
-            token = req.headers.get("token")
-            user_obj: User = None
-            if token:
-                user_obj = await AuthControl.is_authed(token)
-            user_id = user_obj.id if user_obj else 0
-            username = user_obj.username if user_obj else ""
-        except Exception:
-            user_id = 0
-            username = ""
-        
-        try:
             await AuditLog.create(
-                user_id=user_id,
-                username=username,
+                user_id=current_user.id,
+                username=current_user.username,
                 module="日常工具",
                 summary=f"Excel临时表SQL生成: {file.filename} ({file_key})",
                 method="POST",

@@ -279,87 +279,85 @@ class FccRelationService:
         try:
             # 更新任务状态为processing
             self.tasks[task_id]['status'] = 'processing'
-            
+
             await self._ensure_wms_pool()
             await self._ensure_fcc_pool()
-            
+
             wms_pool = db_pool.get_pool(await _get_wms_conn_id())
             fcc_pool = db_pool.get_pool(await _get_fcc_conn_id())
-            
+
             if not wms_pool or not fcc_pool:
                 raise ValueError("数据库连接池不存在")
-            
+            if not isinstance(wms_pool, aiomysql.Pool):
+                raise ValueError("仓储中心连接池类型异常，预期为MySQL")
+
             # 计算总数
             total = sum(len(r['wms_nos']) for r in relations)
             self.tasks[task_id]['progress']['total'] = total
-            
+
             success_count = 0
             failed_items = []
             processed = 0
-            
-            # 逐个处理关联关系
-            for relation in relations:
-                fcc_no = relation['fcc_no']
-                wms_nos = relation['wms_nos']
-                
-                try:
-                    # 步骤1: 从仓储中心查询对账单信息（SQL3）
-                    reconc_data = []
-                    if isinstance(wms_pool, aiomysql.Pool):
-                        async with wms_pool.acquire() as conn:
-                            async with conn.cursor() as cur:
-                                # SQL3: 查询仓储对账单信息
-                                placeholders = ','.join(['%s'] * len(wms_nos))
-                                sql = f"""
-                                    SELECT a.Id AS ReconcId,a.ReconcNo,a.SupplierId,a.SupplierName,a.OwnerId,a.OwnerName,
-                                      a.Amount AS ReconcPrice,a.SubmitPerson AS ReconcPersonCode,a.SubmitPersonName AS ReconcPersonName,
-                                      a.SubmitTime AS ApplyTime,a.OwingNum AS ReconcNum
-                                    FROM tb_reconcinfo a
-                                    JOIN tb_reconcdetail b
-                                      ON b.ReconcId=a.Id
-                                      AND b.Deleted=0
-                                    WHERE a.Deleted=0
-                                      AND a.ReconcNo IN ({placeholders})
-                                """
-                                await cur.execute(sql, wms_nos)
-                                reconc_data = await cur.fetchall()
-                    
-                    if not reconc_data:
-                        raise ValueError(f"未查询到对账单信息: {wms_nos}")
-                    
-                    # 步骤2: 写入FCC临时表（SQL4）
-                    async with fcc_pool.acquire() as conn:
-                        async with conn.cursor() as cur:
-                            # 先清空临时表
-                            await cur.execute("DELETE FROM [dbo].[tm_wh_reconcinfo]")
-                            
-                            # SQL4: 写入FCC临时表
-                            insert_values = []
+
+            async with fcc_pool.acquire() as fcc_conn, wms_pool.acquire() as wms_conn:
+                async with fcc_conn.cursor() as fcc_cur, wms_conn.cursor() as wms_cur:
+                    # 临时表只在任务开始时清空一次，避免循环中只保留最后一条
+                    await fcc_cur.execute("DELETE FROM [dbo].[tm_wh_reconcinfo]")
+
+                    # 逐个处理关联关系
+                    for relation in relations:
+                        fcc_no = relation['fcc_no']
+                        wms_nos = relation['wms_nos']
+
+                        try:
+                            # 步骤1: 查询仓储对账单信息（避免JOIN明细导致重复）
+                            placeholders_mysql = ','.join(['%s'] * len(wms_nos))
+                            sql_wms = f"""
+                                SELECT a.Id AS ReconcId,a.ReconcNo,a.SupplierId,a.SupplierName,a.OwnerId,a.OwnerName,
+                                  a.Amount AS ReconcPrice,a.SubmitPerson AS ReconcPersonCode,a.SubmitPersonName AS ReconcPersonName,
+                                  a.SubmitTime AS ApplyTime,a.OwingNum AS ReconcNum
+                                FROM tb_reconcinfo a
+                                WHERE a.Deleted=0
+                                  AND a.ReconcNo IN ({placeholders_mysql})
+                            """
+                            await wms_cur.execute(sql_wms, wms_nos)
+                            reconc_data = await wms_cur.fetchall()
+
+                            if not reconc_data:
+                                raise ValueError(f"未查询到对账单信息: {wms_nos}")
+
+                            # 步骤2: 写入FCC临时表（参数化批量写入）
+                            insert_tmp_sql = """
+                                INSERT INTO [dbo].[tm_wh_reconcinfo]
+                                ([ReconcId],[ReconcNo],[SupplierId],[SupplierName],[OwnerId],[OwnerName],
+                                 [ReconcPrice],[ReconcPersonCode],[ReconcPersonName],[ApplyTime],
+                                 [CodeNumber],[ReconcNum])
+                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                            """
+                            tmp_rows = []
                             for row in reconc_data:
                                 reconc_id, reconc_no, supplier_id, supplier_name, owner_id, owner_name, \
                                 reconc_price, reconc_person_code, reconc_person_name, apply_time, reconc_num = row
-                                insert_values.append(
-                                    f"('{reconc_id}','{reconc_no}','{supplier_id}','{supplier_name}',"
-                                    f"'{owner_id}','{owner_name}',{reconc_price},'{reconc_person_code}',"
-                                    f"'{reconc_person_name}','{apply_time}',null,{reconc_num})"
-                                )
-                            
-                            if insert_values:
-                                insert_sql = f"""
-                                    INSERT INTO [dbo].[tm_wh_reconcinfo] 
-                                    ([ReconcId],[ReconcNo],[SupplierId],[SupplierName],[OwnerId],[OwnerName],
-                                     [ReconcPrice],[ReconcPersonCode],[ReconcPersonName],[ApplyTime],
-                                     [CodeNumber],[ReconcNum]) 
-                                    VALUES {','.join(insert_values)}
-                                """
-                                await cur.execute(insert_sql)
-                            
-                            # 步骤3: 写入FCC对应关系表
-                            # 需要先判断FCC单据类型：报销单(ApplicationType=1)、借款单(ApplicationType=2)、还款核销单(ApplicationType=3)
-                            placeholders = ','.join(['?'] * len(wms_nos))
-                            
-                            # SQL5-1: ApplicationType=1 报销单
-                            sql5_1 = f"""
+                                tmp_rows.append((
+                                    reconc_id,
+                                    reconc_no,
+                                    supplier_id,
+                                    supplier_name,
+                                    owner_id,
+                                    owner_name,
+                                    reconc_price,
+                                    reconc_person_code,
+                                    reconc_person_name,
+                                    apply_time,
+                                    fcc_no,
+                                    reconc_num,
+                                ))
+                            await fcc_cur.executemany(insert_tmp_sql, tmp_rows)
+
+                            # 步骤3: 查询并写入正式关系表
+                            placeholders_sqlserver = ','.join(['?'] * len(wms_nos))
+                            sql_select_templates = [
+                                f"""
                                 SELECT NEWID() AS Id,1 AS ApplicationType,B.Id AS ApplicationId,B.CodeNumber,C.Id AS CostDetailId,
                                        A.ReconcId,A.ReconcNo,A.SupplierId,A.SupplierName,
                                        D.CompanyId AS OwnerId,
@@ -370,20 +368,17 @@ class FccRelationService:
                                        A.ReconcPrice AS ThisInvoicePrice,
                                        (CAST(FORMAT(GETDATE(),'yyyy-MM-dd') AS VARCHAR)+' 手动刷数') AS Remark,
                                        A.ReconcPersonCode,A.ReconcPersonName,
-                                       NULL,GETDATE(),NULL,GETDATE(),NULL,NULL,0,A.ReconcNum
+                                       NULL AS CreatedById,GETDATE() AS CreatedAt,NULL AS UpdatedById,GETDATE() AS UpdatedAt,
+                                       NULL AS DeletedById,NULL AS DeletedAt,0 AS Deleted,A.ReconcNum
                                   FROM tm_wh_reconcinfo A
-                                  LEFT JOIN dbo.[fms.reimbursement_info] B ON B.CodeNumber=?
+                                  JOIN dbo.[fms.reimbursement_info] B ON B.CodeNumber=?
                                   LEFT JOIN dbo.[fms.costdetail_info] C ON B.Id=C.ReimbursementId AND C.Deleted=0
                                   LEFT JOIN dbo.[fms_warehouse_ownerinfo] D ON D.OwnerId=A.OwnerId
-                                  LEFT JOIN membership_userbaseinfo E ON B.CreatedById=E.Id
-                                 WHERE 1=1
-                                   AND A.ReconcNo IN ({placeholders})
+                                 WHERE A.ReconcNo IN ({placeholders_sqlserver})
                                    AND B.Id IS NOT NULL
                                  ORDER BY A.ApplyTime
-                            """
-                            
-                            # SQL5-2: ApplicationType=2 借款单
-                            sql5_2 = f"""
+                                """,
+                                f"""
                                 SELECT NEWID() AS Id,2 AS ApplicationType,B.Id AS ApplicationId,B.CodeNumber,C.Id AS CostDetailId,
                                        A.ReconcId,A.ReconcNo,A.SupplierId,A.SupplierName,
                                        D.CompanyId AS OwnerId,
@@ -391,23 +386,20 @@ class FccRelationService:
                                        A.ApplyTime,
                                        A.ReconcPrice,
                                        A.ReconcPrice AS InvoiceSurplusPrice,
-                                       A.ReconcPrice,
+                                       A.ReconcPrice AS ThisInvoicePrice,
                                        (CAST(FORMAT(GETDATE(),'yyyy-MM-dd') AS VARCHAR)+' 手动刷数') AS Remark,
                                        A.ReconcPersonCode,A.ReconcPersonName,
-                                       NULL,GETDATE(),NULL,GETDATE(),NULL,NULL,0,A.ReconcNum
+                                       NULL AS CreatedById,GETDATE() AS CreatedAt,NULL AS UpdatedById,GETDATE() AS UpdatedAt,
+                                       NULL AS DeletedById,NULL AS DeletedAt,0 AS Deleted,A.ReconcNum
                                   FROM tm_wh_reconcinfo A
-                                  LEFT JOIN dbo.[fms.loan_info] B ON B.CodeNumber=?
+                                  JOIN dbo.[fms.loan_info] B ON B.CodeNumber=?
                                   LEFT JOIN dbo.[fms.costdetail_info] C ON B.Id=C.ReimbursementId AND C.Deleted=0
                                   LEFT JOIN dbo.[fms_warehouse_ownerinfo] D ON D.OwnerId=A.OwnerId
-                                  LEFT JOIN membership_userbaseinfo E ON B.CreatedById=E.Id
-                                 WHERE 1=1
-                                   AND A.ReconcNo IN ({placeholders})
+                                 WHERE A.ReconcNo IN ({placeholders_sqlserver})
                                    AND B.Id IS NOT NULL
                                  ORDER BY A.ApplyTime
-                            """
-                            
-                            # SQL5-3: ApplicationType=3 还款核销单
-                            sql5_3 = f"""
+                                """,
+                                f"""
                                 SELECT NEWID() AS Id,3 AS ApplicationType,B.Id AS ApplicationId,B.CodeNumber,C.Id AS CostDetailId,
                                        A.ReconcId,A.ReconcNo,A.SupplierId,A.SupplierName,
                                        D.CompanyId AS OwnerId,
@@ -418,88 +410,98 @@ class FccRelationService:
                                        A.ReconcPrice AS ThisInvoicePrice,
                                        (CAST(FORMAT(GETDATE(),'yyyy-MM-dd') AS VARCHAR)+' 手动刷数') AS Remark,
                                        A.ReconcPersonCode,A.ReconcPersonName,
-                                       NULL,GETDATE(),NULL,GETDATE(),NULL,NULL,0,A.ReconcNum
+                                       NULL AS CreatedById,GETDATE() AS CreatedAt,NULL AS UpdatedById,GETDATE() AS UpdatedAt,
+                                       NULL AS DeletedById,NULL AS DeletedAt,0 AS Deleted,A.ReconcNum
                                   FROM tm_wh_reconcinfo A
-                                  LEFT JOIN dbo.[fms.LoanRepaymentOrVerification_Info] B ON B.CodeNumber=?
+                                  JOIN dbo.[fms.LoanRepaymentOrVerification_Info] B ON B.CodeNumber=?
                                   LEFT JOIN dbo.[fms.costdetail_info] C ON B.Id=C.ReimbursementId AND C.Deleted=0
                                   LEFT JOIN dbo.[fms_warehouse_ownerinfo] D ON D.OwnerId=A.OwnerId
-                                  LEFT JOIN membership_userbaseinfo E ON B.CreatedById=E.Id
-                                 WHERE 1=1
-                                   AND A.ReconcNo IN ({placeholders})
+                                 WHERE A.ReconcNo IN ({placeholders_sqlserver})
                                    AND B.Id IS NOT NULL
                                  ORDER BY A.ApplyTime
-                            """
-                            
+                                """,
+                            ]
+
                             params = [fcc_no] + wms_nos
-                            all_relation_data = []
-                            
-                            # 执行三条SQL并合并结果
-                            for sql5 in [sql5_1, sql5_2, sql5_3]:
-                                await cur.execute(sql5, params)
-                                relation_data = await cur.fetchall()
-                                if relation_data:
-                                    all_relation_data.extend(relation_data)
-                            
-                            # 插入到正式表
-                            if all_relation_data:
-                                for rel_row in all_relation_data:
-                                    # 这里需要根据实际表结构构建INSERT语句
-                                    # 暂时记录日志
-                                    logger.info(f"关联数据: {rel_row}")
-                    
-                    # 步骤4: 更新仓储中心付款状态（SQL6）
-                    if isinstance(wms_pool, aiomysql.Pool):
-                        async with wms_pool.acquire() as conn:
-                            async with conn.cursor() as cur:
-                                # SQL6: 更新仓储中心付款状态
-                                placeholders = ','.join(['%s'] * len(wms_nos))
-                                sql6 = f"""
-                                    UPDATE tb_owinginfo x
-                                      SET OwingStatus=4,OwingPrice=0,OwingedPrice=Amount
-                                    WHERE x.Id IN (
-                                      SELECT S.OwingId FROM(
-                                    SELECT a.OwingId,SUM(a.ReconcNum),b.StockNum
-                                      FROM tb_reconcdetail a
-                                      JOIN tb_owinginfo b
-                                        ON b.Id=a.OwingId
-                                        AND b.Deleted=0
-                                      JOIN tb_reconcinfo c
-                                        ON c.Id=a.ReconcId
-                                        AND c.Deleted=0
-                                    WHERE a.Deleted=0
-                                      AND c.ReconcNo IN ({placeholders})
-                                    GROUP BY a.OwingId
-                                      HAVING SUM(a.ReconcNum)=b.StockNum ) AS S
-                                      )
-                                """
-                                await cur.execute(sql6, wms_nos)
-                                
-                                # SQL7: 更新应付单付款信息
-                                sql7 = f"""
-                                    UPDATE tb_reconcinfo
-                                    SET PayStatus=3,InvoiceStatus=2,InvoicePrice=Amount,UnInvoicePrice=0 
-                                    WHERE ReconcNo IN ({placeholders})
-                                      AND Deleted=0
-                                """
-                                await cur.execute(sql7, wms_nos)
-                    
-                    # 成功处理
-                    success_count += len(wms_nos)
-                    processed += len(wms_nos)
-                    
-                except Exception as e:
-                    logger.error(f"处理关联失败: fcc_no={fcc_no}, wms_nos={wms_nos}, error={e}")
-                    for wms_no in wms_nos:
-                        failed_items.append({
-                            'fcc_no': fcc_no,
-                            'wms_no': wms_no,
-                            'reason': str(e)
-                        })
-                        processed += 1
-                finally:
-                    self.tasks[task_id]['progress']['processed'] = processed
-                    self.tasks[task_id]['progress']['success'] = success_count
-                    self.tasks[task_id]['progress']['failed'] = len(failed_items)
+                            inserted_rows = 0
+                            for select_sql in sql_select_templates:
+                                await fcc_cur.execute(select_sql, params)
+                                relation_rows = await fcc_cur.fetchall()
+                                if not relation_rows:
+                                    continue
+
+                                # 用SELECT返回列名动态构造INSERT，避免列顺序硬编码出错
+                                columns = [col[0] for col in fcc_cur.description]
+                                quoted_columns = ",".join([f"[{col}]" for col in columns])
+                                value_marks = ",".join(["?"] * len(columns))
+                                insert_relation_sql = (
+                                    f"INSERT INTO [dbo].[fms_costdetail_reconcinfo] ({quoted_columns}) "
+                                    f"VALUES ({value_marks})"
+                                )
+                                await fcc_cur.executemany(insert_relation_sql, relation_rows)
+                                inserted_rows += len(relation_rows)
+
+                            if inserted_rows == 0:
+                                raise ValueError(f"未匹配到可写入的FCC关系数据: {fcc_no} -> {wms_nos}")
+
+                            # 步骤4: 更新仓储中心付款状态（SQL6、SQL7）
+                            sql6 = f"""
+                                UPDATE tb_owinginfo x
+                                  SET OwingStatus=4,OwingPrice=0,OwingedPrice=Amount
+                                WHERE x.Id IN (
+                                  SELECT S.OwingId FROM(
+                                SELECT a.OwingId,SUM(a.ReconcNum),b.StockNum
+                                  FROM tb_reconcdetail a
+                                  JOIN tb_owinginfo b
+                                    ON b.Id=a.OwingId
+                                    AND b.Deleted=0
+                                  JOIN tb_reconcinfo c
+                                    ON c.Id=a.ReconcId
+                                    AND c.Deleted=0
+                                WHERE a.Deleted=0
+                                  AND c.ReconcNo IN ({placeholders_mysql})
+                                GROUP BY a.OwingId
+                                  HAVING SUM(a.ReconcNum)=b.StockNum ) AS S
+                                  )
+                            """
+                            await wms_cur.execute(sql6, wms_nos)
+
+                            sql7 = f"""
+                                UPDATE tb_reconcinfo
+                                SET PayStatus=3,InvoiceStatus=2,InvoicePrice=Amount,UnInvoicePrice=0
+                                WHERE ReconcNo IN ({placeholders_mysql})
+                                  AND Deleted=0
+                            """
+                            await wms_cur.execute(sql7, wms_nos)
+
+                            # 显式提交，避免“无报错但不落库”
+                            await fcc_conn.commit()
+                            await wms_conn.commit()
+
+                            success_count += len(wms_nos)
+                            processed += len(wms_nos)
+
+                        except Exception as e:
+                            logger.error(f"处理关联失败: fcc_no={fcc_no}, wms_nos={wms_nos}, error={e}")
+                            try:
+                                await fcc_conn.rollback()
+                            except Exception:
+                                pass
+                            try:
+                                await wms_conn.rollback()
+                            except Exception:
+                                pass
+                            for wms_no in wms_nos:
+                                failed_items.append({
+                                    'fcc_no': fcc_no,
+                                    'wms_no': wms_no,
+                                    'reason': str(e)
+                                })
+                                processed += 1
+                        finally:
+                            self.tasks[task_id]['progress']['processed'] = processed
+                            self.tasks[task_id]['progress']['success'] = success_count
+                            self.tasks[task_id]['progress']['failed'] = len(failed_items)
             
             # 更新任务状态为completed
             self.tasks[task_id]['status'] = 'completed'

@@ -23,6 +23,7 @@ class ExcelExportService:
     MAX_ROWS_PER_SHEET = config.report.max_rows_per_sheet
     MAX_SHEETS_PER_FILE = config.report.max_sheets_per_file
     PAGE_SIZE = config.report.page_size
+    ZIP_THRESHOLD_BYTES = 10 * 1024 * 1024  # 单文件超过10MB则压缩
 
     async def export_report(self, generation_id: int):
         """
@@ -221,8 +222,8 @@ class ExcelExportService:
                 logger.info(f"生成ZIP文件: {zip_path}")
                 return zip_path
             else:
-                # 单个文件直接返回
-                return file_list[0]
+                # 单个文件超过10MB则压缩后返回
+                return self._compress_if_large(file_list[0])
 
         except Exception as e:
             # 清理临时文件
@@ -399,6 +400,25 @@ class ExcelExportService:
         wb.save(file_path)
         logger.info(f"保存Excel文件: {file_path}")
         return file_path
+
+    def _compress_if_large(self, file_path: str) -> str:
+        """
+        如果单个报表文件超过阈值，则压缩成zip并删除原文件。
+        :return: 最终文件路径（xlsx或zip）
+        """
+        if not os.path.exists(file_path):
+            return file_path
+        file_size = os.path.getsize(file_path)
+        if file_size <= self.ZIP_THRESHOLD_BYTES:
+            return file_path
+
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        zip_path = os.path.join(os.path.dirname(file_path), f"{base_name}.zip")
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(file_path, os.path.basename(file_path))
+        os.remove(file_path)
+        logger.info(f"单文件超过10MB，已压缩: {zip_path}")
+        return zip_path
 
     def _get_file_dir(self) -> str:
         """

@@ -28,7 +28,12 @@
       </template>
     </CrudTable>
 
-    <CrudModal v-model:visible="modalVisible" :title="modalTitle" :loading="modalLoading" @save="handleSave">
+    <CrudModal
+      v-model:visible="modalVisible"
+      :title="modalTitle"
+      :loading="modalLoading"
+      @save="handleSave"
+    >
       <n-form
         ref="modalFormRef"
         label-placement="left"
@@ -67,23 +72,39 @@
             placeholder="仅支持SELECT语句"
           />
         </n-form-item>
-        <n-form-item label="模板列" path="template_columns">
-          <n-input
-            v-model:value="modalForm.template_columns"
-            clearable
-            placeholder="逗号分隔，如：order_no,sku,total_amount"
-          />
-        </n-form-item>
-        <n-form-item label="消息模板" path="message_template">
+        <n-form-item path="message_template">
+          <template #label>
+            <span class="inline-flex items-center gap-6px">
+              消息模板
+              <n-popover trigger="click" placement="right-start" style="max-width: 640px">
+                <template #trigger>
+                  <n-button text type="info" size="tiny" style="padding: 0 2px">
+                    <TheIcon icon="material-symbols:help-outline-rounded" :size="16" />
+                  </n-button>
+                </template>
+                <div style="line-height: 1.7; white-space: pre-line">
+                  <div>模板用法：</div>
+                  <div>1. 总数占位符：&#123;&#123;total&#125;&#125;</div>
+                  <div>2. 明细占位符：&#123;&#123;rows&#125;&#125;</div>
+                  <div>
+                    3. &#123;&#123;rows&#125;&#125;使用SQL查询结果的列名（支持你写中文别名）
+                  </div>
+                  <div>4. 最多展示20条，超出自动追加“...”</div>
+                  <div>示例：</div>
+                  <div>
+                    仓储中心名称重复共 &#123;&#123;total&#125;&#125; 条：
+                    &#123;&#123;rows&#125;&#125;
+                  </div>
+                </div>
+              </n-popover>
+            </span>
+          </template>
           <n-input
             v-model:value="modalForm.message_template"
             type="textarea"
             :rows="4"
-            placeholder='支持 {{total}} 或 {total}；支持 {} 顺序替换（按模板列）'
+            placeholder="支持 {{total}}、{{rows}}"
           />
-        </n-form-item>
-        <n-form-item label="总数占位符" path="total_placeholder">
-          <n-input v-model:value="modalForm.total_placeholder" clearable placeholder="默认 {{total}}" />
         </n-form-item>
         <n-form-item label="发送明细Excel" path="send_detail_excel">
           <n-switch v-model:value="modalForm.send_detail_excel" />
@@ -101,7 +122,7 @@
 
 <script setup>
 import { h, onMounted, ref } from 'vue'
-import { NButton, NPopconfirm, NSpace, NTag } from 'naive-ui'
+import { NButton, NPopconfirm, NPopover, NSpace, NTag } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
@@ -171,7 +192,11 @@ const columns = [
     key: 'status',
     width: 100,
     render(row) {
-      return h(NTag, { type: row.status ? 'success' : 'warning' }, { default: () => (row.status ? '启用' : '禁用') })
+      return h(
+        NTag,
+        { type: row.status ? 'success' : 'warning' },
+        { default: () => (row.status ? '启用' : '禁用') }
+      )
     },
   },
   { title: '上次执行', key: 'last_run_time', width: 180 },
@@ -182,20 +207,33 @@ const columns = [
     width: 240,
     fixed: 'right',
     render(row) {
-      return h(NSpace, { justify: 'center' }, {
-        default: () => [
-          h(NButton, { size: 'small', type: 'primary', onClick: () => handleEdit(row) }, { default: () => '编辑' }),
-          h(NButton, { size: 'small', type: 'info', onClick: () => handleExecute(row.id) }, { default: () => '立即执行' }),
-          h(
-            NPopconfirm,
-            { onPositiveClick: () => handleDelete({ task_id: row.id }) },
-            {
-              trigger: () => h(NButton, { size: 'small', type: 'error' }, { default: () => '删除' }),
-              default: () => h('div', {}, '确认删除该任务吗？'),
-            }
-          ),
-        ],
-      })
+      return h(
+        NSpace,
+        { justify: 'center' },
+        {
+          default: () => [
+            h(
+              NButton,
+              { size: 'small', type: 'primary', onClick: () => handleEdit(row) },
+              { default: () => '编辑' }
+            ),
+            h(
+              NButton,
+              { size: 'small', type: 'info', onClick: () => handleExecute(row.id) },
+              { default: () => '立即执行' }
+            ),
+            h(
+              NPopconfirm,
+              { onPositiveClick: () => handleDelete({ task_id: row.id }) },
+              {
+                trigger: () =>
+                  h(NButton, { size: 'small', type: 'error' }, { default: () => '删除' }),
+                default: () => h('div', {}, '确认删除该任务吗？'),
+              }
+            ),
+          ],
+        }
+      )
     },
   },
 ]
@@ -218,9 +256,7 @@ const {
     sender_id: null,
     cron: '0 9 * * *',
     sql_statement: '',
-    message_template: '告警总数：{{total}}',
-    template_columns: '',
-    total_placeholder: '{{total}}',
+    message_template: '告警总数：{{total}}\n{{rows}}',
     send_detail_excel: true,
     status: true,
     remark: '',
@@ -233,7 +269,9 @@ const {
 
 const rules = {
   task_name: [{ required: true, message: '请输入任务名称', trigger: ['input', 'blur'] }],
-  db_connection_id: [{ required: true, type: 'number', message: '请选择数据库连接', trigger: ['change'] }],
+  db_connection_id: [
+    { required: true, type: 'number', message: '请选择数据库连接', trigger: ['change'] },
+  ],
   sender_id: [{ required: true, type: 'number', message: '请选择发送人', trigger: ['change'] }],
   cron: [{ required: true, message: '请输入Cron表达式', trigger: ['input', 'blur'] }],
   sql_statement: [{ required: true, message: '请输入SQL语句', trigger: ['input', 'blur'] }],
@@ -254,7 +292,12 @@ const loadConnOptions = async () => {
 }
 
 const loadSenderOptions = async () => {
-  const res = await api.getAlertSenderList({ page: 1, page_size: 1000, channel_type: 'wechat_group', is_enabled: true })
+  const res = await api.getAlertSenderList({
+    page: 1,
+    page_size: 1000,
+    channel_type: 'wechat_group',
+    is_enabled: true,
+  })
   senderOptions.value = (res.data || []).map((item) => ({
     label: item.sender_name,
     value: item.id,

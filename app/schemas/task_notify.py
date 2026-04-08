@@ -10,7 +10,6 @@ class ReportSendTaskCreate(BaseModel):
     sender_id: int = Field(..., description="发送人ID")
     cron: str = Field(..., description="Cron表达式", max_length=100)
     message_template: Optional[str] = Field(None, description="消息模板")
-    send_attachment: bool = Field(default=True, description="是否发送附件")
     status: bool = Field(default=True, description="状态")
     remark: Optional[str] = Field(None, description="备注", max_length=200)
 
@@ -22,7 +21,6 @@ class ReportSendTaskUpdate(BaseModel):
     sender_id: Optional[int] = Field(None, description="发送人ID")
     cron: Optional[str] = Field(None, description="Cron表达式", max_length=100)
     message_template: Optional[str] = Field(None, description="消息模板")
-    send_attachment: Optional[bool] = Field(None, description="是否发送附件")
     status: Optional[bool] = Field(None, description="状态")
     remark: Optional[str] = Field(None, description="备注", max_length=200)
 
@@ -34,8 +32,6 @@ class SqlAlertTaskCreate(BaseModel):
     cron: str = Field(..., description="Cron表达式", max_length=100)
     sql_statement: str = Field(..., description="SQL语句")
     message_template: str = Field(..., description="消息模板")
-    template_columns: Optional[str] = Field(None, description="模板列，逗号分隔", max_length=500)
-    total_placeholder: Optional[str] = Field("{{total}}", description="总数占位符", max_length=50)
     send_detail_excel: bool = Field(default=True, description="是否发送明细Excel")
     status: bool = Field(default=True, description="状态")
     remark: Optional[str] = Field(None, description="备注", max_length=200)
@@ -49,8 +45,6 @@ class SqlAlertTaskUpdate(BaseModel):
     cron: Optional[str] = Field(None, description="Cron表达式", max_length=100)
     sql_statement: Optional[str] = Field(None, description="SQL语句")
     message_template: Optional[str] = Field(None, description="消息模板")
-    template_columns: Optional[str] = Field(None, description="模板列，逗号分隔", max_length=500)
-    total_placeholder: Optional[str] = Field(None, description="总数占位符", max_length=50)
     send_detail_excel: Optional[bool] = Field(None, description="是否发送明细Excel")
     status: Optional[bool] = Field(None, description="状态")
     remark: Optional[str] = Field(None, description="备注", max_length=200)

@@ -14,6 +14,8 @@ class ImpTask(BaseModel, TimestampMixin):
 
     # 数据库配置
     db_type = fields.CharField(max_length=20, description="数据库类型(mysql/postgresql)")
+    target_conn_id = fields.BigIntField(null=True, description="目标连接ID（conn表）", index=True)
+    target_conn_name = fields.CharField(max_length=100, null=True, description="目标连接名称")
 
     # 任务状态
     status = fields.CharField(
@@ -28,6 +30,19 @@ class ImpTask(BaseModel, TimestampMixin):
     # 结果文件
     sql_file_path = fields.CharField(max_length=500, null=True, description="生成的SQL文件路径")
     sql_file_size = fields.BigIntField(null=True, description="SQL文件大小(字节)")
+    sql_sha256 = fields.CharField(max_length=64, null=True, description="SQL文件SHA256摘要")
+
+    # 执行信息
+    execute_status = fields.CharField(
+        max_length=20,
+        default="pending",
+        description="执行状态(pending/success/failed)",
+        index=True
+    )
+    execute_message = fields.CharField(max_length=500, null=True, description="执行结果消息")
+    executed_at = fields.DatetimeField(null=True, description="执行时间", index=True)
+    executor_user_id = fields.BigIntField(null=True, description="执行用户ID", index=True)
+    executor_username = fields.CharField(max_length=50, null=True, description="执行用户名")
 
     # 错误信息
     error_message = fields.TextField(null=True, description="错误信息")

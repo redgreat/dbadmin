@@ -26,7 +26,6 @@ class ReportSendTask(BaseModel, TimestampMixin):
     )
     cron = fields.CharField(max_length=100, description="Cron表达式")
     message_template = fields.TextField(null=True, description="消息模板")
-    send_attachment = fields.BooleanField(default=True, description="是否发送附件")
     status = fields.BooleanField(default=True, description="任务状态：true启用，false禁用", index=True)
     last_run_time = fields.DatetimeField(null=True, description="上次执行时间", index=True)
     next_run_time = fields.DatetimeField(null=True, description="下次执行时间", index=True)

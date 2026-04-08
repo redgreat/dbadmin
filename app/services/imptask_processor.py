@@ -6,6 +6,7 @@ import asyncio
 from datetime import datetime
 from app.models.imptask import ImpTask
 from app.services.excelimp_service import generate_sql
+from app.services.sql_apply_service import calc_sha256
 from app.log import logger
 
 
@@ -85,6 +86,7 @@ async def _process_imptask_async(task_id: int):
         task.message = "SQL生成完成"
         task.sql_file_path = sql_file_path
         task.sql_file_size = os.path.getsize(sql_file_path)
+        task.sql_sha256 = calc_sha256(sql_result)
         task.completed_at = datetime.now()
         await task.save()
 

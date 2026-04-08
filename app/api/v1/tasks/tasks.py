@@ -39,7 +39,7 @@ async def get_tasks(
     return await task_controller.get_tasks(page, limit, name, type, status)
 
 
-@router.get("/{task_id}", response_model=TaskInDB, summary="获取任务详情")
+@router.get("/{task_id:int}", response_model=TaskInDB, summary="获取任务详情")
 async def get_task(task_id: int = Path(..., ge=1, description="任务ID")):
     """
     获取单个定时任务的详细信息
@@ -55,7 +55,7 @@ async def create_task(task_data: TaskCreate):
     return await task_controller.create_task(task_data)
 
 
-@router.put("/{task_id}", response_model=TaskInDB, summary="更新任务")
+@router.put("/{task_id:int}", response_model=TaskInDB, summary="更新任务")
 async def update_task(task_id: int = Path(..., ge=1, description="任务ID"), task_data: TaskUpdate = None):
     """
     更新定时任务信息
@@ -63,7 +63,7 @@ async def update_task(task_id: int = Path(..., ge=1, description="任务ID"), ta
     return await task_controller.update_task(task_id, task_data)
 
 
-@router.delete("/{task_id}", summary="删除任务")
+@router.delete("/{task_id:int}", summary="删除任务")
 async def delete_task(task_id: int = Path(..., ge=1, description="任务ID")):
     """
     删除定时任务
@@ -72,7 +72,7 @@ async def delete_task(task_id: int = Path(..., ge=1, description="任务ID")):
     return {"message": f"任务 {task_id} 已删除"}
 
 
-@router.post("/{task_id}/execute", summary="立即执行任务")
+@router.post("/{task_id:int}/execute", summary="立即执行任务")
 async def execute_task(task_id: int = Path(..., ge=1, description="任务ID")):
     """
     立即执行指定的定时任务
