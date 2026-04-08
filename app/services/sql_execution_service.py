@@ -116,6 +116,49 @@ class SQLExecutionService:
                 conn.close()
 
     @staticmethod
+    async def execute_query_page(
+        db_conn: DBConnection,
+        sql: str,
+        offset: int = 0,
+        limit: int = 1000
+    ) -> List[Dict[str, Any]]:
+        """
+        执行SQL分页查询（不统计总数，供大报表导出使用）
+        :param db_conn: 数据库连接对象
+        :param sql: SQL语句
+        :param offset: 偏移量
+        :param limit: 限制数量
+        :return: 数据列表
+        """
+        conn = None
+        try:
+            conn = await SQLExecutionService.get_connection(db_conn)
+
+            # 移除SQL末尾的分号，避免语法错误
+            sql = sql.strip().rstrip(';')
+
+            if db_conn.db_type == "mysql":
+                async with conn.cursor(aiomysql.DictCursor) as cursor:
+                    data_sql = f"{sql} LIMIT {offset}, {limit}"
+                    await cursor.execute(data_sql)
+                    rows = await cursor.fetchall()
+                    return list(rows)
+
+            if db_conn.db_type == "postgresql":
+                data_sql = f"{sql} OFFSET {offset} LIMIT {limit}"
+                rows = await conn.fetch(data_sql)
+                return [dict(row) for row in rows]
+
+            raise ValueError(f"不支持的数据库类型: {db_conn.db_type}")
+
+        except Exception as e:
+            logger.error(f"执行SQL分页查询失败: {str(e)}")
+            raise
+        finally:
+            if conn:
+                conn.close()
+
+    @staticmethod
     async def get_total_count(db_conn: DBConnection, sql: str) -> int:
         """
         获取SQL查询的总数

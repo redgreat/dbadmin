@@ -61,3 +61,6 @@ Thumbs.db
 
 # 上传文件，docker本地需要
 data
+
+# 固定文件夹
+!web/src/views/alert/log/

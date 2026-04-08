@@ -24,3 +24,6 @@ log/
 data/
 .codeartsdoer
 docs
+
+# 固定文件夹
+!web/src/views/alert/log/

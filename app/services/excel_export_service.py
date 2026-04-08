@@ -128,19 +128,7 @@ class ExcelExportService:
         """
         logger.info(f"_execute_export 开始, sql长度: {len(sql)}")
         
-        # 获取总数
-        logger.info("开始获取总数...")
-        total_count = await SQLExecutionService.get_total_count(db_conn, sql)
-        logger.info(f"报表 {generation.report_name} 总数据量: {total_count}")
-
-        if total_count == 0:
-            raise ValueError("查询结果为空，无法导出")
-
-        # 计算需要的sheet数和文件数
-        total_sheets = (total_count + self.MAX_ROWS_PER_SHEET - 1) // self.MAX_ROWS_PER_SHEET
-        total_files = (total_sheets + self.MAX_SHEETS_PER_FILE - 1) // self.MAX_SHEETS_PER_FILE
-
-        logger.info(f"需要 {total_sheets} 个sheet, {total_files} 个文件")
+        logger.info("大报表导出使用无count分页模式，避免COUNT(*)拖慢导出")
 
         # 创建文件存储目录
         file_dir = self._get_file_dir()
@@ -159,7 +147,9 @@ class ExcelExportService:
         sheet_data = []  # 存储当前sheet的数据
 
         try:
-            while current_row < total_count:
+            has_any_data = False
+            done = False
+            while not done:
                 # 判断是否需要创建新文件
                 if current_sheet % self.MAX_SHEETS_PER_FILE == 0:
                     # 保存上一个文件
@@ -194,11 +184,22 @@ class ExcelExportService:
                     headers=headers
                 )
 
+                if rows_written == 0:
+                    # 当前sheet没有数据，移除空sheet并结束
+                    wb.remove(ws)
+                    done = True
+                    break
+
+                has_any_data = True
                 current_row += rows_written
-                logger.info(f"Sheet {current_sheet} 写入 {rows_written} 行，累计 {current_row}/{total_count}")
+                logger.info(f"Sheet {current_sheet} 写入 {rows_written} 行，累计 {current_row}")
+
+                # 当前sheet未写满，说明已到末尾
+                if rows_written < self.MAX_ROWS_PER_SHEET:
+                    done = True
 
             # 保存最后一个文件
-            if wb:
+            if wb and wb.worksheets:
                 file_path = self._save_workbook(
                     wb,
                     file_dir,
@@ -206,6 +207,9 @@ class ExcelExportService:
                     current_file
                 )
                 file_list.append(file_path)
+
+            if not has_any_data:
+                raise ValueError("查询结果为空，无法导出")
 
             # 如果有多个文件，压缩成ZIP
             if len(file_list) > 1:
@@ -254,7 +258,7 @@ class ExcelExportService:
         while rows_written < limit:
             current_batch_size = min(batch_size, limit - rows_written)
 
-            data, _ = await SQLExecutionService.execute_query(
+            data = await SQLExecutionService.execute_query_page(
                 db_conn=db_conn,
                 sql=sql,
                 offset=offset + rows_written,
