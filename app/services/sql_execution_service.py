@@ -32,7 +32,11 @@ class SQLExecutionService:
                     user=conn_info["username"],
                     password=conn_info["password"],
                     db=conn_info["database"],
-                    charset='utf8mb4'
+                    charset='utf8mb4',
+                    connect_timeout=30,
+                    read_timeout=3600,
+                    write_timeout=3600,
+                    autocommit=True,
                 )
                 logger.info("MySQL连接成功")
                 return conn
@@ -214,6 +218,15 @@ class SQLExecutionService:
             conn = await SQLExecutionService.get_connection(db_conn)
             sql = sql.strip().rstrip(';')
             async with conn.cursor(aiomysql.SSDictCursor) as cursor:
+                # 长查询场景下尽量放宽会话级超时，避免中途断流
+                try:
+                    await cursor.execute("SET SESSION wait_timeout=28800")
+                    await cursor.execute("SET SESSION interactive_timeout=28800")
+                    await cursor.execute("SET SESSION net_read_timeout=600")
+                    await cursor.execute("SET SESSION net_write_timeout=600")
+                except Exception as timeout_set_err:
+                    logger.warning(f"设置MySQL会话超时参数失败(忽略): {timeout_set_err}")
+
                 await cursor.execute(sql)
                 while True:
                     rows = await cursor.fetchmany(batch_size)

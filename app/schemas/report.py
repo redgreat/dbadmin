@@ -68,6 +68,7 @@ class ReportGenerationInDB(BaseModel):
     progress: int
     progress_text: Optional[str]
     exported_rows: int
+    error_message: Optional[str]
     file_path: Optional[str]
     execution_json: Optional[dict]
 

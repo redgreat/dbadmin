@@ -45,7 +45,8 @@ class ExcelExportService:
             generation.progress = 1
             generation.progress_text = "任务启动"
             generation.exported_rows = 0
-            await generation.save(update_fields=["status", "progress", "progress_text", "exported_rows"])
+            generation.error_message = None
+            await generation.save(update_fields=["status", "progress", "progress_text", "exported_rows", "error_message"])
 
             # 获取报表配置
             config = await generation.report_config
@@ -105,6 +106,7 @@ class ExcelExportService:
             generation.completed_at = datetime.now()
             generation.progress = 100
             generation.progress_text = "导出完成"
+            generation.error_message = None
             generation.file_path = file_path
             generation.execution_json = execution_log
             await generation.save()
@@ -568,8 +570,11 @@ class ExcelExportService:
             generation.status = status
             generation.completed_at = datetime.now()
             if status == "failed":
-                generation.progress_text = "导出失败"
-                generation.progress = 0
+                short_error = (error_msg or "未知错误").strip()
+                generation.progress_text = f"导出失败: {short_error[:120]}"
+                generation.error_message = short_error
+            else:
+                generation.error_message = None
 
             if error_msg:
                 execution_log = generation.execution_json or {}

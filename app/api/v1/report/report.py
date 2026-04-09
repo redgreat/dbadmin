@@ -193,6 +193,7 @@ async def generate_report(
             progress=0,
             progress_text="排队中",
             exported_rows=0,
+            error_message=None,
         )
 
         # 提交后台任务

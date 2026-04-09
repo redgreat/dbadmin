@@ -81,6 +81,9 @@ const getStatusText = (row) => {
     if (row.exported_rows) return `导出中：已导出 ${row.exported_rows} 行 (${p}%)`
     return `导出中 (${p}%)`
   }
+  if (row.status === 'failed') {
+    return row.progress_text || '失败'
+  }
   return getStatusInfo(row.status).text
 }
 
