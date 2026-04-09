@@ -93,6 +93,21 @@ class ReportConfig(BaseModel):
     file_expire_days: int = 30
 
 
+class RedisConfig(BaseModel):
+    """Redis 配置"""
+    url: str = "redis://127.0.0.1:6379/0"
+
+
+class CeleryConfig(BaseModel):
+    """Celery 配置"""
+    enabled: bool = True
+    broker_url: Optional[str] = None
+    result_backend: Optional[str] = None
+    timezone: str = "Asia/Shanghai"
+    task_default_queue: str = "dbadmin.default"
+    result_expires: int = 86400
+
+
 class Config(BaseModel):
     """统一配置模型"""
     app: AppConfig
@@ -104,6 +119,8 @@ class Config(BaseModel):
     frontend: FrontendConfig
     nginx: NginxConfig
     report: ReportConfig
+    redis: RedisConfig = Field(default_factory=RedisConfig)
+    celery: CeleryConfig = Field(default_factory=CeleryConfig)
 
 
 class ConfigLoader:

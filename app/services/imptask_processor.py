@@ -7,6 +7,7 @@ from datetime import datetime
 from app.models.imptask import ImpTask
 from app.services.excelimp_service import generate_sql
 from app.services.sql_apply_service import calc_sha256
+from app.services.celery_dispatcher import dispatch_imptask
 from app.log import logger
 
 
@@ -17,12 +18,16 @@ async def submit_imptask(task_id: int):
     Args:
         task_id: 任务ID
     """
-    # 创建后台任务
-    asyncio.create_task(_process_imptask_async(task_id))
-    logger.info(f"任务已提交到后台处理: {task_id}")
+    celery_task_id = dispatch_imptask(task_id)
+    if celery_task_id:
+        logger.info(f"任务已提交到Celery后台处理: task_id={task_id}, celery_task_id={celery_task_id}")
+        return
+
+    asyncio.create_task(process_imptask(task_id))
+    logger.info(f"Celery未启用或不可用，任务已提交到本地后台处理: {task_id}")
 
 
-async def _process_imptask_async(task_id: int):
+async def process_imptask(task_id: int):
     """
     异步处理Excel导入任务
 

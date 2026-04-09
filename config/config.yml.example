@@ -73,3 +73,16 @@ report:
   max_sheets_per_file: 2
   page_size: 1000
   file_expire_days: 30
+
+# Redis 配置（请替换为你的实际地址）
+redis:
+  url: "redis://127.0.0.1:6379/0"
+
+# Celery 配置
+celery:
+  enabled: true
+  broker_url: null
+  result_backend: null
+  timezone: "Asia/Shanghai"
+  task_default_queue: "dbadmin.default"
+  result_expires: 86400

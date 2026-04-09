@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Query, Depends, BackgroundTasks
+from fastapi import APIRouter, Query, Depends
 from fastapi.responses import FileResponse
 from app.core.dependency import get_current_user
 from app.schemas.base import Fail, Success, SuccessExtra
@@ -13,6 +13,7 @@ from app.services.excel_export_service import ExcelExportService
 from app.models.report import ReportConfig, ReportGeneration
 from app.models.admin import User
 from app.log import logger
+from app.services.celery_dispatcher import dispatch_report_export
 
 router = APIRouter()
 
@@ -170,7 +171,6 @@ async def get_system_name_options(
 @router.post("/generate", summary="生成报表")
 async def generate_report(
     request: ReportGenerateRequest,
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
     """触发生成报表"""
@@ -196,10 +196,12 @@ async def generate_report(
             error_message=None,
         )
 
-        # 提交后台任务
-        async def run_export():
-            await ExcelExportService().export_report(generation.id)
-        background_tasks.add_task(run_export)
+        celery_task_id = dispatch_report_export(generation.id)
+        if not celery_task_id:
+            # Celery未启用时回退到应用内后台任务
+            import asyncio
+
+            asyncio.create_task(ExcelExportService().export_report(generation.id))
 
         logger.info(f"创建报表生成任务: {report_name}, ID: {generation.id}")
 

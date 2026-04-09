@@ -157,8 +157,7 @@ async def create_task(
         "user_id": user_id,
         "username": username,
     })
-    import asyncio
-    asyncio.create_task(submit_imptask(task.id))
+    await submit_imptask(task.id)
 
     return Success(data={"task_id": task.id}, msg="任务创建成功，正在后台处理")
 

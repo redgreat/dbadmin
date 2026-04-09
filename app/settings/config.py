@@ -99,6 +99,34 @@ class Settings:
     def DB_PASSWORD_SALT(self) -> str:
         return self._config.app.db_password_salt
 
+    @property
+    def REDIS_URL(self) -> str:
+        return self._config.redis.url
+
+    @property
+    def CELERY_ENABLED(self) -> bool:
+        return self._config.celery.enabled
+
+    @property
+    def CELERY_BROKER_URL(self) -> str:
+        return self._config.celery.broker_url or self.REDIS_URL
+
+    @property
+    def CELERY_RESULT_BACKEND(self) -> str:
+        return self._config.celery.result_backend or self.REDIS_URL
+
+    @property
+    def CELERY_TIMEZONE(self) -> str:
+        return self._config.celery.timezone
+
+    @property
+    def CELERY_TASK_DEFAULT_QUEUE(self) -> str:
+        return self._config.celery.task_default_queue
+
+    @property
+    def CELERY_RESULT_EXPIRES(self) -> int:
+        return self._config.celery.result_expires
+
     async def SIM_CONN_ID(self) -> int:
         """SIM数据库连接ID（从数据库读取）"""
         return await self._get_conn_id_by_alias('SIM_CONN')

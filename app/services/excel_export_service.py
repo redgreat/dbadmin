@@ -3,6 +3,7 @@ Excel导出服务 - 支持大数据量导出、分sheet、分文件、ZIP压缩
 """
 import os
 import zipfile
+import asyncio
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 import openpyxl
@@ -165,7 +166,8 @@ class ExcelExportService:
                 if current_sheet % self.MAX_SHEETS_PER_FILE == 0:
                     # 保存上一个文件
                     if wb:
-                        file_path = self._save_workbook(
+                        file_path = await asyncio.to_thread(
+                            self._save_workbook,
                             wb,
                             file_dir,
                             generation.report_name,
@@ -211,6 +213,7 @@ class ExcelExportService:
                         progress_text=f"导出中：已导出 {current_row} 行",
                         exported_rows=current_row,
                     )
+                    await asyncio.sleep(0)
 
                 # 当前sheet未写满，说明已到末尾
                 if rows_written < self.MAX_ROWS_PER_SHEET:
@@ -218,7 +221,8 @@ class ExcelExportService:
 
             # 保存最后一个文件
             if wb and wb.worksheets:
-                file_path = self._save_workbook(
+                file_path = await asyncio.to_thread(
+                    self._save_workbook,
                     wb,
                     file_dir,
                     generation.report_name,
@@ -229,7 +233,24 @@ class ExcelExportService:
             if not has_any_data:
                 raise ValueError("查询结果为空，无法导出")
 
-            return self._finalize_export_files(file_list=file_list, file_dir=file_dir, report_name=generation.report_name)
+            await self._update_generation_progress(
+                generation=generation,
+                progress=97,
+                progress_text="压缩打包中",
+                exported_rows=current_row,
+            )
+            final_path = await self._finalize_export_files(
+                file_list=file_list,
+                file_dir=file_dir,
+                report_name=generation.report_name
+            )
+            await self._update_generation_progress(
+                generation=generation,
+                progress=99,
+                progress_text="文件处理完成，等待收尾",
+                exported_rows=current_row,
+            )
+            return final_path
 
         except Exception as e:
             # 清理临时文件
@@ -257,22 +278,30 @@ class ExcelExportService:
         current_file = 0
         headers = None
         original_headers = None
-        sheet_data: List[Dict[str, Any]] = []
         exported_rows = 0
+        rows_in_sheet = 0
 
-        def _start_new_sheet():
-            nonlocal wb, ws, current_sheet, current_file, sheet_data
+        async def _start_new_sheet():
+            nonlocal wb, ws, current_sheet, current_file, rows_in_sheet
             if wb is None or current_sheet % self.MAX_SHEETS_PER_FILE == 0:
                 if wb and wb.worksheets:
-                    file_path = self._save_workbook(wb, file_dir, generation.report_name, current_file)
+                    file_path = await asyncio.to_thread(
+                        self._save_workbook,
+                        wb,
+                        file_dir,
+                        generation.report_name,
+                        current_file
+                    )
                     file_list.append(file_path)
-                wb = openpyxl.Workbook()
-                wb.remove(wb.active)
+                # 低内存模式：write_only显著降低大报表导出内存占用
+                wb = openpyxl.Workbook(write_only=True)
                 current_file += 1
                 logger.info(f"创建第 {current_file} 个Excel文件（流式）")
             current_sheet += 1
             ws = wb.create_sheet(title=f"Sheet{current_sheet}")
-            sheet_data = []
+            rows_in_sheet = 0
+            if headers:
+                ws.append(headers)
             logger.info(f"创建第 {current_sheet} 个sheet（流式）")
 
         try:
@@ -288,8 +317,9 @@ class ExcelExportService:
                     headers = self._build_unique_headers(original_headers)
                 for row in batch:
                     if ws is None:
-                        _start_new_sheet()
-                    sheet_data.append(row)
+                        await _start_new_sheet()
+                    ws.append([row.get(h) for h in original_headers])
+                    rows_in_sheet += 1
                     exported_rows += 1
                     if exported_rows % self.PAGE_SIZE == 0:
                         await self._update_generation_progress(
@@ -298,8 +328,8 @@ class ExcelExportService:
                             progress_text=f"导出中：已导出 {exported_rows} 行",
                             exported_rows=exported_rows,
                         )
-                    if len(sheet_data) >= self.MAX_ROWS_PER_SHEET:
-                        self._write_with_styles(ws, headers, sheet_data, original_headers)
+                        await asyncio.sleep(0)
+                    if rows_in_sheet >= self.MAX_ROWS_PER_SHEET:
                         await self._update_generation_progress(
                             generation=generation,
                             progress=min(95, 15 + exported_rows // 100000),
@@ -307,19 +337,39 @@ class ExcelExportService:
                             exported_rows=exported_rows,
                         )
                         ws = None
-                        sheet_data = []
+                        rows_in_sheet = 0
 
             if exported_rows == 0:
                 raise ValueError("查询结果为空，无法导出")
 
-            if ws is not None and sheet_data:
-                self._write_with_styles(ws, headers, sheet_data, original_headers)
-
             if wb and wb.worksheets:
-                file_path = self._save_workbook(wb, file_dir, generation.report_name, current_file)
+                file_path = await asyncio.to_thread(
+                    self._save_workbook,
+                    wb,
+                    file_dir,
+                    generation.report_name,
+                    current_file
+                )
                 file_list.append(file_path)
 
-            return self._finalize_export_files(file_list=file_list, file_dir=file_dir, report_name=generation.report_name)
+            await self._update_generation_progress(
+                generation=generation,
+                progress=97,
+                progress_text="压缩打包中",
+                exported_rows=exported_rows,
+            )
+            final_path = await self._finalize_export_files(
+                file_list=file_list,
+                file_dir=file_dir,
+                report_name=generation.report_name
+            )
+            await self._update_generation_progress(
+                generation=generation,
+                progress=99,
+                progress_text="文件处理完成，等待收尾",
+                exported_rows=exported_rows,
+            )
+            return final_path
         except Exception:
             for file_path in file_list:
                 if os.path.exists(file_path):
@@ -367,13 +417,15 @@ class ExcelExportService:
 
             all_data.extend(data)
             rows_written += len(data)
+            if rows_written % self.PAGE_SIZE == 0:
+                await asyncio.sleep(0)
 
             if len(data) < current_batch_size:
                 break
 
         # 写入数据并应用样式
         if headers and all_data:
-            self._write_with_styles(ws, headers, all_data, original_headers)
+            await asyncio.to_thread(self._write_with_styles, ws, headers, all_data, original_headers)
 
         return rows_written, headers
 
@@ -516,18 +568,25 @@ class ExcelExportService:
         logger.info(f"单文件超过10MB，已压缩: {zip_path}")
         return zip_path
 
-    def _finalize_export_files(self, file_list: List[str], file_dir: str, report_name: str) -> str:
+    async def _finalize_export_files(self, file_list: List[str], file_dir: str, report_name: str) -> str:
         if len(file_list) > 1:
             safe_name = report_name.replace('/', '_').replace('\\', '_').replace(':', '_')
             zip_path = os.path.join(file_dir, f"{safe_name}.zip")
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for file_path in file_list:
-                    zipf.write(file_path, os.path.basename(file_path))
-            for file_path in file_list:
-                os.remove(file_path)
+            await asyncio.to_thread(self._zip_files, zip_path, file_list)
+            await asyncio.to_thread(self._remove_files, file_list)
             logger.info(f"生成ZIP文件: {zip_path}")
             return zip_path
-        return self._compress_if_large(file_list[0])
+        return await asyncio.to_thread(self._compress_if_large, file_list[0])
+
+    def _zip_files(self, zip_path: str, file_list: List[str]):
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file_path in file_list:
+                zipf.write(file_path, os.path.basename(file_path))
+
+    def _remove_files(self, file_list: List[str]):
+        for file_path in file_list:
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
     async def _update_generation_progress(
         self,

@@ -16,6 +16,10 @@ from apscheduler.triggers.cron import CronTrigger
 from tortoise import Tortoise
 
 from app.models.task import Task, TaskLog, TaskStatus, TaskType
+from app.services.celery_dispatcher import (
+    dispatch_notify_report_send,
+    dispatch_notify_sql_alert,
+)
 from app.settings.config import settings
 
 logger = logging.getLogger(__name__)
@@ -192,14 +196,18 @@ class TaskScheduler:
             self.scheduler.remove_job(job_id)
 
     async def execute_report_send_task(self, task_id: int):
-        from app.services.notify_task_executor import NotifyTaskExecutor
+        celery_task_id = dispatch_notify_report_send(task_id=task_id)
+        if not celery_task_id:
+            from app.services.notify_task_executor import NotifyTaskExecutor
 
-        await NotifyTaskExecutor.execute_report_send_task(task_id=task_id)
+            await NotifyTaskExecutor.execute_report_send_task(task_id=task_id)
 
     async def execute_sql_alert_task(self, task_id: int):
-        from app.services.notify_task_executor import NotifyTaskExecutor
+        celery_task_id = dispatch_notify_sql_alert(task_id=task_id)
+        if not celery_task_id:
+            from app.services.notify_task_executor import NotifyTaskExecutor
 
-        await NotifyTaskExecutor.execute_sql_alert_task(task_id=task_id)
+            await NotifyTaskExecutor.execute_sql_alert_task(task_id=task_id)
 
     async def remove_job(self, task_id: int):
         """从调度器中移除任务"""

@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime
 from typing import Optional
 
@@ -17,6 +16,11 @@ from app.schemas.task_notify import (
 )
 from app.services.notify_task_executor import NotifyTaskExecutor
 from app.services.report_service import ReportService
+from app.services.celery_dispatcher import (
+    dispatch_notify_report_send,
+    dispatch_notify_sql_alert,
+    fallback_async,
+)
 from app.services.task_scheduler import scheduler
 
 
@@ -95,7 +99,9 @@ class TaskNotifyController:
         task = await ReportSendTask.get_or_none(id=task_id)
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
-        asyncio.create_task(NotifyTaskExecutor.execute_report_send_task(task_id=task_id))
+        celery_task_id = dispatch_notify_report_send(task_id=task_id)
+        if not celery_task_id:
+            fallback_async(NotifyTaskExecutor.execute_report_send_task(task_id=task_id))
         return {"success": True, "message": "任务已开始执行"}
 
     @staticmethod
@@ -180,7 +186,9 @@ class TaskNotifyController:
         task = await SqlAlertTask.get_or_none(id=task_id)
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
-        asyncio.create_task(NotifyTaskExecutor.execute_sql_alert_task(task_id=task_id))
+        celery_task_id = dispatch_notify_sql_alert(task_id=task_id)
+        if not celery_task_id:
+            fallback_async(NotifyTaskExecutor.execute_sql_alert_task(task_id=task_id))
         return {"success": True, "message": "任务已开始执行"}
 
     @staticmethod
