@@ -34,8 +34,6 @@ class SQLExecutionService:
                     db=conn_info["database"],
                     charset='utf8mb4',
                     connect_timeout=30,
-                    read_timeout=3600,
-                    write_timeout=3600,
                     autocommit=True,
                 )
                 logger.info("MySQL连接成功")
