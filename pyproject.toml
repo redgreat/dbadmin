@@ -44,11 +44,6 @@ pytest = "^8.0.0"
 line-length = 120
 target-version = ["py311", "py312"]
 
-[[tool.poetry.source]]
-name = "tsinghua"
-url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
-priority = "primary"
-
 [tool.ruff]
 line-length = 120
 extend-select = [
