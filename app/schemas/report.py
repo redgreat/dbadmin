@@ -65,6 +65,9 @@ class ReportGenerationInDB(BaseModel):
     generated_at: datetime
     completed_at: Optional[datetime]
     status: str
+    progress: int
+    progress_text: Optional[str]
+    exported_rows: int
     file_path: Optional[str]
     execution_json: Optional[dict]
 

@@ -59,6 +59,9 @@ class ReportGeneration(BaseModel, SoftDeleteMixin):
         default="exporting",
         index=True
     )
+    progress = fields.IntField(default=0, description="导出进度(0-100)")
+    progress_text = fields.CharField(max_length=200, null=True, description="导出进度描述")
+    exported_rows = fields.BigIntField(default=0, description="已导出行数")
     file_path = fields.CharField(max_length=500, description="文件路径", null=True)
     execution_json = fields.JSONField(description="执行日志(SQL语句、数据库连接等)", null=True)
 

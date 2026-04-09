@@ -189,7 +189,10 @@ async def generate_report(
             report_name=report_name,
             report_config_id=config.id,
             generator=current_user.username,
-            status="exporting"
+            status="exporting",
+            progress=0,
+            progress_text="排队中",
+            exported_rows=0,
         )
 
         # 提交后台任务

@@ -9,12 +9,7 @@
     </template>
 
     <!-- 表格 -->
-    <CrudTable
-      ref="$table"
-      v-model:query-items="queryItems"
-      :columns="columns"
-      :get-data="getData"
-    >
+    <CrudTable ref="$table" v-model:query-items="queryItems" :columns="columns" :get-data="getData">
       <template #queryBar>
         <QueryBarItem label="系统名称" :label-width="80">
           <n-select
@@ -64,13 +59,6 @@ const isAdmin = computed(() => userStore.isSuperUser || userStore.role?.includes
 // 系统名称选项
 const systemNameOptions = ref([])
 
-// 状态选项
-const statusOptions = [
-  { label: '导出中', value: 'exporting' },
-  { label: '已完成', value: 'completed' },
-  { label: '失败', value: 'failed' }
-]
-
 // 状态图标和颜色
 const getStatusInfo = (status) => {
   switch (status) {
@@ -85,6 +73,17 @@ const getStatusInfo = (status) => {
   }
 }
 
+const getStatusText = (row) => {
+  if (row.status === 'exporting') {
+    const p = Number.isFinite(row.progress) ? row.progress : 0
+    const t = row.progress_text || ''
+    if (t) return `${t} (${p}%)`
+    if (row.exported_rows) return `导出中：已导出 ${row.exported_rows} 行 (${p}%)`
+    return `导出中 (${p}%)`
+  }
+  return getStatusInfo(row.status).text
+}
+
 // 表格列定义
 const columns = [
   { title: 'ID', key: 'id', width: 80 },
@@ -93,18 +92,18 @@ const columns = [
   {
     title: '生成时间',
     key: 'generated_at',
-    width: 180
+    width: 180,
   },
   {
     title: '完成时间',
     key: 'completed_at',
     width: 180,
-    render: (row) => row.completed_at || '-'
+    render: (row) => row.completed_at || '-',
   },
   {
     title: '报表状态',
     key: 'status',
-    width: 120,
+    width: 300,
     render: (row) => {
       const statusInfo = getStatusInfo(row.status)
       return h(
@@ -112,17 +111,25 @@ const columns = [
         { type: statusInfo.type },
         {
           default: () =>
-            h(NSpace, { align: 'center' }, {
-              default: () => [
-                h(NIcon, { size: 16, class: row.status === 'exporting' ? 'animate-spin' : '' }, {
-                  default: () => h(TheIcon, { icon: statusInfo.icon })
-                }),
-                statusInfo.text
-              ]
-            })
+            h(
+              NSpace,
+              { align: 'center' },
+              {
+                default: () => [
+                  h(
+                    NIcon,
+                    { size: 16, class: row.status === 'exporting' ? 'animate-spin' : '' },
+                    {
+                      default: () => h(TheIcon, { icon: statusInfo.icon }),
+                    }
+                  ),
+                  getStatusText(row),
+                ],
+              }
+            ),
         }
       )
-    }
+    },
   },
   {
     title: '操作',
@@ -140,7 +147,7 @@ const columns = [
             {
               size: 'small',
               type: 'primary',
-              onClick: () => handleDownload(row)
+              onClick: () => handleDownload(row),
             },
             { default: () => '下载' }
           )
@@ -156,7 +163,7 @@ const columns = [
               size: 'small',
               type: 'error',
               style: 'margin-left: 8px',
-              onClick: () => handleDelete(row)
+              onClick: () => handleDelete(row),
             },
             { default: () => '删除' }
           )
@@ -164,8 +171,8 @@ const columns = [
       }
 
       return h(NSpace, null, { default: () => buttons })
-    }
-  }
+    },
+  },
 ]
 
 // 获取数据的API
@@ -202,10 +209,9 @@ const handleDownload = async (row) => {
     const link = document.createElement('a')
     link.href = url
 
-    // 从报表名称提取文件名
-    const fileName = row.report_name.endsWith('.zip')
-      ? `${row.report_name}.zip`
-      : `${row.report_name}.xlsx`
+    // 根据后端实际文件路径确定扩展名
+    const isZip = typeof row.file_path === 'string' && row.file_path.toLowerCase().endsWith('.zip')
+    const fileName = isZip ? `${row.report_name}.zip` : `${row.report_name}.xlsx`
     link.setAttribute('download', fileName)
 
     document.body.appendChild(link)
@@ -240,7 +246,7 @@ const handleDelete = (row) => {
         console.error('删除报表失败', error)
         $message.error('删除失败')
       }
-    }
+    },
   })
 }
 

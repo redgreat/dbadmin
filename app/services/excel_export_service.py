@@ -41,6 +41,11 @@ class ExcelExportService:
                 return
 
             logger.info(f"获取到生成记录: {generation.report_name}")
+            generation.status = "exporting"
+            generation.progress = 1
+            generation.progress_text = "任务启动"
+            generation.exported_rows = 0
+            await generation.save(update_fields=["status", "progress", "progress_text", "exported_rows"])
 
             # 获取报表配置
             config = await generation.report_config
@@ -98,6 +103,8 @@ class ExcelExportService:
             # 更新生成记录状态
             generation.status = "completed"
             generation.completed_at = datetime.now()
+            generation.progress = 100
+            generation.progress_text = "导出完成"
             generation.file_path = file_path
             generation.execution_json = execution_log
             await generation.save()
@@ -127,6 +134,8 @@ class ExcelExportService:
         :return: 生成的文件路径
         """
         logger.info(f"_execute_export 开始, sql长度: {len(sql)}")
+        if db_conn.db_type == "mysql":
+            return await self._execute_export_mysql_stream(generation, db_conn, sql)
         
         logger.info("大报表导出使用无count分页模式，避免COUNT(*)拖慢导出")
 
@@ -193,6 +202,13 @@ class ExcelExportService:
                 has_any_data = True
                 current_row += rows_written
                 logger.info(f"Sheet {current_sheet} 写入 {rows_written} 行，累计 {current_row}")
+                if current_row % self.PAGE_SIZE == 0:
+                    await self._update_generation_progress(
+                        generation=generation,
+                        progress=min(95, 10 + current_row // 100000),
+                        progress_text=f"导出中：已导出 {current_row} 行",
+                        exported_rows=current_row,
+                    )
 
                 # 当前sheet未写满，说明已到末尾
                 if rows_written < self.MAX_ROWS_PER_SHEET:
@@ -211,26 +227,98 @@ class ExcelExportService:
             if not has_any_data:
                 raise ValueError("查询结果为空，无法导出")
 
-            # 如果有多个文件，压缩成ZIP
-            if len(file_list) > 1:
-                safe_name = generation.report_name.replace('/', '_').replace('\\', '_').replace(':', '_')
-                zip_path = os.path.join(file_dir, f"{safe_name}.zip")
-                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                    for file_path in file_list:
-                        zipf.write(file_path, os.path.basename(file_path))
-
-                # 删除临时Excel文件
-                for file_path in file_list:
-                    os.remove(file_path)
-
-                logger.info(f"生成ZIP文件: {zip_path}")
-                return zip_path
-            else:
-                # 单个文件超过10MB则压缩后返回
-                return self._compress_if_large(file_list[0])
+            return self._finalize_export_files(file_list=file_list, file_dir=file_dir, report_name=generation.report_name)
 
         except Exception as e:
             # 清理临时文件
+            for file_path in file_list:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            raise
+
+    async def _execute_export_mysql_stream(
+        self,
+        generation: ReportGeneration,
+        db_conn: DBConnection,
+        sql: str,
+    ) -> str:
+        """
+        MySQL流式导出：单次执行SQL，避免深分页OFFSET导致的大SQL卡死问题。
+        """
+        logger.info("MySQL报表导出使用流式拉取模式")
+        file_dir = self._get_file_dir()
+        os.makedirs(file_dir, exist_ok=True)
+        file_list: List[str] = []
+        wb = None
+        ws = None
+        current_sheet = 0
+        current_file = 0
+        headers = None
+        original_headers = None
+        sheet_data: List[Dict[str, Any]] = []
+        exported_rows = 0
+
+        def _start_new_sheet():
+            nonlocal wb, ws, current_sheet, current_file, sheet_data
+            if wb is None or current_sheet % self.MAX_SHEETS_PER_FILE == 0:
+                if wb and wb.worksheets:
+                    file_path = self._save_workbook(wb, file_dir, generation.report_name, current_file)
+                    file_list.append(file_path)
+                wb = openpyxl.Workbook()
+                wb.remove(wb.active)
+                current_file += 1
+                logger.info(f"创建第 {current_file} 个Excel文件（流式）")
+            current_sheet += 1
+            ws = wb.create_sheet(title=f"Sheet{current_sheet}")
+            sheet_data = []
+            logger.info(f"创建第 {current_sheet} 个sheet（流式）")
+
+        try:
+            async for batch in SQLExecutionService.execute_query_stream_mysql(
+                db_conn=db_conn,
+                sql=sql,
+                batch_size=self.PAGE_SIZE,
+            ):
+                if not batch:
+                    continue
+                if headers is None:
+                    original_headers = list(batch[0].keys())
+                    headers = self._build_unique_headers(original_headers)
+                for row in batch:
+                    if ws is None:
+                        _start_new_sheet()
+                    sheet_data.append(row)
+                    exported_rows += 1
+                    if exported_rows % self.PAGE_SIZE == 0:
+                        await self._update_generation_progress(
+                            generation=generation,
+                            progress=min(95, 10 + exported_rows // 100000),
+                            progress_text=f"导出中：已导出 {exported_rows} 行",
+                            exported_rows=exported_rows,
+                        )
+                    if len(sheet_data) >= self.MAX_ROWS_PER_SHEET:
+                        self._write_with_styles(ws, headers, sheet_data, original_headers)
+                        await self._update_generation_progress(
+                            generation=generation,
+                            progress=min(95, 15 + exported_rows // 100000),
+                            progress_text=f"导出中：已完成第 {current_sheet} 个Sheet，累计 {exported_rows} 行",
+                            exported_rows=exported_rows,
+                        )
+                        ws = None
+                        sheet_data = []
+
+            if exported_rows == 0:
+                raise ValueError("查询结果为空，无法导出")
+
+            if ws is not None and sheet_data:
+                self._write_with_styles(ws, headers, sheet_data, original_headers)
+
+            if wb and wb.worksheets:
+                file_path = self._save_workbook(wb, file_dir, generation.report_name, current_file)
+                file_list.append(file_path)
+
+            return self._finalize_export_files(file_list=file_list, file_dir=file_dir, report_name=generation.report_name)
+        except Exception:
             for file_path in file_list:
                 if os.path.exists(file_path):
                     os.remove(file_path)
@@ -271,17 +359,7 @@ class ExcelExportService:
             # 记录表头（仅第一次）
             if rows_written == 0 and headers is None:
                 original_headers = list(data[0].keys())
-                # 处理重复字段名
-                seen = {}
-                unique_headers = []
-                for h in original_headers:
-                    if h in seen:
-                        seen[h] += 1
-                        unique_headers.append(f"{h}_{seen[h]}")
-                    else:
-                        seen[h] = 1
-                        unique_headers.append(h)
-                headers = unique_headers
+                headers = self._build_unique_headers(original_headers)
             elif original_headers is None:
                 original_headers = list(data[0].keys())
 
@@ -405,6 +483,18 @@ class ExcelExportService:
         logger.info(f"保存Excel文件: {file_path}")
         return file_path
 
+    def _build_unique_headers(self, original_headers: List[str]) -> List[str]:
+        seen = {}
+        unique_headers = []
+        for h in original_headers:
+            if h in seen:
+                seen[h] += 1
+                unique_headers.append(f"{h}_{seen[h]}")
+            else:
+                seen[h] = 1
+                unique_headers.append(h)
+        return unique_headers
+
     def _compress_if_large(self, file_path: str) -> str:
         """
         如果单个报表文件超过阈值，则压缩成zip并删除原文件。
@@ -423,6 +513,34 @@ class ExcelExportService:
         os.remove(file_path)
         logger.info(f"单文件超过10MB，已压缩: {zip_path}")
         return zip_path
+
+    def _finalize_export_files(self, file_list: List[str], file_dir: str, report_name: str) -> str:
+        if len(file_list) > 1:
+            safe_name = report_name.replace('/', '_').replace('\\', '_').replace(':', '_')
+            zip_path = os.path.join(file_dir, f"{safe_name}.zip")
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file_path in file_list:
+                    zipf.write(file_path, os.path.basename(file_path))
+            for file_path in file_list:
+                os.remove(file_path)
+            logger.info(f"生成ZIP文件: {zip_path}")
+            return zip_path
+        return self._compress_if_large(file_list[0])
+
+    async def _update_generation_progress(
+        self,
+        generation: ReportGeneration,
+        progress: int,
+        progress_text: str,
+        exported_rows: int,
+    ):
+        try:
+            generation.progress = max(0, min(progress, 99))
+            generation.progress_text = progress_text
+            generation.exported_rows = exported_rows
+            await generation.save(update_fields=["progress", "progress_text", "exported_rows"])
+        except Exception as e:
+            logger.warning(f"更新导出进度失败: {str(e)}")
 
     def _get_file_dir(self) -> str:
         """
@@ -449,6 +567,9 @@ class ExcelExportService:
         try:
             generation.status = status
             generation.completed_at = datetime.now()
+            if status == "failed":
+                generation.progress_text = "导出失败"
+                generation.progress = 0
 
             if error_msg:
                 execution_log = generation.execution_json or {}

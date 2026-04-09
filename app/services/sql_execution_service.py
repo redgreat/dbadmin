@@ -195,3 +195,34 @@ class SQLExecutionService:
         finally:
             if conn:
                 conn.close()
+
+    @staticmethod
+    async def execute_query_stream_mysql(
+        db_conn: DBConnection,
+        sql: str,
+        batch_size: int = 1000,
+    ):
+        """
+        MySQL流式查询（单次执行SQL，按批次拉取，避免深分页性能问题）
+        :yield: 每批数据列表
+        """
+        if db_conn.db_type != "mysql":
+            raise ValueError("execute_query_stream_mysql 仅支持 MySQL 连接")
+
+        conn = None
+        try:
+            conn = await SQLExecutionService.get_connection(db_conn)
+            sql = sql.strip().rstrip(';')
+            async with conn.cursor(aiomysql.SSDictCursor) as cursor:
+                await cursor.execute(sql)
+                while True:
+                    rows = await cursor.fetchmany(batch_size)
+                    if not rows:
+                        break
+                    yield list(rows)
+        except Exception as e:
+            logger.error(f"MySQL流式查询失败: {str(e)}")
+            raise
+        finally:
+            if conn:
+                conn.close()
