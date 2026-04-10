@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
 import requests
+from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -40,8 +41,9 @@ class TaskScheduler:
 
         # 配置执行器
         executors = {
-            "default": ThreadPoolExecutor(20),  # 线程池执行器，适合IO密集型任务
-            "processpool": ProcessPoolExecutor(5),  # 进程池执行器，适合CPU密集型任务
+            "default": AsyncIOExecutor(),
+            "threadpool": ThreadPoolExecutor(20),
+            "processpool": ProcessPoolExecutor(5),
         }
 
         # 作业默认配置
@@ -126,19 +128,13 @@ class TaskScheduler:
         # 创建Cron触发器
         trigger = self._build_cron_trigger(task.cron)
 
-        # 根据任务类型选择执行器
-        if task.type == TaskType.PYTHON:
-            executor = "processpool"  # Python函数使用进程池执行器
-        else:
-            executor = "default"  # 其他任务使用线程池执行器
-
         # 添加作业到调度器
         self.scheduler.add_job(
             self.execute_task,  # 执行函数
             trigger=trigger,  # 触发器
             id=job_id,  # 作业ID
             name=task.name,  # 作业名称
-            executor=executor,  # 执行器
+            executor="default",  # 执行器
             replace_existing=True,  # 如果存在则替换
             kwargs={"task_id": task.id},  # 传递给执行函数的参数
         )
@@ -277,8 +273,18 @@ class TaskScheduler:
                     continue
 
         # 更新任务日志
-        task_log.end_time = datetime.now()
-        task_log.duration = int((task_log.end_time - task_log.start_time).total_seconds())
+        start_time = task_log.start_time
+        end_time = datetime.now(tz=start_time.tzinfo) if getattr(start_time, "tzinfo", None) else datetime.now()
+        task_log.end_time = end_time
+        if start_time and end_time:
+            safe_start = start_time
+            safe_end = end_time
+            if (getattr(safe_start, "tzinfo", None) is None) != (getattr(safe_end, "tzinfo", None) is None):
+                if getattr(safe_start, "tzinfo", None) is None:
+                    safe_start = safe_start.replace(tzinfo=safe_end.tzinfo)
+                else:
+                    safe_end = safe_end.replace(tzinfo=safe_start.tzinfo)
+            task_log.duration = int((safe_end - safe_start).total_seconds())
         await task_log.save()
 
         # 更新下次执行时间
@@ -423,7 +429,8 @@ class TaskScheduler:
             timeout = task.timeout if task.timeout > 0 else None
 
             # 执行请求
-            response = requests.request(
+            response = await asyncio.to_thread(
+                requests.request,
                 method=method,
                 url=url,
                 headers=headers,

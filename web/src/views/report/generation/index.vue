@@ -44,6 +44,7 @@ import CrudTable from '@/components/table/CrudTable.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
 
 import api from '@/api'
+import { getToken } from '@/utils'
 
 defineOptions({ name: '报表生成' })
 
@@ -203,26 +204,18 @@ const handleRefresh = () => {
 // 下载报表
 const handleDownload = async (row) => {
   try {
-    $message.info('正在下载，请稍候...')
-    const response = await api.downloadReport({ generation_id: row.id })
-
-    // 创建下载链接
-    const blob = new Blob([response])
-    const url = window.URL.createObjectURL(blob)
+    const token = getToken()
+    if (!token) {
+      $message.error('未登录或登录已过期')
+      return
+    }
+    const url = `${import.meta.env.VITE_BASE_API}/report/generation/download-direct/${row.id}?token=${encodeURIComponent(token)}`
     const link = document.createElement('a')
     link.href = url
-
-    // 根据后端实际文件路径确定扩展名
-    const isZip = typeof row.file_path === 'string' && row.file_path.toLowerCase().endsWith('.zip')
-    const fileName = isZip ? `${row.report_name}.zip` : `${row.report_name}.xlsx`
-    link.setAttribute('download', fileName)
-
+    link.target = '_blank'
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-
-    $message.success('下载成功')
   } catch (error) {
     console.error('下载报表失败', error)
     $message.error('下载失败')

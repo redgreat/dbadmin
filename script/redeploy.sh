@@ -7,9 +7,9 @@ echo "=========================================="
 echo "    开始重新部署 dbadmin 容器环境"
 echo "=========================================="
 
-echo "➤ 1. 停止并移除旧容器: dbadmin..."
-docker compose stop dbadmin
-docker compose rm -f dbadmin
+echo "➤ 1. 停止并移除旧容器: dbadmin ..."
+docker compose stop dbadmin celery-worker
+docker compose rm -f dbadmin celery-worker
 
 echo "➤ 2. 删除本地所有的 dbadmin 镜像记录..."
 # 注意：这会查找带有 dbadmin 名称的镜像，并按 ID 强制删除
@@ -22,7 +22,7 @@ echo "日志清理完成。"
 
 echo "➤ 4. 重新拉取最新镜像并后台启动..."
 docker compose pull dbadmin
-docker compose up -d dbadmin dbadmin-celery-worker
+docker compose up -d dbadmin celery-worker
 
 echo "等待 2 秒检查容器状态..."
 sleep 2

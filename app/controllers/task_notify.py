@@ -37,8 +37,8 @@ class TaskNotifyController:
         data = []
         for item in items:
             item_dict = await item.to_dict()
-            report_config = item.report_config
-            sender = item.sender
+            report_config = await item.report_config
+            sender = await item.sender
             item_dict["report_config_name"] = report_config.report_name if report_config else ""
             item_dict["sender_name"] = sender.sender_name if sender else ""
             data.append(item_dict)
@@ -116,8 +116,8 @@ class TaskNotifyController:
         data = []
         for item in items:
             item_dict = await item.to_dict()
-            db_conn = item.db_connection
-            sender = item.sender
+            db_conn = await item.db_connection
+            sender = await item.sender
             item_dict["db_connection_name"] = db_conn.name if db_conn else ""
             item_dict["sender_name"] = sender.sender_name if sender else ""
             data.append(item_dict)

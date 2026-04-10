@@ -1,5 +1,11 @@
+import hashlib
+import hmac
 import logging
-from fastapi import APIRouter, Query, Depends
+import os
+import time
+
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from fastapi.responses import FileResponse
 from app.core.dependency import get_current_user
 from app.schemas.base import Fail, Success, SuccessExtra
@@ -14,8 +20,38 @@ from app.models.report import ReportConfig, ReportGeneration
 from app.models.admin import User
 from app.log import logger
 from app.services.celery_dispatcher import dispatch_report_export
+from app.settings import settings
 
 router = APIRouter()
+
+def _build_public_download_sig(generation_id: int, exp: int) -> str:
+    """生成公开下载签名（HMAC-SHA256）。"""
+    key = settings.SECRET_KEY.encode("utf-8")
+    raw = f"{generation_id}:{exp}".encode("utf-8")
+    return hmac.new(key, raw, hashlib.sha256).hexdigest()
+
+
+async def _file_response_from_generation(generation: ReportGeneration) -> FileResponse:
+    """将报表生成记录转换为可下载的文件响应。"""
+    if generation.status != "completed":
+        raise HTTPException(status_code=400, detail="报表尚未生成完成")
+
+    if not generation.file_path:
+        raise HTTPException(status_code=404, detail="文件路径不存在")
+
+    if not os.path.exists(generation.file_path):
+        raise HTTPException(status_code=404, detail="文件不存在或已被删除")
+
+    if generation.file_path.endswith(".zip"):
+        media_type = "application/zip"
+    else:
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    return FileResponse(
+        path=generation.file_path,
+        media_type=media_type,
+        filename=os.path.basename(generation.file_path),
+    )
 
 
 # ==================== 报表配置相关接口 ====================
@@ -69,7 +105,7 @@ async def get_config_detail(
             return Fail(msg="报表配置不存在")
 
         data = await config.to_dict()
-        db_conn = config.db_connection
+        db_conn = await config.db_connection
         data["db_connection_name"] = db_conn.name if db_conn else ""
 
         return Success(data=data)
@@ -249,31 +285,64 @@ async def download_report(
         generation = await ReportGeneration.get_or_none(id=generation_id)
         if not generation:
             return Fail(msg="报表生成记录不存在")
-
-        if generation.status != "completed":
-            return Fail(msg="报表尚未生成完成")
-
-        if not generation.file_path:
-            return Fail(msg="文件路径不存在")
-
-        import os
-        if not os.path.exists(generation.file_path):
-            return Fail(msg="文件不存在或已被删除")
-
-        # 判断文件类型
-        if generation.file_path.endswith('.zip'):
-            media_type = 'application/zip'
-        else:
-            media_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-
-        return FileResponse(
-            path=generation.file_path,
-            media_type=media_type,
-            filename=os.path.basename(generation.file_path)
-        )
+        return await _file_response_from_generation(generation)
     except Exception as e:
         logger.error(f"下载报表文件失败: {str(e)}")
         return Fail(msg=f"下载失败: {str(e)}")
+
+
+@router.get("/generation/download-direct/{generation_id}", summary="直接下载报表文件（支持查询参数token）")
+async def download_report_direct(generation_id: int = Path(..., ge=1, description="报表生成记录ID"), req: Request = None):
+    """下载报表文件（支持Header和查询参数token），用于浏览器直接接管下载流程。"""
+    try:
+        token = req.headers.get("token") if req else None
+        if not token and req:
+            token = req.query_params.get("token")
+        if not token:
+            raise HTTPException(status_code=401, detail="未提供认证token，请在Header或查询参数中提供token")
+
+        try:
+            decode_data = jwt.decode(token, settings.SECRET_KEY, algorithms=settings.JWT_ALGORITHM)
+            user_id = decode_data.get("user_id")
+        except jwt.DecodeError:
+            raise HTTPException(status_code=401, detail="无效的Token")
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="登录已过期")
+
+        user = await User.filter(id=user_id).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="用户不存在")
+
+        generation = await ReportGeneration.get_or_none(id=generation_id)
+        if not generation:
+            raise HTTPException(status_code=404, detail="报表生成记录不存在")
+        return await _file_response_from_generation(generation)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"下载报表文件失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"下载失败: {str(e)}")
+
+
+@router.get("/generation/public-download/{generation_id}", summary="公开下载报表文件（签名校验）")
+async def download_report_public(
+    generation_id: int = Path(..., ge=1, description="报表生成记录ID"),
+    exp: int = Query(..., description="过期时间戳（秒）"),
+    sig: str = Query(..., description="签名"),
+):
+    """公开下载报表文件（签名校验），用于企业微信群无法携带token的场景。"""
+    now = int(time.time())
+    if exp < now:
+        raise HTTPException(status_code=403, detail="下载链接已过期")
+
+    expected = _build_public_download_sig(generation_id=generation_id, exp=exp)
+    if not hmac.compare_digest(expected, (sig or "").strip()):
+        raise HTTPException(status_code=403, detail="下载链接签名无效")
+
+    generation = await ReportGeneration.get_or_none(id=generation_id)
+    if not generation:
+        raise HTTPException(status_code=404, detail="报表生成记录不存在")
+    return await _file_response_from_generation(generation)
 
 
 @router.delete("/generation/delete", summary="删除报表生成记录")

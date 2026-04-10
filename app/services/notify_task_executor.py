@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import os
 import re
 from datetime import datetime
@@ -5,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import openpyxl
 
+from app.core.config_loader import config
 from app.models.alert import AlertSendLog, AlertSender
 from app.models.conn import DBConnection
 from app.models.report import ReportConfig, ReportGeneration
@@ -13,6 +16,7 @@ from app.services.excel_export_service import ExcelExportService
 from app.services.report_service import ReportService
 from app.services.sql_execution_service import SQLExecutionService
 from app.services.wecom_bot_service import WecomBotService
+from app.settings import settings
 
 
 class NotifyTaskExecutor:
@@ -39,8 +43,18 @@ class NotifyTaskExecutor:
         run_log.output = output
         run_log.error = error
         run_log.result_json = result_json
-        run_log.end_time = datetime.now()
-        run_log.duration = int((run_log.end_time - run_log.start_time).total_seconds())
+        start_time = run_log.start_time
+        end_time = datetime.now(tz=start_time.tzinfo) if getattr(start_time, "tzinfo", None) else datetime.now()
+        run_log.end_time = end_time
+        if start_time and end_time:
+            safe_start = start_time
+            safe_end = end_time
+            if (getattr(safe_start, "tzinfo", None) is None) != (getattr(safe_end, "tzinfo", None) is None):
+                if getattr(safe_start, "tzinfo", None) is None:
+                    safe_start = safe_start.replace(tzinfo=safe_end.tzinfo)
+                else:
+                    safe_end = safe_end.replace(tzinfo=safe_start.tzinfo)
+            run_log.duration = int((safe_end - safe_start).total_seconds())
         await run_log.save()
 
     @staticmethod
@@ -84,6 +98,33 @@ class NotifyTaskExecutor:
         return msg
 
     @staticmethod
+    def _guess_public_base_url() -> str:
+        """推断用于外部访问的服务根地址。"""
+        try:
+            if getattr(config, "nginx", None) and config.nginx.enabled:
+                host = (config.nginx.server_name or "localhost").strip()
+                port = int(config.nginx.listen_port)
+            else:
+                host = (getattr(config, "server", None) and config.server.host) or "localhost"
+                host = "localhost" if host in {"0.0.0.0", "127.0.0.1"} else host
+                port = int((getattr(config, "server", None) and config.server.port) or 8090)
+            if port in {80, 443}:
+                return f"http://{host}"
+            return f"http://{host}:{port}"
+        except Exception:
+            return "http://localhost"
+
+    @staticmethod
+    def _build_report_public_download_link(generation_id: int, expires_seconds: int = 86400) -> str:
+        """生成报表公开下载链接（签名校验，默认24小时过期）。"""
+        exp = int(datetime.now().timestamp()) + int(expires_seconds)
+        raw = f"{generation_id}:{exp}".encode("utf-8")
+        key = settings.SECRET_KEY.encode("utf-8")
+        sig = hmac.new(key, raw, hashlib.sha256).hexdigest()
+        base_url = NotifyTaskExecutor._guess_public_base_url()
+        return f"{base_url}/api/v1/report/generation/public-download/{generation_id}?exp={exp}&sig={sig}"
+
+    @staticmethod
     async def execute_report_send_task(task_id: int) -> Dict[str, Any]:
         run_log = await NotifyTaskExecutor._create_run_log("report_send", task_id)
         task = await ReportSendTask.get_or_none(id=task_id).prefetch_related("report_config", "sender")
@@ -92,11 +133,11 @@ class NotifyTaskExecutor:
             return {"success": False, "message": "任务不存在"}
 
         try:
-            sender = task.sender
+            sender = await task.sender
             if not sender or not sender.is_enabled:
                 raise ValueError("发送人不存在或已禁用")
 
-            report_config = task.report_config
+            report_config = await task.report_config
             if not report_config:
                 raise ValueError("报表配置不存在")
 
@@ -120,10 +161,15 @@ class NotifyTaskExecutor:
             )
             text_resp = WecomBotService.send_text(sender.channel_target, message)
 
-            # 定时报表任务强制发送附件（xlsx或zip）
+            file_resp = None
             if not generation.file_path or not os.path.exists(generation.file_path):
                 raise ValueError("报表文件不存在，无法发送附件")
-            file_resp = WecomBotService.send_file(sender.channel_target, generation.file_path)
+            try:
+                file_resp = WecomBotService.send_file(sender.channel_target, generation.file_path)
+            except Exception as file_exc:
+                download_url = NotifyTaskExecutor._build_report_public_download_link(generation_id=generation.id)
+                fallback_msg = f"{message}\n\n附件发送失败，已改为提供下载链接（24小时有效）：\n{download_url}\n\n失败原因：{str(file_exc)}"
+                text_resp = WecomBotService.send_text(sender.channel_target, fallback_msg)
 
             task.last_run_time = datetime.now()
             await task.save()
@@ -137,8 +183,8 @@ class NotifyTaskExecutor:
             await NotifyTaskExecutor._finish_run_log(
                 run_log=run_log,
                 status=TaskRunStatus.SUCCESS,
-                output="执行成功",
-                result_json={"generation_id": generation.id, "file_path": generation.file_path},
+                output="执行成功" if file_resp else "执行成功（附件发送失败，已发送下载链接）",
+                result_json={"generation_id": generation.id, "file_path": generation.file_path, "file_sent": bool(file_resp)},
             )
             return {"success": True, "message": "执行成功", "generation_id": generation.id}
         except Exception as exc:
@@ -224,11 +270,11 @@ class NotifyTaskExecutor:
             return {"success": False, "message": "任务不存在"}
 
         try:
-            sender = task.sender
+            sender = await task.sender
             if not sender or not sender.is_enabled:
                 raise ValueError("发送人不存在或已禁用")
 
-            db_conn = task.db_connection
+            db_conn = await task.db_connection
             if not db_conn:
                 raise ValueError("数据库连接不存在")
 
