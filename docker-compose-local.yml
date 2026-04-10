@@ -46,6 +46,43 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  celery-worker:
+    image: dbadmin:local
+    container_name: dbadmin-celery-worker
+    hostname: dbadmin-celery-worker
+    restart: unless-stopped
+    command: ["celery", "-A", "app.core.celery_app.celery_app", "worker", "-l", "info", "-Q", "dbadmin.default", "--concurrency=2"]
+    environment:
+      - PYTHONPATH=/opt/dbadmin
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+      - LANG=zh_CN.UTF-8
+    volumes:
+      - ./log:/opt/dbadmin/log:rw
+      - ./config/config.yml:/opt/dbadmin/config/config.yml:ro
+      - ./data:/opt/dbadmin/data:rw
+    networks:
+      - dbadmin-network
+    cpus: 1.0
+    mem_limit: 2G
+    mem_reservation: 256m
+    deploy:
+      resources:
+        limits:
+          cpus: 1.0
+          memory: 2G
+        reservations:
+          memory: 256m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   dbadmin-network:
     driver: bridge

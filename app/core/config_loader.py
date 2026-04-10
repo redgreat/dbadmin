@@ -106,6 +106,8 @@ class CeleryConfig(BaseModel):
     timezone: str = "Asia/Shanghai"
     task_default_queue: str = "dbadmin.default"
     result_expires: int = 86400
+    require_worker: bool = True
+    worker_probe_timeout: float = 0.5
 
 
 class Config(BaseModel):

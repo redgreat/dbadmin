@@ -86,3 +86,5 @@ celery:
   timezone: "Asia/Shanghai"
   task_default_queue: "dbadmin.default"
   result_expires: 86400
+  require_worker: true
+  worker_probe_timeout: 0.5

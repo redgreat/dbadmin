@@ -127,6 +127,14 @@ class Settings:
     def CELERY_RESULT_EXPIRES(self) -> int:
         return self._config.celery.result_expires
 
+    @property
+    def CELERY_REQUIRE_WORKER(self) -> bool:
+        return self._config.celery.require_worker
+
+    @property
+    def CELERY_WORKER_PROBE_TIMEOUT(self) -> float:
+        return self._config.celery.worker_probe_timeout
+
     async def SIM_CONN_ID(self) -> int:
         """SIM数据库连接ID（从数据库读取）"""
         return await self._get_conn_id_by_alias('SIM_CONN')
