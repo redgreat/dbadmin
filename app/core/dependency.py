@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 import jwt
 from fastapi import Depends, Header, HTTPException, Request
@@ -10,7 +10,7 @@ from app.settings import settings
 
 class AuthControl:
     @classmethod
-    async def is_authed(cls, token: str = Header(..., description="token验证")) -> Optional["User"]:
+    async def is_authed(cls, token: str = Header(..., description="token验证")) -> Optional[Any]:
         try:
             if token == "dev":
                 user = await User.filter().first()
@@ -33,7 +33,7 @@ class AuthControl:
 
 class PermissionControl:
     @classmethod
-    async def has_permission(cls, request: Request, current_user: User = Depends(AuthControl.is_authed)) -> None:
+    async def has_permission(cls, request: Request, current_user: Any = Depends(AuthControl.is_authed)) -> None:
         if current_user.is_superuser:
             return
         method = request.method
@@ -66,9 +66,9 @@ class PermissionControl:
             if not api_exists:
                 detail = f"API not found in database: {method} {path}. Please refresh API table."
             elif not menu_ids:
-                detail = f"User has no menu permissions. Please assign menus to user's roles."
+                detail = "User has no menu permissions. Please assign menus to user's roles."
             elif not permission_apis:
-                detail = f"Menus have no API mappings. Please configure menu-API relations in menu management."
+                detail = "Menus have no API mappings. Please configure menu-API relations in menu management."
             else:
                 detail = f"Permission denied: {method} {path}. Please add this API to user's menu permissions."
             raise HTTPException(status_code=403, detail=detail)
@@ -78,7 +78,7 @@ DependAuth = Depends(AuthControl.is_authed)
 DependPermisson = Depends(PermissionControl.has_permission)
 
 
-async def get_current_user(user=Depends(AuthControl.is_authed)) -> User:
+async def get_current_user(user=Depends(AuthControl.is_authed)) -> Any:
     """获取当前登录用户"""
     return user
 

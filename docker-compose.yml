@@ -7,6 +7,8 @@ services:
     environment:
       - PYTHONPATH=/opt/dbadmin
       - PYTHONUNBUFFERED=1
+      - PYTHONTRACEMALLOC=25
+      - PYTHONWARNINGS=default
       - TZ=Asia/Shanghai
       - LANG=zh_CN.UTF-8
     volumes:
@@ -48,7 +50,11 @@ services:
     container_name: dbadmin-celery-worker
     hostname: dbadmin-celery-worker
     restart: unless-stopped
-    command: ["celery", "-A", "app.core.celery_app.celery_app", "worker", "-l", "info", "-Q", "dbadmin.default", "--concurrency=2"]
+    command: [
+      "sh",
+      "-c",
+      "mkdir -p /opt/dbadmin/data /opt/dbadmin/log && chown -R 1000:1000 /opt/dbadmin/data /opt/dbadmin/log && chmod -R ug+rwX /opt/dbadmin/data /opt/dbadmin/log && exec celery -A app.core.celery_app.celery_app worker -l info -Q dbadmin.default --concurrency=2 --uid=1000 --gid=1000"
+    ]
     environment:
       - PYTHONPATH=/opt/dbadmin
       - PYTHONUNBUFFERED=1

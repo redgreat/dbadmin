@@ -11,7 +11,7 @@ class ApiController(CRUDBase[Api, ApiCreate, ApiUpdate]):
         super().__init__(model=Api)
 
     async def refresh_api(self):
-        from app import app
+        from app.main import app
 
         all_api_list = []
         for route in app.routes:

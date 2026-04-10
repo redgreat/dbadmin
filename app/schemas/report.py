@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ==================== 报表配置相关 Schema ====================
@@ -39,8 +39,7 @@ class ReportConfigInDB(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReportConfigList(BaseModel):
@@ -72,8 +71,7 @@ class ReportGenerationInDB(BaseModel):
     file_path: Optional[str]
     execution_json: Optional[dict]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReportGenerationList(BaseModel):

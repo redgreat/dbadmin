@@ -54,7 +54,7 @@ function Start-Backend {
   Write-Host "正在启动后端服务..." -ForegroundColor Cyan
   Write-Host "  日志文件: $logFile" -ForegroundColor Gray
 
-  $args = @('-m','uvicorn','app:app','--reload','--port','8090')
+  $args = @('-m','uvicorn','app.main:app','--reload','--port','8090')
 
   if ($NewWindow) {
     $p = Start-Process -FilePath 'python' -ArgumentList $args -WorkingDirectory $root -PassThru

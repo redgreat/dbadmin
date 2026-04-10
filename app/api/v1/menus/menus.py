@@ -171,7 +171,7 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
             - "full": 完全刷新，删除所有关联后重新创建
             - "smart": 智能更新，识别多菜单共用API并保留
     """
-    from app import app
+    from app.main import app
     
     global _refresh_task_status
     _refresh_task_status["running"] = True

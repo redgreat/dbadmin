@@ -1,7 +1,7 @@
 from typing import Optional, List
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class DictCreate(BaseModel):
@@ -28,8 +28,7 @@ class DictResponse(BaseModel):
     deleted_at: Optional[datetime]
     children: Optional[List["DictResponse"]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DictOption(BaseModel):

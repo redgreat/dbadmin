@@ -22,13 +22,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """将数据库模型转换为 schema 模型"""
         schema_model = self.get_schema_model()
         obj_dict = {}
-        for field_name in obj._meta.fields_map.keys():
-            if hasattr(obj, field_name):
-                value = getattr(obj, field_name)
-                if isinstance(value, datetime):
-                    obj_dict[field_name] = value
-                else:
-                    obj_dict[field_name] = value
+        for field_name in obj._meta.db_fields:
+            value = getattr(obj, field_name)
+            obj_dict[field_name] = value
 
         if hasattr(obj, 'created_at'):
             obj_dict['created_at'] = obj.created_at

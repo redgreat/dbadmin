@@ -1,26 +1,24 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict as TypingDict, Any
 from datetime import datetime
 
-from tortoise.expressions import Q
-
 from app.core.crud import CRUDBase
-from app.models.dict import Dict
+from app.models.dict import Dict as DictModel
 from app.schemas.dict import DictCreate, DictUpdate
 
 
-class DictController(CRUDBase[Dict, DictCreate, DictUpdate]):
+class DictController(CRUDBase[DictModel, DictCreate, DictUpdate]):
     def __init__(self):
-        super().__init__(model=Dict)
+        super().__init__(model=DictModel)
 
-    async def get_by_code(self, code: str) -> Optional[Dict]:
+    async def get_by_code(self, code: str) -> Optional[DictModel]:
         """根据编码获取字典"""
         return await self.model.filter(code=code, deleted=False).first()
 
-    async def get_children_by_parent_code(self, parent_code: str) -> List[Dict]:
+    async def get_children_by_parent_code(self, parent_code: str) -> List[DictModel]:
         """根据父级编码获取子级字典列表"""
         return await self.model.filter(parent_code=parent_code, deleted=False).order_by("created_at")
 
-    async def get_root_dicts(self) -> List[Dict]:
+    async def get_root_dicts(self) -> List[DictModel]:
         """获取根级字典（parent_code为空）"""
         return await self.model.filter(parent_code__isnull=True, deleted=False).order_by("created_at")
 
@@ -42,9 +40,9 @@ class DictController(CRUDBase[Dict, DictCreate, DictUpdate]):
         """检查是否存在子级字典"""
         return await self.model.filter(parent_code=code, deleted=False).exists()
 
-    async def get_dict_tree(self) -> List[Dict[str, Any]]:
+    async def get_dict_tree(self) -> List[TypingDict[str, Any]]:
         """获取字典树形结构"""
-        async def build_tree(parent_code: Optional[str] = None, level: int = 0) -> List[Dict[str, Any]]:
+        async def build_tree(parent_code: Optional[str] = None, level: int = 0) -> List[TypingDict[str, Any]]:
             if level >= 3:  # 最多三层
                 return []
 
@@ -65,9 +63,9 @@ class DictController(CRUDBase[Dict, DictCreate, DictUpdate]):
 
         return await build_tree()
 
-    async def get_dict_options(self, code: str) -> List[Dict[str, Any]]:
+    async def get_dict_options(self, code: str) -> List[TypingDict[str, Any]]:
         """根据编码获取字典选项（用于下拉框）"""
-        async def build_options(parent_code: Optional[str] = None, level: int = 0) -> List[Dict[str, Any]]:
+        async def build_options(parent_code: Optional[str] = None, level: int = 0) -> List[TypingDict[str, Any]]:
             if level >= 3:  # 最多三层
                 return []
 

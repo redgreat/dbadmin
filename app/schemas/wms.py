@@ -1,7 +1,7 @@
 from typing import List
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class WmsDeleteBatchIn(BaseModel):
@@ -29,12 +29,13 @@ class PriceQueryIn(BaseModel):
     material_name: str = Field(default="", description="物料名称")
     new_price: str = Field(default="", description="修改后价格")
 
-    @validator('new_price')
+    @field_validator('new_price')
+    @classmethod
     def validate_price(cls, v):
         if v:  # 非空时验证格式
             try:
                 Decimal(v)  # 验证是否为有效数字
-            except:
+            except Exception:
                 raise ValueError('价格格式不正确，应为有效的数字')
         return v
 
@@ -44,11 +45,12 @@ class PriceModifyIn(BaseModel):
     detail_id: str = Field(..., description="明细Id")
     new_price: str = Field(..., description="修改后价格")
 
-    @validator('new_price')
+    @field_validator('new_price')
+    @classmethod
     def validate_price(cls, v):
         try:
             Decimal(v)  # 验证是否为有效数字
-        except:
+        except Exception:
             raise ValueError('价格格式不正确，应为有效的数字')
         return v
 
