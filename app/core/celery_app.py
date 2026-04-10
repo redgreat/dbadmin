@@ -29,4 +29,8 @@ def _build_celery() -> Celery:
 
 
 celery_app = _build_celery()
-celery_app.autodiscover_tasks(["app.tasks"])
+celery_app.conf.update(
+    imports=(
+        "app.tasks.celery_tasks",
+    )
+)

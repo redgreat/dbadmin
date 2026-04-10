@@ -22,7 +22,7 @@ echo "日志清理完成。"
 
 echo "➤ 4. 重新拉取最新镜像并后台启动..."
 docker compose pull dbadmin
-docker compose up -d dbadmin
+docker compose up -d dbadmin dbadmin-celery-worker
 
 echo "等待 2 秒检查容器状态..."
 sleep 2

@@ -14,7 +14,7 @@ services:
       - ./config/config.yml:/opt/dbadmin/config/config.yml:ro
       - ./data:/opt/dbadmin/data:rw
     ports:
-      - "8051:80"
+      - "8501:80"
     networks:
       - dbadmin-network
     healthcheck:
