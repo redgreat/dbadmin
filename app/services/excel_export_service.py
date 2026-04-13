@@ -10,6 +10,7 @@ import openpyxl
 from openpyxl.workbook.workbook import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.table import Table, TableStyleInfo
 from app.models.report import ReportGeneration, ReportConfig
 from app.models.conn import DBConnection
 from app.services.sql_execution_service import SQLExecutionService
@@ -280,6 +281,7 @@ class ExcelExportService:
         original_headers = None
         exported_rows = 0
         rows_in_sheet = 0
+        styled_sheets = set()
 
         async def _start_new_sheet():
             nonlocal wb, ws, current_sheet, current_file, rows_in_sheet
@@ -293,15 +295,13 @@ class ExcelExportService:
                         current_file
                     )
                     file_list.append(file_path)
-                # 低内存模式：write_only显著降低大报表导出内存占用
-                wb = openpyxl.Workbook(write_only=True)
+                wb = openpyxl.Workbook()
+                wb.remove(wb.active)
                 current_file += 1
                 logger.info(f"创建第 {current_file} 个Excel文件（流式）")
             current_sheet += 1
             ws = wb.create_sheet(title=f"Sheet{current_sheet}")
             rows_in_sheet = 0
-            if headers:
-                ws.append(headers)
             logger.info(f"创建第 {current_sheet} 个sheet（流式）")
 
         try:
@@ -318,6 +318,9 @@ class ExcelExportService:
                 for row in batch:
                     if ws is None:
                         await _start_new_sheet()
+                        if headers:
+                            for col_idx, header in enumerate(headers, 1):
+                                ws.cell(row=1, column=col_idx, value=header)
                     ws.append([row.get(h) for h in original_headers])
                     rows_in_sheet += 1
                     exported_rows += 1
@@ -336,11 +339,18 @@ class ExcelExportService:
                             progress_text=f"导出中：已完成第 {current_sheet} 个Sheet，累计 {exported_rows} 行",
                             exported_rows=exported_rows,
                         )
+                        if ws and current_sheet not in styled_sheets:
+                            await asyncio.to_thread(self._apply_sheet_style, ws, headers)
+                            styled_sheets.add(current_sheet)
                         ws = None
                         rows_in_sheet = 0
 
             if exported_rows == 0:
                 raise ValueError("查询结果为空，无法导出")
+
+            if ws and current_sheet not in styled_sheets:
+                await asyncio.to_thread(self._apply_sheet_style, ws, headers)
+                styled_sheets.add(current_sheet)
 
             if wb and wb.worksheets:
                 file_path = await asyncio.to_thread(
@@ -440,12 +450,12 @@ class ExcelExportService:
         写入数据并应用Excel样式美化
         """
         # 定义样式
-        header_font = Font(name='微软雅黑', size=12, bold=True, color='FFFFFF')
+        header_font = Font(name='微软雅黑', size=11, bold=True, color='FFFFFF')
         header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
         header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
 
         data_font = Font(name='微软雅黑', size=10)
-        data_alignment = Alignment(horizontal='left', vertical='center')
+        data_alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
 
         # 交替行颜色
         odd_fill = PatternFill(start_color='D9E2F3', end_color='D9E2F3', fill_type='solid')  # 浅蓝
@@ -481,15 +491,7 @@ class ExcelExportService:
                 cell.alignment = data_alignment
                 cell.border = thin_border
 
-        # 自动调整列宽
-        self._auto_adjust_column_width(ws, headers, data, original_headers)
-
-        # 冻结首行
-        ws.freeze_panes = 'A2'
-
-        # 添加自动筛选
-        max_col = get_column_letter(len(headers))
-        ws.auto_filter.ref = f'A1:{max_col}{len(data) + 1}'
+        self._apply_sheet_style(ws, headers)
 
     def _auto_adjust_column_width(
         self,
@@ -518,6 +520,93 @@ class ExcelExportService:
             # 设置列宽，最小8，最大50
             adjusted_width = min(max(max_length + 2, 8), 50)
             ws.column_dimensions[get_column_letter(col_idx)].width = adjusted_width
+
+    def _display_width(self, value: Any) -> int:
+        text = "" if value is None else str(value)
+        width = 0
+        for char in text:
+            if '\u4e00' <= char <= '\u9fff':
+                width += 2
+            else:
+                width += 1
+        return width
+
+    def _apply_sheet_style(self, ws, headers: Optional[List[str]]):
+        """
+        对已有sheet应用统一样式：
+        - 首行冻结
+        - 自动筛选
+        - 表头加粗+大一号
+        - 行高列宽自适配（近似）
+        - 套用表格样式
+        """
+        if not headers:
+            return
+
+        max_row = ws.max_row
+        max_col = len(headers)
+        if max_row <= 0 or max_col <= 0:
+            return
+
+        header_font = Font(name="微软雅黑", size=11, bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        data_alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+        thin_border = Border(
+            left=Side(style="thin", color="B4C6E7"),
+            right=Side(style="thin", color="B4C6E7"),
+            top=Side(style="thin", color="B4C6E7"),
+            bottom=Side(style="thin", color="B4C6E7"),
+        )
+
+        # 表头样式
+        for col_idx in range(1, max_col + 1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+
+        # 数据区域样式 + 列宽估算
+        sample_limit = min(max_row, 2000)
+        col_widths = [self._display_width(h) for h in headers]
+        for row_idx in range(2, max_row + 1):
+            row_max_lines = 1
+            for col_idx in range(1, max_col + 1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.alignment = data_alignment
+                cell.border = thin_border
+                if row_idx <= sample_limit:
+                    v = "" if cell.value is None else str(cell.value)
+                    col_widths[col_idx - 1] = max(col_widths[col_idx - 1], self._display_width(v))
+                    row_max_lines = max(row_max_lines, v.count("\n") + 1)
+            if row_max_lines > 1:
+                ws.row_dimensions[row_idx].height = min(120, 18 * row_max_lines)
+
+        # 表头行高
+        ws.row_dimensions[1].height = 24
+
+        # 自动列宽（近似）
+        for idx, width in enumerate(col_widths, 1):
+            ws.column_dimensions[get_column_letter(idx)].width = min(max(width + 2, 8), 60)
+
+        # 冻结首行 + 全列筛选
+        max_col_letter = get_column_letter(max_col)
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = f"A1:{max_col_letter}{max_row}"
+
+        # 表格样式（避免重复创建）
+        table_name = f"Table_{ws.title}".replace(" ", "_").replace("-", "_")
+        if table_name not in ws.tables:
+            table = Table(displayName=table_name, ref=f"A1:{max_col_letter}{max_row}")
+            table.tableStyleInfo = TableStyleInfo(
+                name="TableStyleMedium2",
+                showFirstColumn=False,
+                showLastColumn=False,
+                showRowStripes=True,
+                showColumnStripes=False,
+            )
+            ws.add_table(table)
 
     def _save_workbook(
         self,
