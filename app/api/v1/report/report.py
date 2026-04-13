@@ -291,7 +291,6 @@ async def download_report(
         return Fail(msg=f"下载失败: {str(e)}")
 
 
-@router.get("/generation/download-direct/{generation_id}", summary="直接下载报表文件（支持查询参数token）")
 async def download_report_direct(generation_id: int = Path(..., ge=1, description="报表生成记录ID"), req: Request = None):
     """下载报表文件（支持Header和查询参数token），用于浏览器直接接管下载流程。"""
     try:
@@ -324,7 +323,6 @@ async def download_report_direct(generation_id: int = Path(..., ge=1, descriptio
         raise HTTPException(status_code=500, detail=f"下载失败: {str(e)}")
 
 
-@router.get("/generation/public-download/{generation_id}", summary="公开下载报表文件（签名校验）")
 async def download_report_public(
     generation_id: int = Path(..., ge=1, description="报表生成记录ID"),
     exp: int = Query(..., description="过期时间戳（秒）"),
