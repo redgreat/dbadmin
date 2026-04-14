@@ -14,8 +14,10 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 from app.models.report import ReportGeneration, ReportConfig
 from app.models.conn import DBConnection
 from app.services.sql_execution_service import SQLExecutionService
+from app.services.oss_service import oss_service
 from app.log import logger
 from app.core.config_loader import config
+from app.settings import settings
 
 
 class ExcelExportService:
@@ -92,16 +94,46 @@ class ExcelExportService:
             }
 
             # 执行导出
-            file_path = await self._execute_export(
+            local_file_path = await self._execute_export(
                 generation=generation,
                 db_conn=db_conn,
                 sql=config.sql_statement
             )
+            file_path = local_file_path
+
+            # 上传到OSS（启用时）
+            oss_meta = await asyncio.to_thread(oss_service.upload_file, local_file_path)
+            if oss_meta:
+                execution_log["storage"] = oss_meta
+                execution_log["local_file_path"] = local_file_path
+                execution_log["storage_upload_status"] = "success"
+                # 仍保留本地file_path用于兼容历史逻辑，下载优先走OSS返回直链
+                if settings.OSS_CLEANUP_LOCAL_AFTER_UPLOAD and os.path.exists(local_file_path):
+                    try:
+                        os.remove(local_file_path)
+                        execution_log["local_file_cleaned"] = True
+                    except Exception as cleanup_exc:
+                        logger.warning(f"清理本地报表文件失败: {local_file_path}, error={cleanup_exc}")
+            elif settings.OSS_ENABLED:
+                execution_log["storage_upload_status"] = "failed"
+                execution_log["storage_upload_error"] = "OSS上传失败，已回退本地文件地址"
+                execution_log["local_file_path"] = local_file_path
+                logger.error(
+                    f"OSS上传失败，报表将保留本地下载路径: generation_id={generation_id}, file={local_file_path}"
+                )
 
             # 更新执行日志
             execution_log["end_time"] = datetime.now().isoformat()
             execution_log["status"] = "success"
-            execution_log["file_path"] = file_path
+            if oss_meta:
+                remote_path = (
+                    oss_meta.get("download_url")
+                    or oss_meta.get("url")
+                    or oss_meta.get("oss_uri")
+                )
+                execution_log["file_path"] = remote_path or file_path
+            else:
+                execution_log["file_path"] = file_path
 
             # 更新生成记录状态
             generation.status = "completed"

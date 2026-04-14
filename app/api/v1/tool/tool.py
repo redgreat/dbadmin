@@ -10,6 +10,7 @@ from app.services.formatter_service import format_sql
 from app.models.admin import AuditLog, User
 from app.core.dependency import DependAuth
 from app.controllers.conn import conn_controller
+from app.services.conn_permission_service import ensure_conn_access
 
 router = APIRouter(tags=["日常工具"])
 
@@ -118,6 +119,7 @@ async def submit_excel_sql(
 
         # 配置连接时由连接决定db_type；未配置时使用默认mysql生成SQL
         if target_conn_id:
+            await ensure_conn_access(current_user, target_conn_id, "使用该目标连接")
             conn_info = await conn_controller.get_decrypted_connection(target_conn_id)
             if not conn_info:
                 raise HTTPException(status_code=400, detail="目标连接不存在或不可用")

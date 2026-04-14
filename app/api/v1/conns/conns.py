@@ -4,9 +4,12 @@ from fastapi import APIRouter, Query
 from tortoise.expressions import Q
 
 from app.controllers.conn import conn_controller
+from app.core.dependency import DependAuth
+from app.models.admin import User
 from app.schemas.base import Fail, Success, SuccessExtra
 from app.schemas.conn import DBConnectionCreate, DBConnectionTest, DBConnectionUpdate
 from app.services.db_pool import db_pool
+from app.services.conn_permission_service import apply_conn_permission_filter
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +20,13 @@ async def list_connections(
     page: int = Query(1, description="页码"),
     page_size: int = Query(10, description="每页数量"),
     name: str = Query(None, description="连接名称"),
+    current_user: User = DependAuth,
 ):
     """获取数据库连接列表"""
     q = Q()
     if name:
         q &= Q(name__contains=name)
+    q = await apply_conn_permission_filter(q, current_user)
     
     total, conn_objs = await conn_controller.list(
         page=page, page_size=page_size, search=q, order=["-updated_at"]

@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import os
@@ -13,6 +14,7 @@ from app.models.conn import DBConnection
 from app.models.report import ReportConfig, ReportGeneration
 from app.models.task_notify import NotifyTaskRunLog, ReportSendTask, SqlAlertTask, TaskRunStatus
 from app.services.excel_export_service import ExcelExportService
+from app.services.oss_service import oss_service
 from app.services.report_service import ReportService
 from app.services.sql_execution_service import SQLExecutionService
 from app.services.wecom_bot_service import WecomBotService
@@ -21,6 +23,21 @@ from app.settings import settings
 
 class NotifyTaskExecutor:
     MAX_MESSAGE_ROWS = 20
+    _report_send_running_task_ids = set()
+    _report_send_running_lock = asyncio.Lock()
+
+    @classmethod
+    async def _acquire_report_send_lock(cls, task_id: int) -> bool:
+        async with cls._report_send_running_lock:
+            if task_id in cls._report_send_running_task_ids:
+                return False
+            cls._report_send_running_task_ids.add(task_id)
+            return True
+
+    @classmethod
+    async def _release_report_send_lock(cls, task_id: int):
+        async with cls._report_send_running_lock:
+            cls._report_send_running_task_ids.discard(task_id)
 
     @staticmethod
     async def _create_run_log(task_type: str, task_ref_id: int) -> NotifyTaskRunLog:
@@ -126,10 +143,14 @@ class NotifyTaskExecutor:
 
     @staticmethod
     async def execute_report_send_task(task_id: int) -> Dict[str, Any]:
+        if not await NotifyTaskExecutor._acquire_report_send_lock(task_id):
+            return {"success": True, "message": "任务正在执行，跳过重复触发"}
+
         run_log = await NotifyTaskExecutor._create_run_log("report_send", task_id)
         task = await ReportSendTask.get_or_none(id=task_id).prefetch_related("report_config", "sender")
         if not task:
             await NotifyTaskExecutor._finish_run_log(run_log, TaskRunStatus.FAILED, error="任务不存在")
+            await NotifyTaskExecutor._release_report_send_lock(task_id)
             return {"success": False, "message": "任务不存在"}
 
         try:
@@ -162,13 +183,33 @@ class NotifyTaskExecutor:
             text_resp = WecomBotService.send_text(sender.channel_target, message)
 
             file_resp = None
-            if not generation.file_path or not os.path.exists(generation.file_path):
-                raise ValueError("报表文件不存在，无法发送附件")
-            try:
-                file_resp = WecomBotService.send_file(sender.channel_target, generation.file_path)
-            except Exception as file_exc:
+            fallback_reason = None
+            storage_meta = oss_service.extract_oss_meta(generation.execution_json)
+            download_url = oss_service.resolve_download_url(storage_meta)
+            if not download_url:
                 download_url = NotifyTaskExecutor._build_report_public_download_link(generation_id=generation.id)
-                fallback_msg = f"{message}\n\n附件发送失败，已改为提供下载链接（24小时有效）：\n{download_url}\n\n失败原因：{str(file_exc)}"
+
+            local_file_path = None
+            execution_json = generation.execution_json if isinstance(generation.execution_json, dict) else {}
+            candidate_local_file = execution_json.get("local_file_path")
+            if candidate_local_file and os.path.exists(candidate_local_file):
+                local_file_path = candidate_local_file
+            elif generation.file_path and os.path.exists(generation.file_path):
+                local_file_path = generation.file_path
+
+            try:
+                if local_file_path:
+                    file_resp = WecomBotService.send_file(sender.channel_target, local_file_path)
+                else:
+                    fallback_reason = "本地文件不存在或不可访问"
+            except Exception as file_exc:
+                fallback_reason = str(file_exc)
+
+            if not file_resp:
+                fallback_msg = (
+                    f"{message}\n\n附件发送失败，已改为提供下载链接：\n{download_url}\n\n"
+                    f"失败原因：{fallback_reason or '未知错误'}"
+                )
                 text_resp = WecomBotService.send_text(sender.channel_target, fallback_msg)
 
             task.last_run_time = datetime.now()
@@ -184,7 +225,13 @@ class NotifyTaskExecutor:
                 run_log=run_log,
                 status=TaskRunStatus.SUCCESS,
                 output="执行成功" if file_resp else "执行成功（附件发送失败，已发送下载链接）",
-                result_json={"generation_id": generation.id, "file_path": generation.file_path, "file_sent": bool(file_resp)},
+                result_json={
+                    "generation_id": generation.id,
+                    "file_path": generation.file_path,
+                    "local_file_path": local_file_path,
+                    "download_url": download_url,
+                    "file_sent": bool(file_resp),
+                },
             )
             return {"success": True, "message": "执行成功", "generation_id": generation.id}
         except Exception as exc:
@@ -200,6 +247,8 @@ class NotifyTaskExecutor:
                     response_text=str(exc),
                 )
             return {"success": False, "message": str(exc)}
+        finally:
+            await NotifyTaskExecutor._release_report_send_lock(task_id)
 
     @staticmethod
     def _safe_str(value: Any) -> str:

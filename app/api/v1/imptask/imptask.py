@@ -14,11 +14,11 @@ from app.schemas.imptask import ImpTaskOut
 from app.controllers.imptask import imptask_controller
 from app.services.imptask_processor import submit_imptask
 from app.models.admin import User
-from app.core.dependency import AuthControl, DependAuth
+from app.core.dependency import DependAuth
 from app.controllers.conn import conn_controller
-from app.settings.config import settings
 from app.services.excelimp_service import get_progress
 from app.services.sql_apply_service import execute_sql_on_connection, calc_sha256
+from app.services.conn_permission_service import ensure_conn_access
 
 router = APIRouter()
 
@@ -79,7 +79,7 @@ async def get_task_list(
 
 @router.post("/create", summary="创建Excel导入任务")
 async def create_task(
-    req: Request,
+    current_user: User = DependAuth,
     file: UploadFile = File(...),
     task_name: str = Form(...),
     target_conn_id: Optional[int] = Form(None),
@@ -109,6 +109,7 @@ async def create_task(
 
     conn_info = None
     if target_conn_id:
+        await ensure_conn_access(current_user, target_conn_id, "使用该目标连接")
         # 配置了目标连接时，数据库类型由连接决定（前端不可自定义）
         conn_info = await conn_controller.get_decrypted_connection(target_conn_id)
         if not conn_info:
@@ -121,17 +122,8 @@ async def create_task(
         if db_type not in ("mysql", "postgresql"):
             db_type = "mysql"
 
-    # 获取用户信息
-    try:
-        token = req.headers.get("token")
-        user_obj: User = None
-        if token:
-            user_obj = await AuthControl.is_authed(token)
-        user_id = user_obj.id if user_obj else 0
-        username = user_obj.username if user_obj else ""
-    except Exception:
-        user_id = 0
-        username = ""
+    user_id = current_user.id
+    username = current_user.username
 
     # 生成文件存储路径
     file_ext = file.filename.split('.')[-1]
@@ -198,6 +190,7 @@ async def execute_task_sql(
                     "task_id": task.id,
                 },
             )
+        await ensure_conn_access(current_user, int(task.target_conn_id), "使用该任务目标连接")
 
         with open(task.sql_file_path, "r", encoding="utf-8") as file_obj:
             sql_text = file_obj.read()
@@ -235,6 +228,7 @@ async def execute_task_sql(
             raise HTTPException(status_code=400, detail="file_key不能为空")
         if not target_conn_id:
             raise HTTPException(status_code=400, detail="target_conn_id不能为空")
+        await ensure_conn_access(current_user, int(target_conn_id), "使用该目标连接")
 
         progress = get_progress(file_key)
         if not progress or progress.get("stage") != "done":

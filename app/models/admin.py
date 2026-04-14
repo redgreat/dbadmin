@@ -16,6 +16,11 @@ class User(BaseModel, TimestampMixin):
     is_superuser = fields.BooleanField(default=False, description="是否为超级管理员", index=True)
     last_login = fields.DatetimeField(null=True, description="最后登录时间", index=True)
     roles = fields.ManyToManyField("models.Role", related_name="user_roles")
+    conn_permissions = fields.ManyToManyField(
+        "models.DBConnection",
+        related_name="authorized_users",
+        through="user_conn_permission",
+    )
 
     class Meta:
         table = "user"

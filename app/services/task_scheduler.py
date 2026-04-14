@@ -156,6 +156,9 @@ class TaskScheduler:
             id=job_id,
             name=task.task_name,
             executor="default",
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=60,
             replace_existing=True,
             kwargs={"task_id": task.id},
         )

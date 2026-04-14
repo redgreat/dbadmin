@@ -4,6 +4,7 @@ from typing import List, Optional
 from fastapi.exceptions import HTTPException
 
 from app.core.crud import CRUDBase
+from app.models.conn import DBConnection
 from app.models.admin import User
 from app.schemas.login import CredentialsSchema
 from app.schemas.users import UserCreate, UserUpdate
@@ -23,8 +24,9 @@ class UserController(CRUDBase[User, UserCreate, UserUpdate]):
         return await self.model.filter(username=username).first()
 
     async def create_user(self, obj_in: UserCreate) -> User:
-        obj_in.password = get_password_hash(password=obj_in.password)
-        obj = await self.create(obj_in)
+        obj_dict = obj_in.create_dict()
+        obj_dict["password"] = get_password_hash(password=obj_in.password)
+        obj = await self.create(obj_dict)
         return obj
 
     async def update_last_login(self, id: int) -> None:
@@ -55,6 +57,18 @@ class UserController(CRUDBase[User, UserCreate, UserUpdate]):
         for role_id in role_ids:
             role_obj = await role_controller.get(id=role_id)
             await user.roles.add(role_obj)
+
+    async def update_conn_permissions(self, user: User, conn_ids: List[int]) -> None:
+        await user.conn_permissions.clear()
+        if not conn_ids:
+            return
+        conn_objs = await DBConnection.filter(id__in=conn_ids).all()
+        found_ids = {conn.id for conn in conn_objs}
+        input_ids = {int(conn_id) for conn_id in conn_ids}
+        if found_ids != input_ids:
+            missing_ids = sorted(list(input_ids - found_ids))
+            raise HTTPException(status_code=400, detail=f"连接不存在: {missing_ids}")
+        await user.conn_permissions.add(*conn_objs)
 
     async def reset_password(self, user_id: int):
         user_obj = await self.get(id=user_id)

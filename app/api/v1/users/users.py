@@ -12,6 +12,28 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _sanitize_conn_permissions(data: dict):
+    conn_permissions = data.get("conn_permissions", []) or []
+    safe_conns = []
+    conn_ids = []
+    for item in conn_permissions:
+        conn_id = item.get("id")
+        if conn_id is None:
+            continue
+        conn_ids.append(conn_id)
+        safe_conns.append(
+            {
+                "id": conn_id,
+                "name": item.get("name"),
+                "alias": item.get("alias"),
+                "db_type": item.get("db_type"),
+            }
+        )
+    data["conn_permissions"] = safe_conns
+    data["conn_ids"] = conn_ids
+    return data
+
+
 @router.get("/list", summary="查看用户列表")
 async def list_user(
     page: int = Query(1, description="页码"),
@@ -26,6 +48,7 @@ async def list_user(
         q &= Q(email__contains=email)
     total, user_objs = await user_controller.list(page=page, page_size=page_size, search=q)
     data = [await obj.to_dict(m2m=True, exclude_fields=["password"]) for obj in user_objs]
+    data = [_sanitize_conn_permissions(item) for item in data]
     return SuccessExtra(data=data, total=total, page=page, page_size=page_size)
 
 
@@ -34,7 +57,8 @@ async def get_user(
     user_id: int = Query(..., description="用户ID"),
 ):
     user_obj = await user_controller.get(id=user_id)
-    user_dict = await user_obj.to_dict(exclude_fields=["password"])
+    user_dict = await user_obj.to_dict(m2m=True, exclude_fields=["password"])
+    user_dict = _sanitize_conn_permissions(user_dict)
     return Success(data=user_dict)
 
 
@@ -47,6 +71,7 @@ async def create_user(
         return Fail(code=400, msg="The user with this email already exists in the system.")
     new_user = await user_controller.create_user(obj_in=user_in)
     await user_controller.update_roles(new_user, user_in.role_ids)
+    await user_controller.update_conn_permissions(new_user, user_in.conn_ids or [])
     return Success(msg="Created Successfully")
 
 
@@ -54,8 +79,11 @@ async def create_user(
 async def update_user(
     user_in: UserUpdate,
 ):
-    user = await user_controller.update(id=user_in.id, obj_in=user_in)
+    user_update_payload = user_in.model_dump(exclude={"id", "role_ids", "conn_ids"})
+    user = await user_controller.update(id=user_in.id, obj_in=user_update_payload)
     await user_controller.update_roles(user, user_in.role_ids)
+    if user_in.conn_ids is not None:
+        await user_controller.update_conn_permissions(user, user_in.conn_ids)
     return Success(msg="Updated Successfully")
 
 

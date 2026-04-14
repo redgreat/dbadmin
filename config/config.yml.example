@@ -88,3 +88,21 @@ celery:
   result_expires: 86400
   require_worker: true
   worker_probe_timeout: 0.5
+
+# OSS 配置
+oss:
+  enabled: false
+  bucket: "your-bucket-name"
+  app_code: ""
+  identity_url: ""
+  client_id: ""
+  client_secret: ""
+  scope: ""
+  upload_api_url: ""
+  direct_download_base_url: ""
+  upload_header_app_code: false
+  upload_app_code_header_name: "X-App-Code"
+  request_timeout_seconds: 30
+  prefix: "reports"
+  signed_url_expire_seconds: 300
+  cleanup_local_after_upload: false

@@ -12,6 +12,7 @@ import {
   NSwitch,
   NTag,
   NPopconfirm,
+  NSelect,
   NLayout,
   NLayoutSider,
   NLayoutContent,
@@ -49,7 +50,7 @@ const {
   handleAdd,
 } = useCRUD({
   name: '用户',
-  initForm: {},
+  initForm: { role_ids: [], conn_ids: [] },
   doCreate: api.createUser,
   doUpdate: api.updateUser,
   doDelete: api.deleteUser,
@@ -57,10 +58,17 @@ const {
 })
 
 const roleOption = ref([])
+const connOption = ref([])
 
 onMounted(() => {
   $table.value?.handleSearch()
   api.getRoleList({ page: 1, page_size: 9999 }).then((res) => (roleOption.value = res.data))
+  api.getConnList({ page: 1, page_size: 9999 }).then((res) => {
+    connOption.value = (res.data || []).map((item) => ({
+      label: `${item.name} (${item.db_type})`,
+      value: item.id,
+    }))
+  })
 })
 
 const columns = [
@@ -160,6 +168,7 @@ const columns = [
               style: 'margin-right: 8px;',              onClick: () => {
                 handleEdit(row)
                 modalForm.value.role_ids = row.roles.map((e) => (e = e.id))
+                modalForm.value.conn_ids = row.conn_ids || row.conn_permissions?.map((e) => e.id) || []
               },
             },
             {
@@ -250,6 +259,7 @@ async function handleUpdateDisable(row) {
     role_ids.push(e.id)
   })
   row.role_ids = role_ids
+  row.conn_ids = row.conn_ids || row.conn_permissions?.map((item) => item.id) || []
   row.dept_id = row.dept?.id
   try {
     await api.updateUser(row)
@@ -414,6 +424,16 @@ const validateAddUser = {
                   />
                 </NSpace>
               </NCheckboxGroup>
+            </NFormItem>
+            <NFormItem label="连接权限" path="conn_ids">
+              <NSelect
+                v-model:value="modalForm.conn_ids"
+                :options="connOption"
+                multiple
+                clearable
+                filterable
+                placeholder="请选择该账号可使用的数据库连接"
+              />
             </NFormItem>
             <NFormItem label="超级用户" path="is_superuser">
               <NSwitch

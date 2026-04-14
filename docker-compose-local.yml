@@ -28,16 +28,16 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
-    cpus: 2.0
-    mem_limit: 4G
-    mem_reservation: 512m
+    cpus: 1.0
+    mem_limit: 2G
+    mem_reservation: 128m
     deploy:
       resources:
         limits:
-          cpus: 2.0
-          memory: 4G
+          cpus: 1.0
+          memory: 2G
         reservations:
-          memory: 512m
+          memory: 128m
     ulimits:
       nofile:
         soft: 65536
@@ -69,14 +69,14 @@ services:
       - ./data:/opt/dbadmin/data:rw
     networks:
       - dbadmin-network
-    cpus: 1.0
-    mem_limit: 2G
+    cpus: 2.0
+    mem_limit: 4G
     mem_reservation: 256m
     deploy:
       resources:
         limits:
-          cpus: 1.0
-          memory: 2G
+          cpus: 2.0
+          memory: 4G
         reservations:
           memory: 256m
     ulimits:

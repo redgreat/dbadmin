@@ -14,6 +14,7 @@ class BaseUser(BaseModel):
     updated_at: Optional[datetime]
     last_login: Optional[datetime]
     roles: Optional[list] = []
+    conn_ids: Optional[List[int]] = []
 
 
 class UserCreate(BaseModel):
@@ -23,9 +24,10 @@ class UserCreate(BaseModel):
     is_active: Optional[bool] = True
     is_superuser: Optional[bool] = False
     role_ids: Optional[List[int]] = []
+    conn_ids: Optional[List[int]] = []
 
     def create_dict(self):
-        return self.model_dump(exclude_unset=True, exclude={"role_ids"})
+        return self.model_dump(exclude_unset=True, exclude={"role_ids", "conn_ids"})
 
 
 class UserUpdate(BaseModel):
@@ -35,6 +37,7 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = True
     is_superuser: Optional[bool] = False
     role_ids: Optional[List[int]] = []
+    conn_ids: Optional[List[int]] = None
 
 
 class UpdatePassword(BaseModel):

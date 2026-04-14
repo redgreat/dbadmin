@@ -6,7 +6,7 @@ import time
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from app.core.dependency import get_current_user
 from app.schemas.base import Fail, Success, SuccessExtra
 from app.schemas.report import (
@@ -20,6 +20,7 @@ from app.models.report import ReportConfig, ReportGeneration
 from app.models.admin import User
 from app.log import logger
 from app.services.celery_dispatcher import dispatch_report_export
+from app.services.oss_service import oss_service
 from app.settings import settings
 
 router = APIRouter()
@@ -31,10 +32,40 @@ def _build_public_download_sig(generation_id: int, exp: int) -> str:
     return hmac.new(key, raw, hashlib.sha256).hexdigest()
 
 
-async def _file_response_from_generation(generation: ReportGeneration) -> FileResponse:
+def _normalize_generation_file_path(item_dict: dict) -> dict:
+    """
+    统一报表生成记录的文件路径展示：
+    - 优先使用 execution_json.file_path（通常是远端URL）
+    - 其次尝试 execution_json.storage.url / download_url
+    - 原始本地路径保留到 local_file_path
+    """
+    execution_json = item_dict.get("execution_json")
+    if not isinstance(execution_json, dict):
+        return item_dict
+
+    remote_path = execution_json.get("file_path")
+    storage = execution_json.get("storage")
+    if not remote_path and isinstance(storage, dict):
+        remote_path = storage.get("url") or storage.get("download_url")
+
+    if isinstance(remote_path, str) and remote_path.strip():
+        origin_path = item_dict.get("file_path")
+        if origin_path and not item_dict.get("local_file_path"):
+            item_dict["local_file_path"] = origin_path
+        item_dict["file_path"] = remote_path.strip()
+    return item_dict
+
+
+async def _file_response_from_generation(generation: ReportGeneration):
     """将报表生成记录转换为可下载的文件响应。"""
     if generation.status != "completed":
         raise HTTPException(status_code=400, detail="报表尚未生成完成")
+
+    oss_meta = oss_service.extract_oss_meta(generation.execution_json)
+    if oss_meta:
+        direct_url = oss_service.resolve_download_url(oss_meta)
+        if direct_url:
+            return RedirectResponse(url=direct_url, status_code=302)
 
     if not generation.file_path:
         raise HTTPException(status_code=404, detail="文件路径不存在")
@@ -209,42 +240,12 @@ async def generate_report(
     request: ReportGenerateRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """触发生成报表"""
-    try:
-        # 获取报表配置
-        config = await ReportConfig.get_or_none(id=request.config_id)
-        if not config:
-            return Fail(msg="报表配置不存在")
+    """触发生成报表（异步处理，立即返回）"""
+    # 立即返回响应，释放前端资源
+    import asyncio
+    asyncio.create_task(_generate_report_async(request, current_user))
 
-        # 生成报表名称（报表名称+年月日时分秒）
-        from datetime import datetime
-        report_name = f"{config.report_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-        # 创建生成记录
-        generation = await ReportGeneration.create(
-            report_name=report_name,
-            report_config_id=config.id,
-            generator=current_user.username,
-            status="exporting",
-            progress=0,
-            progress_text="排队中",
-            exported_rows=0,
-            error_message=None,
-        )
-
-        celery_task_id = dispatch_report_export(generation.id)
-        if not celery_task_id:
-            # Celery未启用时回退到应用内后台任务
-            import asyncio
-
-            asyncio.create_task(ExcelExportService().export_report(generation.id))
-
-        logger.info(f"创建报表生成任务: {report_name}, ID: {generation.id}")
-
-        return Success(msg="生成任务已提交", data={"generation_id": generation.id})
-    except Exception as e:
-        logger.error(f"生成报表失败: {str(e)}")
-        return Fail(msg=f"生成失败: {str(e)}")
+    return Success(msg="生成任务已提交，请稍后查看进度", data={"generation_id": None})
 
 
 @router.get("/generation/list", summary="获取报表生成记录列表")
@@ -267,7 +268,7 @@ async def get_generation_list(
         )
 
         # 转换为字典列表
-        data = [await item.to_dict() for item in items]
+        data = [_normalize_generation_file_path(await item.to_dict()) for item in items]
 
         return SuccessExtra(data=data, total=total, page=page, page_size=page_size)
     except Exception as e:
@@ -375,3 +376,48 @@ async def delete_generation(
     except Exception as e:
         logger.error(f"删除报表生成记录失败: {str(e)}")
         return Fail(msg=f"删除失败: {str(e)}")
+
+
+async def _generate_report_async(request: ReportGenerateRequest, current_user: User):
+    """异步处理报表生成任务"""
+    try:
+        logger.info(f"开始异步处理报表生成请求: config_id={request.config_id}, user={current_user.username}")
+
+        # 获取报表配置
+        config = await ReportConfig.get_or_none(id=request.config_id)
+        if not config:
+            logger.error(f"报表配置不存在: config_id={request.config_id}")
+            return
+
+        # 生成报表名称（报表名称+年月日时分秒）
+        from datetime import datetime
+        report_name = f"{config.report_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        # 创建生成记录
+        generation = await ReportGeneration.create(
+            report_name=report_name,
+            report_config_id=config.id,
+            generator=current_user.username,
+            status="exporting",
+            progress=0,
+            progress_text="排队中",
+            exported_rows=0,
+            error_message=None,
+        )
+
+        logger.info(f"创建报表生成记录成功: {report_name}, ID: {generation.id}")
+
+        # 尝试使用Celery，如果不可用则使用本地异步任务
+        celery_task_id = dispatch_report_export(generation.id)
+        if not celery_task_id:
+            # Celery未启用时回退到应用内后台任务
+            import asyncio
+            asyncio.create_task(ExcelExportService().export_report(generation.id))
+            logger.info(f"使用本地异步任务处理报表生成: {report_name}, ID: {generation.id}")
+        else:
+            logger.info(f"使用Celery任务处理报表生成: {report_name}, ID: {generation.id}, task_id: {celery_task_id}")
+
+    except Exception as e:
+        logger.error(f"异步处理报表生成失败: config_id={request.config_id}, user={current_user.username}, error={str(e)}")
+        # 注意：这里无法返回错误响应给前端，因为前端已经释放了
+        # 错误信息会记录在日志中，用户可以通过查询生成记录状态来了解

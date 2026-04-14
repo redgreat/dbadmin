@@ -110,6 +110,25 @@ class CeleryConfig(BaseModel):
     worker_probe_timeout: float = 0.5
 
 
+class OSSConfig(BaseModel):
+    """OSS 配置（SRE OPEN API / 直连URL）"""
+    enabled: bool = False
+    bucket: str = ""
+    app_code: str = ""
+    identity_url: str = ""
+    client_id: str = ""
+    client_secret: str = ""
+    scope: str = ""
+    upload_api_url: str = ""
+    direct_download_base_url: str = ""
+    upload_header_app_code: bool = False
+    upload_app_code_header_name: str = "X-App-Code"
+    request_timeout_seconds: int = 30
+    prefix: str = "reports"
+    signed_url_expire_seconds: int = 300
+    cleanup_local_after_upload: bool = False
+
+
 class Config(BaseModel):
     """统一配置模型"""
     app: AppConfig
@@ -123,6 +142,7 @@ class Config(BaseModel):
     report: ReportConfig
     redis: RedisConfig = Field(default_factory=RedisConfig)
     celery: CeleryConfig = Field(default_factory=CeleryConfig)
+    oss: OSSConfig = Field(default_factory=OSSConfig)
 
 
 class ConfigLoader:

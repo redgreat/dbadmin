@@ -20,6 +20,11 @@ warnings.filterwarnings(
     message="'crypt' is deprecated and slated for removal in Python 3.13",
     category=DeprecationWarning,
 )
+warnings.filterwarnings(
+    "ignore",
+    message="invalid escape sequence.*",
+    category=SyntaxWarning,
+)
 
 if __name__ == "__main__":
     import uvicorn

@@ -135,6 +135,66 @@ class Settings:
     def CELERY_WORKER_PROBE_TIMEOUT(self) -> float:
         return self._config.celery.worker_probe_timeout
 
+    @property
+    def OSS_ENABLED(self) -> bool:
+        return self._config.oss.enabled
+
+    @property
+    def OSS_BUCKET(self) -> str:
+        return self._config.oss.bucket
+
+    @property
+    def OSS_APP_CODE(self) -> str:
+        return self._config.oss.app_code
+
+    @property
+    def OSS_IDENTITY_URL(self) -> str:
+        return self._config.oss.identity_url
+
+    @property
+    def OSS_CLIENT_ID(self) -> str:
+        return self._config.oss.client_id
+
+    @property
+    def OSS_CLIENT_SECRET(self) -> str:
+        return self._config.oss.client_secret
+
+    @property
+    def OSS_SCOPE(self) -> str:
+        return self._config.oss.scope
+
+    @property
+    def OSS_UPLOAD_API_URL(self) -> str:
+        return self._config.oss.upload_api_url
+
+    @property
+    def OSS_DIRECT_DOWNLOAD_BASE_URL(self) -> str:
+        return self._config.oss.direct_download_base_url
+
+    @property
+    def OSS_UPLOAD_HEADER_APP_CODE(self) -> bool:
+        return self._config.oss.upload_header_app_code
+
+    @property
+    def OSS_UPLOAD_APP_CODE_HEADER_NAME(self) -> str:
+        return self._config.oss.upload_app_code_header_name
+
+    @property
+    def OSS_REQUEST_TIMEOUT_SECONDS(self) -> int:
+        return self._config.oss.request_timeout_seconds
+
+    @property
+    def OSS_PREFIX(self) -> str:
+        return self._config.oss.prefix
+
+    @property
+    def OSS_SIGNED_URL_EXPIRE_SECONDS(self) -> int:
+        return self._config.oss.signed_url_expire_seconds
+
+    @property
+    def OSS_CLEANUP_LOCAL_AFTER_UPLOAD(self) -> bool:
+        return self._config.oss.cleanup_local_after_upload
+
     async def SIM_CONN_ID(self) -> int:
         """SIM数据库连接ID（从数据库读取）"""
         return await self._get_conn_id_by_alias('SIM_CONN')

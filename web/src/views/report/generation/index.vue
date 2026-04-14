@@ -210,12 +210,8 @@ const handleDownload = async (row) => {
       return
     }
     const url = `${import.meta.env.VITE_BASE_API}/report/generation/download-direct/${row.id}?token=${encodeURIComponent(token)}`
-    const link = document.createElement('a')
-    link.href = url
-    link.target = '_blank'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    // 同页触发下载，让浏览器直接接管，不弹出新窗口
+    window.location.href = url
   } catch (error) {
     console.error('下载报表失败', error)
     $message.error('下载失败')
