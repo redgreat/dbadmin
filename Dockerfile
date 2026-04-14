@@ -11,8 +11,8 @@ RUN npm config set registry https://registry.npmjs.org
 # 复制package文件（利用Docker层缓存）
 COPY web/package*.json ./
 
-# 安装依赖（这一层会经常被缓存）
-RUN npm ci --only=production && npm cache clean --force
+# 安装依赖（包括devDependencies，构建时需要）
+RUN npm ci && npm cache clean --force
 
 # 复制前端源代码
 COPY web/ ./
