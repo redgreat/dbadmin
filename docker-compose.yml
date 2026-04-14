@@ -25,36 +25,30 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
-    cpus: 2.0
-    mem_limit: 4G
-    mem_reservation: 512m
+    cpus: 1.0
+    mem_limit: 2G
+    mem_reservation: 64m
     deploy:
       resources:
         limits:
-          cpus: 2.0
-          memory: 4G
+          cpus: 1.0
+          memory: 2G
         reservations:
-          memory: 512m
+          memory: 64m
     ulimits:
       nofile:
         soft: 65536
         hard: 65536
     logging:
       driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   celery-worker:
     image: registry.cn-hangzhou.aliyuncs.com/redgreat/dbadmin:latest
     container_name: dbadmin-celery-worker
     hostname: dbadmin-celery-worker
     restart: unless-stopped
-    command: [
-      "sh",
-      "-c",
-      "mkdir -p /opt/dbadmin/data /opt/dbadmin/log && chown -R 1000:1000 /opt/dbadmin/data /opt/dbadmin/log && chmod -R ug+rwX /opt/dbadmin/data /opt/dbadmin/log && exec celery -A app.core.celery_app.celery_app worker -l info -Q dbadmin.default --concurrency=2 --uid=1000 --gid=1000"
-    ]
+    user: "1000:1000"
+    command: ["celery", "-A", "app.core.celery_app.celery_app", "worker", "-l", "info", "-Q", "dbadmin.default", "--concurrency=2"]
     environment:
       - PYTHONPATH=/opt/dbadmin
       - PYTHONUNBUFFERED=1
@@ -66,16 +60,25 @@ services:
       - ./data:/opt/dbadmin/data:rw
     networks:
       - dbadmin-network
-    cpus: 1.0
-    mem_limit: 2G
-    mem_reservation: 256m
+    depends_on:
+      dbadmin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/opt/dbadmin/script/celery-healthcheck.sh"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    cpus: 2.0
+    mem_limit: 4G
+    mem_reservation: 64m
     deploy:
       resources:
         limits:
-          cpus: 1.0
-          memory: 2G
+          cpus: 2.0
+          memory: 4G
         reservations:
-          memory: 256m
+          memory: 64m
     ulimits:
       nofile:
         soft: 65536
