@@ -1,10 +1,6 @@
 from typing import List, Dict, Any, Optional, Tuple
 import asyncpg
 import aiomysql
-from app.models.conn import DBConnection
-from app.controllers.conn import conn_controller
-from app.services.db_pool import db_pool
-from app.log import logger
 
 
 class SQLExecutionService:
@@ -44,7 +40,11 @@ class SQLExecutionService:
                     port=conn_info["port"],
                     user=conn_info["username"],
                     password=conn_info["password"],
-                    database=conn_info["database"]
+                    database=conn_info["database"],
+                    # 长查询优化（硬编码，避免配置复杂化）
+                    command_timeout=7200,  # 2小时命令超时（适合大多数场景）
+                    statement_cache_size=0,  # 禁用语句缓存
+                    max_cached_statement_lifetime=0,
                 )
                 logger.info("PostgreSQL连接成功")
                 return conn
@@ -147,6 +147,9 @@ class SQLExecutionService:
                     return list(rows)
 
             if db_conn.db_type == "postgresql":
+                # 设置会话级超时参数（硬编码，避免配置复杂化）
+                await conn.execute("SET statement_timeout = '2 hours'")
+                await conn.execute("SET idle_in_transaction_session_timeout = '2 hours'")
                 data_sql = f"{sql} OFFSET {offset} LIMIT {limit}"
                 rows = await conn.fetch(data_sql)
                 return [dict(row) for row in rows]
@@ -216,12 +219,13 @@ class SQLExecutionService:
             conn = await SQLExecutionService.get_connection(db_conn)
             sql = sql.strip().rstrip(';')
             async with conn.cursor(aiomysql.SSDictCursor) as cursor:
-                # 长查询场景下尽量放宽会话级超时，避免中途断流
+                # 长查询场景下尽量放宽会话级超时，避免中途断流（硬编码）
                 try:
-                    await cursor.execute("SET SESSION wait_timeout=28800")
-                    await cursor.execute("SET SESSION interactive_timeout=28800")
-                    await cursor.execute("SET SESSION net_read_timeout=600")
-                    await cursor.execute("SET SESSION net_write_timeout=600")
+                    await cursor.execute("SET SESSION wait_timeout=7200")  # 2小时
+                    await cursor.execute("SET SESSION interactive_timeout=7200")  # 2小时
+                    await cursor.execute("SET SESSION net_read_timeout=600")  # 10分钟
+                    await cursor.execute("SET SESSION net_write_timeout=600")  # 10分钟
+                    await cursor.execute("SET SESSION max_execution_time=7200000")  # 2小时（毫秒）
                 except Exception as timeout_set_err:
                     logger.warning(f"设置MySQL会话超时参数失败(忽略): {timeout_set_err}")
 

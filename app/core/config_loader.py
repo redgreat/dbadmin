@@ -91,6 +91,7 @@ class ReportConfig(BaseModel):
     max_sheets_per_file: int = 2
     page_size: int = 1000
     file_expire_days: int = 30
+    heartbeat_interval: int = Field(default=1000, description="心跳间隔(行数)")
 
 
 class RedisConfig(BaseModel):

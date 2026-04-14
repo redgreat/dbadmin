@@ -2,7 +2,7 @@ from app.core.celery_app import celery_app
 from app.core.celery_runtime import run_async_with_tortoise
 
 
-@celery_app.task(name="dbadmin.report.export")
+@celery_app.task(name="dbadmin.report.export", time_limit=7200, soft_time_limit=6300)
 def export_report_task(generation_id: int):
     from app.services.excel_export_service import ExcelExportService
 

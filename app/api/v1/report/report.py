@@ -65,7 +65,12 @@ async def _file_response_from_generation(generation: ReportGeneration):
     if oss_meta:
         direct_url = oss_service.resolve_download_url(oss_meta)
         if direct_url:
-            return RedirectResponse(url=direct_url, status_code=302)
+            # 返回JSON响应包含OSS URL，让前端直接下载，避免重定向导致的新页面问题
+            return {
+                "type": "oss_redirect",
+                "url": direct_url,
+                "filename": os.path.basename(generation.report_name + (".zip" if generation.file_path and generation.file_path.endswith(".zip") else ".xlsx"))
+            }
 
     if not generation.file_path:
         raise HTTPException(status_code=404, detail="文件路径不存在")

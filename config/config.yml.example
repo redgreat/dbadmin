@@ -89,7 +89,13 @@ celery:
   require_worker: true
   worker_probe_timeout: 0.5
 
-# OSS 配置
+# 报表导出配置
+report:
+  max_rows_per_sheet: 100000
+  max_sheets_per_file: 10
+  page_size: 1000
+  heartbeat_interval: 1000  # 每处理1000行更新一次进度
+
 oss:
   enabled: false
   bucket: "your-bucket-name"

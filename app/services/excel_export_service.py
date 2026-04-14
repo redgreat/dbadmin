@@ -246,7 +246,8 @@ class ExcelExportService:
                         progress_text=f"导出中：已导出 {current_row} 行",
                         exported_rows=current_row,
                     )
-                    await asyncio.sleep(0)
+                    # 长时间任务需要定期yield控制权，避免阻塞事件循环
+                    await asyncio.sleep(0.01)
 
                 # 当前sheet未写满，说明已到末尾
                 if rows_written < self.MAX_ROWS_PER_SHEET:

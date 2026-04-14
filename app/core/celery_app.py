@@ -24,6 +24,12 @@ def _build_celery() -> Celery:
             "socket_connect_timeout": 2,
             "socket_timeout": 2,
         },
+        # 长任务超时设置（硬编码，避免配置复杂化）
+        task_time_limit=7200,  # 2小时硬超时
+        task_soft_time_limit=6300,  # 1.75小时软超时
+        worker_prefetch_multiplier=1,  # 每次只处理一个任务
+        worker_max_tasks_per_child=1,  # 每个worker进程只处理一个任务后重启
+        worker_disable_rate_limits=True,  # 禁用速率限制
     )
     return app
 

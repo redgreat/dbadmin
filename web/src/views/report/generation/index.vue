@@ -209,9 +209,62 @@ const handleDownload = async (row) => {
       $message.error('未登录或登录已过期')
       return
     }
-    const url = `${import.meta.env.VITE_BASE_API}/report/generation/download-direct/${row.id}?token=${encodeURIComponent(token)}`
-    // 同页触发下载，让浏览器直接接管，不弹出新窗口
-    window.location.href = url
+
+    // 先尝试获取下载信息（可能是OSS URL或直接的文件流）
+    const response = await fetch(`${import.meta.env.VITE_BASE_API}/report/generation/download?generation_id=${row.id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      $message.error(errorData.msg || '下载失败')
+      return
+    }
+
+    // 检查响应内容类型
+    const contentType = response.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      // 这是JSON响应，包含OSS URL
+      const data = await response.json()
+      if (data.type === 'oss_redirect' && data.url) {
+        // 直接下载OSS文件
+        const link = document.createElement('a')
+        link.href = data.url
+        link.download = data.filename || 'download'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        return
+      }
+    }
+
+    // 如果是直接的文件流，使用blob下载
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+
+    // 从响应头获取文件名
+    const contentDisposition = response.headers.get('content-disposition')
+    let filename = 'download'
+    if (contentDisposition) {
+      const matches = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (matches && matches[1]) {
+        filename = matches[1].replace(/['"]/g, '')
+      }
+    }
+
+    link.download = filename
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
   } catch (error) {
     console.error('下载报表失败', error)
     $message.error('下载失败')
