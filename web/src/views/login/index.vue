@@ -107,6 +107,11 @@ async function handleLogin() {
       await router.push({ path: '/' })
     }
   } catch (e) {
+    // 如果错误已经被HTTP拦截器处理过，避免重复显示消息
+    if (e.handled) {
+      return
+    }
+
     if (e.type === 'auth') {
       $message.warning(e.message, { keepAliveOnHover: true })
     } else {

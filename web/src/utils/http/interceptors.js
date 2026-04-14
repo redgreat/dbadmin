@@ -16,7 +16,7 @@ export function reqResolve(config) {
 }
 
 export function reqReject(error) {
-  return Promise.reject(error)
+  return Promise.reject({ ...error, handled: true })
 }
 
 export function resResolve(response) {
@@ -33,7 +33,7 @@ export function resResolve(response) {
     if (code !== 404 || (data?.msg && !data.msg.includes('暂无数据'))) {
       window.$message?.error(message, { keepAliveOnHover: true })
     }
-    return Promise.reject({ code, message, error: data || response })
+    return Promise.reject({ code, message, error: data || response, handled: true })
   }
   return Promise.resolve(data)
 }
@@ -60,5 +60,5 @@ export async function resReject(error) {
   const code = data?.code ?? status
   const message = resolveResError(code, data?.msg ?? error.message)
   window.$message?.error(message, { keepAliveOnHover: true })
-  return Promise.reject({ code, message, error: error.response?.data || error.response })
+  return Promise.reject({ code, message, error: error.response?.data || error.response, handled: true })
 }
