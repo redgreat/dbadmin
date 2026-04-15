@@ -74,10 +74,6 @@ RUN poetry config virtualenvs.create false && \
     poetry lock --no-update && \
     poetry install --no-root --only main --no-cache
 
-# 复制脚本文件
-COPY deploy/celery-healthcheck.sh /opt/dbadmin/script/celery-healthcheck.sh
-RUN chmod +x /opt/dbadmin/script/celery-healthcheck.sh
-
 # 从前端构建阶段复制构建产物
 COPY --from=frontend-builder /app/dist /opt/dbadmin/web/dist
 
