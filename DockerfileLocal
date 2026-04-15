@@ -78,6 +78,19 @@ RUN echo '#!/bin/bash\n\
     # 创建符号链接\n\
     ln -sf /etc/nginx/sites-available/web.conf /etc/nginx/sites-enabled/\n\
     \n\
+    # 修复挂载目录的权限，确保 appuser 可写\n\
+    chown -R appuser:appuser /opt/dbadmin/data /opt/dbadmin/log 2>/dev/null || true\n\
+    \n\
+    # 确保日志目录存在且权限正确\n\
+    mkdir -p /opt/dbadmin/log /var/log/supervisor /var/log/nginx\n\
+    chown -R appuser:appuser /opt/dbadmin/log /var/log/supervisor /var/log/nginx\n\
+    chmod 755 /opt/dbadmin/log /var/log/supervisor /var/log/nginx\n\
+    \n\
+    # 预创建日志文件并设置权限\n\
+    touch /opt/dbadmin/log/supervisord.log /opt/dbadmin/log/dbadmin_supervisor.log /opt/dbadmin/log/dbadmin_supervisor_error.log /opt/dbadmin/log/nginx_supervisor.log /opt/dbadmin/log/nginx_supervisor_error.log\n\
+    chown appuser:appuser /opt/dbadmin/log/*.log\n\
+    chmod 644 /opt/dbadmin/log/*.log\n\
+    \n\
     # 启动 supervisor\n\
     exec supervisord -c /etc/supervisor/supervisord.conf\n\
     ' > /opt/dbadmin/docker-entrypoint.sh && chmod +x /opt/dbadmin/docker-entrypoint.sh
@@ -89,7 +102,8 @@ RUN groupadd -r -g 1000 appuser && useradd -r -u 1000 -g appuser appuser \
     && chown -R appuser:appuser /var/log/supervisor \
     && chown -R appuser:appuser /var/log/nginx \
     && chown -R appuser:appuser /var/lib/nginx \
-    && chown -R appuser:appuser /run
+    && chown -R appuser:appuser /run \
+    && chmod 755 /opt/dbadmin/log
 
 # 暴露端口
 EXPOSE 80

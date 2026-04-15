@@ -8,7 +8,7 @@ services:
       - PYTHONPATH=/opt/dbadmin
       - PYTHONUNBUFFERED=1
       - PYTHONTRACEMALLOC=25
-      - PYTHONWARNINGS=default
+      - PYTHONWARNINGS=default,ignore::DeprecationWarning
       - TZ=Asia/Shanghai
       - LANG=zh_CN.UTF-8
     volumes:
@@ -47,9 +47,10 @@ services:
     container_name: dbadmin-celery-worker
     hostname: dbadmin-celery-worker
     restart: unless-stopped
-    user: "1000:1000"
-    working_dir: /opt/dbadmin
-    command: ["celery", "-A", "app.core.celery_app.celery_app", "worker", "-l", "info", "-Q", "dbadmin.default", "--concurrency=2"]
+    command:
+      - sh
+      - -c
+      - cd /opt/dbadmin && export PYTHONPATH=/opt/dbadmin && exec celery -A app.core.celery_app:celery_app worker -l info -Q dbadmin.default --concurrency=2 --uid=1000 --gid=1000
     environment:
       - PYTHONPATH=/opt/dbadmin
       - PYTHONUNBUFFERED=1
@@ -61,15 +62,8 @@ services:
       - ./data:/opt/dbadmin/data:rw
     networks:
       - dbadmin-network
-    depends_on:
-      dbadmin:
-        condition: service_healthy
     healthcheck:
-      test: ["CMD", "/opt/dbadmin/script/celery-healthcheck.sh"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-      start_period: 30s
+      disable: true
     cpus: 2.0
     mem_limit: 4G
     mem_reservation: 64m

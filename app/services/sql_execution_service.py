@@ -2,6 +2,10 @@ from typing import List, Dict, Any, Optional, Tuple
 import asyncpg
 import aiomysql
 
+from app.controllers.conn import conn_controller
+from app.log import logger
+from app.models.conn import DBConnection
+
 
 class SQLExecutionService:
     """SQL执行服务"""
