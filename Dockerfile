@@ -8,11 +8,11 @@ WORKDIR /app
 # 设置npm镜像
 RUN npm config set registry https://registry.npmjs.org
 
-# 复制package文件（利用Docker层缓存）
+# 复制前端源代码
 COPY web/package*.json ./
 
-# 安装依赖（包括devDependencies，构建时需要）
-RUN npm ci && npm cache clean --force
+# 安装依赖
+RUN npm install
 
 # 复制前端源代码
 COPY web/ ./
@@ -36,7 +36,7 @@ ENV PYTHONPATH=/opt/dbadmin \
     POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_CREATE=false
 
-# 安装系统依赖（较稳定的层，放在前面）
+# 安装系统依赖
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -64,15 +64,18 @@ RUN curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /u
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # 安装 Poetry
-RUN pip install --no-cache-dir poetry==1.8.2
+RUN pip install poetry==1.8.2
 
-# 复制依赖文件（利用缓存）
+# 复制项目依赖文件
 COPY pyproject.toml poetry.lock ./
 
-# 安装Python依赖（这一层会经常被缓存）
+# 安装Python依赖
 RUN poetry config virtualenvs.create false && \
     poetry lock --no-update && \
-    poetry install --no-root --only main --no-cache
+    poetry install --no-root --only main -n
+
+# 复制项目文件
+COPY . .
 
 # 从前端构建阶段复制构建产物
 COPY --from=frontend-builder /app/dist /opt/dbadmin/web/dist
@@ -104,16 +107,6 @@ RUN echo '#!/bin/bash\n\
     # 修复挂载目录的权限，确保 appuser 可写\n\
     chown -R appuser:appuser /opt/dbadmin/data /opt/dbadmin/log 2>/dev/null || true\n\
     \n\
-    # 确保日志目录存在且权限正确\n\
-    mkdir -p /opt/dbadmin/log /var/log/supervisor /var/log/nginx\n\
-    chown -R appuser:appuser /opt/dbadmin/log /var/log/supervisor /var/log/nginx\n\
-    chmod 755 /opt/dbadmin/log /var/log/supervisor /var/log/nginx\n\
-    \n\
-    # 预创建日志文件并设置权限\n\
-    touch /opt/dbadmin/log/supervisord.log /opt/dbadmin/log/dbadmin_supervisor.log /opt/dbadmin/log/dbadmin_supervisor_error.log /opt/dbadmin/log/nginx_supervisor.log /opt/dbadmin/log/nginx_supervisor_error.log\n\
-    chown appuser:appuser /opt/dbadmin/log/*.log\n\
-    chmod 644 /opt/dbadmin/log/*.log\n\
-    \n\
     # 启动 supervisor\n\
     exec supervisord -c /etc/supervisor/supervisord.conf\n\
     ' > /opt/dbadmin/docker-entrypoint.sh && chmod +x /opt/dbadmin/docker-entrypoint.sh
@@ -125,8 +118,7 @@ RUN groupadd -r -g 1000 appuser && useradd -r -u 1000 -g appuser appuser \
     && chown -R appuser:appuser /var/log/supervisor \
     && chown -R appuser:appuser /var/log/nginx \
     && chown -R appuser:appuser /var/lib/nginx \
-    && chown -R appuser:appuser /run \
-    && chmod 755 /opt/dbadmin/log
+    && chown -R appuser:appuser /run
 
 # 暴露端口
 EXPOSE 80

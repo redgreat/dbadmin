@@ -5,34 +5,12 @@ on:
     tags:
       - 'v*'
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Free disk space
-        run: |
-          echo "::group::Before"
-          df -h /
-          echo "::endgroup::"
-          echo "::group::Removing unneeded softwares and files..."
-          for DIR in /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
-          do
-            if [ -d "$DIR" ]; then
-                echo "Removing $DIR..."
-                sudo rm -rf "$DIR"
-            fi
-          done
-          echo "::endgroup::"
-          echo "::group::After"
-          df -h /
-          echo "::endgroup::"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -49,10 +27,8 @@ jobs:
         with:
           context: .
           push: true
-          provenance: false
           tags: |
             registry.cn-hangzhou.aliyuncs.com/${{ secrets.ALIYUN_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}
             registry.cn-hangzhou.aliyuncs.com/${{ secrets.ALIYUN_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:latest
-          # 使用GitHub Actions缓存
-          cache-from: type=gha,scope=${{ secrets.DOCKER_IMAGE_NAME }}
-          cache-to: type=gha,mode=max,scope=${{ secrets.DOCKER_IMAGE_NAME }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
