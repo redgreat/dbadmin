@@ -56,7 +56,7 @@ services:
     command:
       - sh
       - -c
-      - cd /opt/dbadmin && export PYTHONPATH=/opt/dbadmin && exec celery -A app.core.celery_app:celery_app worker -l info -Q dbadmin.default --concurrency=2 --uid=1000 --gid=1000
+      - cd /opt/dbadmin && export PYTHONPATH=/opt/dbadmin && exec celery -A app.core.celery_app:celery_app worker -l info -Q dbadmin.default --concurrency=1 --uid=1000 --gid=1000
     environment:
       - PYTHONPATH=/opt/dbadmin
       - PYTHONUNBUFFERED=1

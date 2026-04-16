@@ -53,7 +53,7 @@ services:
     command: [
       "sh",
       "-c",
-      "mkdir -p /opt/dbadmin/data /opt/dbadmin/log && chown -R 1000:1000 /opt/dbadmin/data /opt/dbadmin/log && chmod -R ug+rwX /opt/dbadmin/data /opt/dbadmin/log && exec celery -A app.core.celery_app.celery_app worker -l info -Q dbadmin.default --concurrency=2 --uid=1000 --gid=1000"
+      "mkdir -p /opt/dbadmin/data /opt/dbadmin/log && chown -R 1000:1000 /opt/dbadmin/data /opt/dbadmin/log && chmod -R ug+rwX /opt/dbadmin/data /opt/dbadmin/log && exec celery -A app.core.celery_app.celery_app worker -l info -Q dbadmin.default --concurrency=1 --uid=1000 --gid=1000"
     ]
     environment:
       - PYTHONPATH=/opt/dbadmin

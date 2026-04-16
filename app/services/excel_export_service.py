@@ -27,6 +27,9 @@ class ExcelExportService:
     MAX_ROWS_PER_SHEET = config.report.max_rows_per_sheet
     MAX_SHEETS_PER_FILE = config.report.max_sheets_per_file
     PAGE_SIZE = config.report.page_size
+    STREAM_MAX_ROWS_PER_SHEET = config.report.stream_max_rows_per_sheet
+    STREAM_MAX_SHEETS_PER_FILE = config.report.stream_max_sheets_per_file
+    STREAM_FULL_STYLE_MAX_ROWS = config.report.stream_full_style_max_rows
     ZIP_THRESHOLD_BYTES = 10 * 1024 * 1024  # 单文件超过10MB则压缩
 
     async def export_report(self, generation_id: int):
@@ -315,10 +318,12 @@ class ExcelExportService:
         exported_rows = 0
         rows_in_sheet = 0
         styled_sheets = set()
+        stream_rows_per_sheet = max(1000, self.STREAM_MAX_ROWS_PER_SHEET)
+        stream_sheets_per_file = max(1, self.STREAM_MAX_SHEETS_PER_FILE)
 
         async def _start_new_sheet():
             nonlocal wb, ws, current_sheet, current_file, rows_in_sheet
-            if wb is None or current_sheet % self.MAX_SHEETS_PER_FILE == 0:
+            if wb is None or current_sheet % stream_sheets_per_file == 0:
                 if wb and wb.worksheets:
                     file_path = await asyncio.to_thread(
                         self._save_workbook,
@@ -365,7 +370,7 @@ class ExcelExportService:
                             exported_rows=exported_rows,
                         )
                         await asyncio.sleep(0)
-                    if rows_in_sheet >= self.MAX_ROWS_PER_SHEET:
+                    if rows_in_sheet >= stream_rows_per_sheet:
                         await self._update_generation_progress(
                             generation=generation,
                             progress=min(95, 15 + exported_rows // 100000),
@@ -373,7 +378,10 @@ class ExcelExportService:
                             exported_rows=exported_rows,
                         )
                         if ws and current_sheet not in styled_sheets:
-                            await asyncio.to_thread(self._apply_sheet_style, ws, headers)
+                            if rows_in_sheet > self.STREAM_FULL_STYLE_MAX_ROWS:
+                                await asyncio.to_thread(self._apply_sheet_style_light, ws, headers)
+                            else:
+                                await asyncio.to_thread(self._apply_sheet_style, ws, headers)
                             styled_sheets.add(current_sheet)
                         ws = None
                         rows_in_sheet = 0
@@ -382,7 +390,10 @@ class ExcelExportService:
                 raise ValueError("查询结果为空，无法导出")
 
             if ws and current_sheet not in styled_sheets:
-                await asyncio.to_thread(self._apply_sheet_style, ws, headers)
+                if rows_in_sheet > self.STREAM_FULL_STYLE_MAX_ROWS:
+                    await asyncio.to_thread(self._apply_sheet_style_light, ws, headers)
+                else:
+                    await asyncio.to_thread(self._apply_sheet_style, ws, headers)
                 styled_sheets.add(current_sheet)
 
             if wb and wb.worksheets:
@@ -640,6 +651,55 @@ class ExcelExportService:
                 showColumnStripes=False,
             )
             ws.add_table(table)
+
+    def _apply_sheet_style_light(self, ws, headers: Optional[List[str]]):
+        """
+        大数据量轻量样式：
+        - 保留表头样式、首行冻结、筛选、基础列宽
+        - 跳过全量单元格样式遍历和表格样式，降低内存和CPU压力
+        """
+        if not headers:
+            return
+
+        max_row = ws.max_row
+        max_col = len(headers)
+        if max_row <= 0 or max_col <= 0:
+            return
+
+        header_font = Font(name="微软雅黑", size=11, bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        thin_border = Border(
+            left=Side(style="thin", color="B4C6E7"),
+            right=Side(style="thin", color="B4C6E7"),
+            top=Side(style="thin", color="B4C6E7"),
+            bottom=Side(style="thin", color="B4C6E7"),
+        )
+
+        for col_idx in range(1, max_col + 1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+
+        ws.row_dimensions[1].height = 24
+
+        # 仅基于表头和少量样本估算列宽，避免全量遍历
+        sample_limit = min(max_row, 300)
+        col_widths = [self._display_width(h) for h in headers]
+        for row_idx in range(2, sample_limit + 1):
+            for col_idx in range(1, max_col + 1):
+                v = ws.cell(row=row_idx, column=col_idx).value
+                if v is not None:
+                    col_widths[col_idx - 1] = max(col_widths[col_idx - 1], self._display_width(v))
+
+        for idx, width in enumerate(col_widths, 1):
+            ws.column_dimensions[get_column_letter(idx)].width = min(max(width + 2, 8), 50)
+
+        max_col_letter = get_column_letter(max_col)
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = f"A1:{max_col_letter}{max_row}"
 
     def _save_workbook(
         self,

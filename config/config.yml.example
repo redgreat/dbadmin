@@ -89,6 +89,9 @@ report:
   page_size: 1000
   file_expire_days: 30
   heartbeat_interval: 1000  # 每处理1000行更新一次进度
+  stream_max_rows_per_sheet: 100000
+  stream_max_sheets_per_file: 1
+  stream_full_style_max_rows: 50000
 
 oss:
   enabled: false

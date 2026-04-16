@@ -91,6 +91,9 @@ class ReportConfig(BaseModel):
     max_sheets_per_file: int = 2
     page_size: int = 1000
     file_expire_days: int = 30
+    stream_max_rows_per_sheet: int = 100000
+    stream_max_sheets_per_file: int = 1
+    stream_full_style_max_rows: int = 50000
     heartbeat_interval: int = Field(default=1000, description="心跳间隔(行数)")
 
 
