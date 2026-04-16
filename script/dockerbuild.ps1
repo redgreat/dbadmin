@@ -43,6 +43,28 @@ function Ensure-Git {
   }
 }
 
+function Ensure-CleanWorkingTree {
+  <#
+  .SYNOPSIS
+  检查工作区是否干净；如存在改动则要求人工确认后继续打标签与推送。
+  #>
+  try {
+    $changes = git status --porcelain
+    if ($changes) {
+      Write-Warn "检测到未提交/已暂存/未跟踪的改动：`n$changes"
+      $answer = Read-Host "仍要继续打标签并推送吗？输入 YES 继续，其它任意输入中止"
+      if ($answer.Trim().ToUpperInvariant() -ne 'YES') {
+        Write-ErrorMsg '已取消打标签与推送。'
+        exit 1
+      }
+      Write-Warn '已确认忽略当前改动，将继续打标签与推送。'
+    }
+  } catch {
+    Write-ErrorMsg "检查工作区状态失败: $($_.Exception.Message)"
+    exit 1
+  }
+}
+
 # 获取最新标签（按语义版本排序）
 function Get-LatestTag {
   try {
@@ -75,6 +97,7 @@ function Bump-Tail([string]$tag) {
 
 try {
   Ensure-Git
+  Ensure-CleanWorkingTree
 
   # 若未显式传入版本参数，则依据最新标签自动计算
   $VersionProvided = $PSBoundParameters.ContainsKey('Version') -and -not [string]::IsNullOrWhiteSpace($Version)
