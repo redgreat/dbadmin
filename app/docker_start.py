@@ -21,6 +21,11 @@ warnings.filterwarnings(
     message="'crypt' is deprecated and slated for removal in Python 3.13",
     category=DeprecationWarning,
 )
+warnings.filterwarnings(
+    "ignore",
+    message="Accessing argon2.__version__ is deprecated.*",
+    category=DeprecationWarning,
+)
 
 if __name__ == "__main__":
     import uvicorn

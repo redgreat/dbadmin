@@ -22,6 +22,11 @@ warnings.filterwarnings(
 )
 warnings.filterwarnings(
     "ignore",
+    message="Accessing argon2.__version__ is deprecated.*",
+    category=DeprecationWarning,
+)
+warnings.filterwarnings(
+    "ignore",
     message="invalid escape sequence.*",
     category=SyntaxWarning,
 )
