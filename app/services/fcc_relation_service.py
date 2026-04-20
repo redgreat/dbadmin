@@ -310,6 +310,7 @@ class FccRelationService:
                         wms_nos = relation['wms_nos']
 
                         try:
+                            relation_tag = f"fcc_no={fcc_no}, wms_nos={wms_nos}"
                             # 步骤1: 查询仓储对账单信息（避免JOIN明细导致重复）
                             placeholders_mysql = ','.join(['%s'] * len(wms_nos))
                             sql_wms = f"""
@@ -322,6 +323,7 @@ class FccRelationService:
                             """
                             await wms_cur.execute(sql_wms, wms_nos)
                             reconc_data = await wms_cur.fetchall()
+                            logger.info(f"[FCC关联][步骤1] 查询仓储对账单完成: {relation_tag}, 查询行数={len(reconc_data)}")
 
                             if not reconc_data:
                                 raise ValueError(f"未查询到对账单信息: {wms_nos}")
@@ -353,6 +355,8 @@ class FccRelationService:
                                     reconc_num,
                                 ))
                             await fcc_cur.executemany(insert_tmp_sql, tmp_rows)
+                            tmp_insert_count = len(tmp_rows)
+                            logger.info(f"[FCC关联][步骤2] 写入FCC临时表完成: {relation_tag}, 影响行数={tmp_insert_count}")
 
                             # 步骤3: 查询并写入正式关系表
                             placeholders_sqlserver = ','.join(['?'] * len(wms_nos))
@@ -424,9 +428,12 @@ class FccRelationService:
 
                             params = [fcc_no] + wms_nos
                             inserted_rows = 0
-                            for select_sql in sql_select_templates:
+                            for template_idx, select_sql in enumerate(sql_select_templates, start=1):
                                 await fcc_cur.execute(select_sql, params)
                                 relation_rows = await fcc_cur.fetchall()
+                                logger.info(
+                                    f"[FCC关联][步骤3-{template_idx}] 查询关系候选数据完成: {relation_tag}, 查询行数={len(relation_rows)}"
+                                )
                                 if not relation_rows:
                                     continue
 
@@ -440,9 +447,13 @@ class FccRelationService:
                                 )
                                 await fcc_cur.executemany(insert_relation_sql, relation_rows)
                                 inserted_rows += len(relation_rows)
+                                logger.info(
+                                    f"[FCC关联][步骤3-{template_idx}] 写入正式关系表完成: {relation_tag}, 影响行数={len(relation_rows)}"
+                                )
 
                             if inserted_rows == 0:
                                 raise ValueError(f"未匹配到可写入的FCC关系数据: {fcc_no} -> {wms_nos}")
+                            logger.info(f"[FCC关联][步骤3] 关系写入汇总: {relation_tag}, 总影响行数={inserted_rows}")
 
                             # 步骤4: 更新仓储中心付款状态（SQL6、SQL7）
                             sql6 = f"""
@@ -465,6 +476,8 @@ class FccRelationService:
                                   )
                             """
                             await wms_cur.execute(sql6, wms_nos)
+                            sql6_affected = wms_cur.rowcount
+                            logger.info(f"[FCC关联][步骤4-SQL6] 更新tb_owinginfo完成: {relation_tag}, 影响行数={sql6_affected}")
 
                             sql7 = f"""
                                 UPDATE tb_reconcinfo
@@ -473,10 +486,15 @@ class FccRelationService:
                                   AND Deleted=0
                             """
                             await wms_cur.execute(sql7, wms_nos)
+                            sql7_affected = wms_cur.rowcount
+                            logger.info(
+                                f"[FCC关联][步骤4-SQL7] 更新tb_reconcinfo完成: {relation_tag}, 影响行数={sql7_affected}"
+                            )
 
                             # 显式提交，避免“无报错但不落库”
                             await fcc_conn.commit()
                             await wms_conn.commit()
+                            logger.info(f"[FCC关联][步骤5] 双库提交完成: {relation_tag}")
 
                             success_count += len(wms_nos)
                             processed += len(wms_nos)
