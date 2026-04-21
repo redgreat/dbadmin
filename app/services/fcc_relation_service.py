@@ -552,6 +552,7 @@ class FccRelationService:
         Returns:
             任务ID
         """
+        logger.info(f"[FCC关联] 任务提交接收: relations_count={len(relations)}")
         task_id = str(uuid.uuid4())
         self.tasks[task_id] = {
             'task_id': task_id,

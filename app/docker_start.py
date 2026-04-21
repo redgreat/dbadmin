@@ -75,6 +75,10 @@ if __name__ == "__main__":
                 "propagate": False,
             },
         },
+        "root": {
+            "level": config.logging.level,
+            "handlers": ["default"],
+        },
     }
     
     # 启动 uvicorn（配置从 config.yml 读取）
