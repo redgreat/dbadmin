@@ -73,7 +73,7 @@ export default {
     }),
   simiccidProgress: (params = {}) => request.get('/sim/simiccid/progress', { params }),
   // simtrans - SIM卡同步
-  syncSimCards: (data = {}) => request.post('/sim/simtrans/sync', data),
+  syncSimCards: (data = {}) => request.post('/sim/simtrans/sync', data, { timeout: 180000 }),
   // tool - excelimp
   generateExcelSql: (formData) =>
     request.post('/tool/excelimp/generate', formData, {

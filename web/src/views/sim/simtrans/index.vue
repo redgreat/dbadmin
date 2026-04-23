@@ -39,32 +39,54 @@ RK2024003"
             {{ syncResult.validation?.total_count || 0 }}
           </n-descriptions-item>
           <n-descriptions-item label="有效单号">
-            <n-tag type="success">{{ syncResult.validation?.valid_count || 0 }}</n-tag>
+            <n-tag type="success">{{ syncResult.validation?.exists_count || 0 }}</n-tag>
           </n-descriptions-item>
           <n-descriptions-item label="无效单号">
-            <n-tag :type="syncResult.validation?.invalid_count > 0 ? 'warning' : 'default'">
-              {{ syncResult.validation?.invalid_count || 0 }}
+            <n-tag :type="syncResult.validation?.not_exists_count > 0 ? 'warning' : 'default'">
+              {{ syncResult.validation?.not_exists_count || 0 }}
             </n-tag>
           </n-descriptions-item>
-          <n-descriptions-item label="抓取数据">
-            {{ syncResult.fetched_count || 0 }} 条
+          <n-descriptions-item v-if="syncResult.installed_check" label="已加装设备">
+            <n-tag :type="syncResult.installed_check.has_installed ? 'error' : 'success'">
+              {{ syncResult.installed_check.installed_count || 0 }} 条
+            </n-tag>
           </n-descriptions-item>
-          <n-descriptions-item label="写入数据">
-            <n-tag type="success">{{ syncResult.inserted_count || 0 }} 条</n-tag>
+          <n-descriptions-item v-if="syncResult.sync_result" label="写入SIM卡">
+            <n-tag type="success" size="large">{{ syncResult.sync_result.sim_card_count || 0 }} 张</n-tag>
+          </n-descriptions-item>
+          <n-descriptions-item v-if="syncResult.sync_result" label="总计写入">
+            <n-tag type="info">{{ syncResult.sync_result.total_inserted || 0 }} 条</n-tag>
           </n-descriptions-item>
         </n-descriptions>
 
         <n-alert
-          v-if="syncResult.validation?.invalid_count > 0"
+          v-if="syncResult.validation?.not_exists_count > 0"
           type="warning"
-          :title="无效入库单号"
+          title="不存在的入库单号"
           style="margin-top: 16px"
         >
           <n-ul>
-            <n-li v-for="(item, index) in syncResult.validation.invalid_receipts" :key="index">
-              {{ item.receipt_no }}: {{ item.reason }}
+            <n-li v-for="(receipt, index) in syncResult.validation.not_exists" :key="index">
+              {{ receipt }}
             </n-li>
           </n-ul>
+        </n-alert>
+
+        <n-alert
+          v-if="syncResult.sync_result?.inserted_by_table"
+          type="info"
+          title="各表写入详情"
+          style="margin-top: 16px"
+        >
+          <n-descriptions bordered :column="2" size="small">
+            <n-descriptions-item
+              v-for="(count, table) in syncResult.sync_result.inserted_by_table"
+              :key="table"
+              :label="table"
+            >
+              {{ count }} 条
+            </n-descriptions-item>
+          </n-descriptions>
         </n-alert>
       </n-card>
     </n-space>
