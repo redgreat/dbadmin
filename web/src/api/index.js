@@ -72,6 +72,8 @@ export default {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   simiccidProgress: (params = {}) => request.get('/sim/simiccid/progress', { params }),
+  // simtrans - SIM卡同步
+  syncSimCards: (data = {}) => request.post('/sim/simtrans/sync', data),
   // tool - excelimp
   generateExcelSql: (formData) =>
     request.post('/tool/excelimp/generate', formData, {
