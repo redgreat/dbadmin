@@ -3,8 +3,8 @@
     <n-space vertical size="large">
       <n-card title="单据逻辑删除" size="small">
         <n-form ref="logicalFormRef" :model="logicalForm" :rules="logicalRules" label-placement="left" :label-width="100">
-          <n-form-item label="单据编码" path="stock_nos">
-            <n-input v-model:value="logicalForm.stock_nos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据编码，逗号分隔" />
+          <n-form-item label="单据编码/Id" path="stock_nos">
+            <n-input v-model:value="logicalForm.stock_nos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据编码或Id，逗号分隔" />
           </n-form-item>
           <n-form-item label="操作人Id" path="operatorId">
             <n-input v-model:value="logicalForm.operatorId" clearable placeholder="输入操作人Id" />
@@ -18,8 +18,8 @@
 
       <n-card title="单据物理删除" size="small">
         <n-form ref="physicalFormRef" :model="physicalForm" :rules="physicalRules" label-placement="left" :label-width="100">
-          <n-form-item label="单据编码" path="stock_nos">
-            <n-input v-model:value="physicalForm.stock_nos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据编码，逗号分隔" />
+          <n-form-item label="单据编码/Id" path="stock_nos">
+            <n-input v-model:value="physicalForm.stock_nos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据编码或Id，逗号分隔" />
           </n-form-item>
           <n-space>
             <n-button type="error" :loading="physicalExecuting" @click="handlePhysicalExecute">执行物理删除</n-button>
@@ -30,8 +30,8 @@
 
       <n-card title="单据逻辑删除恢复" size="small">
         <n-form ref="restoreFormRef" :model="restoreForm" :rules="restoreRules" label-placement="left" :label-width="100">
-          <n-form-item label="单据编码" path="stock_no">
-            <n-input v-model:value="restoreForm.stock_no" clearable placeholder="输入单个单据编码" />
+          <n-form-item label="单据编码/Id" path="stock_no">
+            <n-input v-model:value="restoreForm.stock_no" clearable placeholder="输入单个单据编码或Id" />
           </n-form-item>
           <n-form-item label="删除人Id" path="operatorId">
             <n-input v-model:value="restoreForm.operatorId" clearable placeholder="输入删除人Id" />
@@ -76,12 +76,12 @@ const guidValidator = (value) => {
 
 const logicalRules = {
   stock_nos: [
-    { required: true, message: '请输入单据编码' },
+    { required: true, message: '请输入单据编码或Id' },
     {
       validator: (_, value) => {
-        if (!value) return new Error('请输入单据编码')
+        if (!value) return new Error('请输入单据编码或Id')
         const nos = value.split(',').map((s) => s.trim()).filter((s) => s.length)
-        if (!nos.length) return new Error('请输入单据编码')
+        if (!nos.length) return new Error('请输入单据编码或Id')
         return true
       },
     },
@@ -101,12 +101,12 @@ const logicalRules = {
 
 const physicalRules = {
   stock_nos: [
-    { required: true, message: '请输入单据编码' },
+    { required: true, message: '请输入单据编码或Id' },
     {
       validator: (_, value) => {
-        if (!value) return new Error('请输入单据编码')
+        if (!value) return new Error('请输入单据编码或Id')
         const nos = value.split(',').map((s) => s.trim()).filter((s) => s.length)
-        if (!nos.length) return new Error('请输入单据编码')
+        if (!nos.length) return new Error('请输入单据编码或Id')
         return true
       },
     },
@@ -115,7 +115,7 @@ const physicalRules = {
 
 const restoreRules = {
   stock_no: [
-    { required: true, message: '请输入单据编码' },
+    { required: true, message: '请输入单据编码或Id' },
   ],
   operatorId: [
     { required: true, message: '请输入删除人Id' },

@@ -10,12 +10,12 @@
         :model="batchForm"
         :rules="batchFormRules"
       >
-        <n-form-item label="订单编码" path="orderNos">
+        <n-form-item label="订单编码/Id" path="orderNos">
           <n-input
             v-model:value="batchForm.orderNos"
             type="textarea"
             :rows="6"
-            placeholder="请输入订单编码，多个用逗号分隔，例如：&#10;OI9971420165,&#10;OI9971420167"
+            placeholder="请输入订单编码或Id，多个用逗号分隔，例如：&#10;OI9971420165,&#10;OI9971420167"
           />
         </n-form-item>
         <n-form-item label="删除原因" path="reason">
@@ -151,7 +151,7 @@ const batchForm = ref({
 const batchFormRules = {
   orderNos: {
     required: true,
-    message: '请输入订单编码',
+    message: '请输入订单编码或Id',
     trigger: ['blur']
   },
   reason: {
@@ -172,13 +172,13 @@ const parseOrderNos = (orderNosStr) => {
 // 数据校验处理
 const handleValidate = async () => {
   if (!batchForm.value.orderNos) {
-    message.warning('请先填写订单编码')
+    message.warning('请先填写订单编码或Id')
     return
   }
 
   const orderNos = parseOrderNos(batchForm.value.orderNos)
   if (orderNos.length === 0) {
-    message.warning('请输入有效的订单编码')
+    message.warning('请输入有效的订单编码或Id')
     return
   }
 

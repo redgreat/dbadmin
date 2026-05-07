@@ -3,8 +3,8 @@
     <n-space vertical size="large">
       <n-card title="订单逻辑删除" size="small">
         <n-form ref="logicalFormRef" :model="logicalForm" :rules="rules" label-placement="left" :label-width="100">
-          <n-form-item label="订单编码" path="orderNos">
-            <n-input v-model:value="logicalForm.orderNos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单编码，逗号分隔" />
+          <n-form-item label="订单编码/Id" path="orderNos">
+            <n-input v-model:value="logicalForm.orderNos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单编码或Id，逗号分隔" />
           </n-form-item>
           <n-space>
             <n-button type="primary" :loading="logicalExecuting" @click="handleLogicalExecute">执行逻辑删除</n-button>
@@ -15,8 +15,8 @@
 
       <n-card title="订单物理删除" size="small">
         <n-form ref="physicalFormRef" :model="physicalForm" :rules="rules" label-placement="left" :label-width="100">
-          <n-form-item label="订单编码" path="orderNos">
-            <n-input v-model:value="physicalForm.orderNos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单编码，逗号分隔" />
+          <n-form-item label="订单编码/Id" path="orderNos">
+            <n-input v-model:value="physicalForm.orderNos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单编码或Id，逗号分隔" />
           </n-form-item>
           <n-space>
             <n-button type="error" :loading="physicalExecuting" @click="handlePhysicalExecute">执行物理删除</n-button>
@@ -27,8 +27,8 @@
 
       <n-card title="订单逻辑删除恢复" size="small">
         <n-form ref="restoreFormRef" :model="restoreForm" :rules="restoreRules" label-placement="left" :label-width="100">
-          <n-form-item label="订单编码" path="orderNo">
-            <n-input v-model:value="restoreForm.orderNo" clearable placeholder="输入单个订单编码" />
+          <n-form-item label="订单编码/Id" path="orderNo">
+            <n-input v-model:value="restoreForm.orderNo" clearable placeholder="输入单个订单编码或Id" />
           </n-form-item>
           <n-form-item label="删除人Id" path="operatorId">
             <n-input v-model:value="restoreForm.operatorId" clearable placeholder="输入删除人Id" />
@@ -68,15 +68,15 @@ const restoreExecuting = ref(false)
 
 const rules = {
   orderNos: [
-    { required: true, message: '请输入订单编码' },
+    { required: true, message: '请输入订单编码或Id' },
     {
       validator: (_, value) => {
-        if (!value) return new Error('请输入订单编码')
+        if (!value) return new Error('请输入订单编码或Id')
         const ids = value
           .split(',')
           .map((s) => s.trim())
           .filter((s) => s.length)
-        if (!ids.length) return new Error('请输入订单编码')
+        if (!ids.length) return new Error('请输入订单编码或Id')
         return true
       },
     },
@@ -85,7 +85,7 @@ const rules = {
 
 const restoreRules = {
   orderNo: [
-    { required: true, message: '请输入订单编码' },
+    { required: true, message: '请输入订单编码或Id' },
   ],
   operatorId: [
     { required: true, message: '请输入删除人Id' },

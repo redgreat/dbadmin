@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/wms_curd/validate_stock", summary="验证单据状态")
+@router.post("/wms_curd/validate_stock", summary="验证单据状态（支持单据编码或单据Id）")
 async def validate_stock(body: WmsValidateRequest):
-    """验证单据状态"""
+    """验证单据状态，支持传入单据编码或单据Id"""
     try:
         nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
         if not nos:
-            return Fail(code=400, msg="单据编码不能为空")
+            return Fail(code=400, msg="单据编码或单据Id不能为空")
 
         result = await wms_service.validate_stock(nos, body.validate_type, body.operator_id)
         return Success(data=result, msg=result["message"])
@@ -35,13 +35,13 @@ async def validate_stock(body: WmsValidateRequest):
         return Fail(code=500, msg=f"验证失败: {str(e)}")
 
 
-@router.post("/wms_curd/delete_logical_batch", summary="按单据编码批量逻辑删除")
+@router.post("/wms_curd/delete_logical_batch", summary="批量逻辑删除（支持单据编码或单据Id）")
 async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
-    """批量逻辑删除单据"""
+    """批量逻辑删除单据，支持传入单据编码或单据Id"""
     try:
         nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
         if not nos:
-            return Fail(code=400, msg="单据编码不能为空")
+            return Fail(code=400, msg="单据编码或单据Id不能为空")
 
         # 先验证单据状态
         validation = await wms_service.validate_stock(nos, "logical_delete")
@@ -95,13 +95,13 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
         return Fail(code=500, msg="服务异常")
 
 
-@router.post("/wms_curd/delete_physical_batch", summary="按单据编码批量物理删除")
+@router.post("/wms_curd/delete_physical_batch", summary="批量物理删除（支持单据编码或单据Id）")
 async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
-    """批量物理删除单据"""
+    """批量物理删除单据，支持传入单据编码或单据Id"""
     try:
         nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
         if not nos:
-            return Fail(code=400, msg="单据编码不能为空")
+            return Fail(code=400, msg="单据编码或单据Id不能为空")
 
         # 先验证单据是否存在
         validation = await wms_service.validate_stock(nos, "physical_delete")
@@ -155,9 +155,9 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
         return Fail(code=500, msg="服务异常")
 
 
-@router.post("/wms_curd/restore_logical", summary="单据逻辑删除恢复")
+@router.post("/wms_curd/restore_logical", summary="单据逻辑删除恢复（支持单据编码或单据Id）")
 async def restore_logical(req: Request, body: WmsRestoreLogicalIn):
-    """恢复被逻辑删除的单据"""
+    """恢复被逻辑删除的单据，支持传入单据编码或单据Id"""
     try:
         # 先验证单据状态
         validation = await wms_service.validate_stock([body.stock_no], "restore", body.operator_id)

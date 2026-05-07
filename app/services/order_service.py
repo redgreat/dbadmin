@@ -1,5 +1,4 @@
 from typing import Dict, List, Optional, Tuple
-import re
 import aiomysql
 
 from app.services.db_pool import db_pool
@@ -38,72 +37,127 @@ class OrderService:
         )
 
     async def fetch_audit_time_map(self, order_nos: List[str]) -> Dict[str, Optional[str]]:
-        """根据订单编码获取审核时间（使用指定连接池）"""
+        """根据订单编码或数字Id获取审核时间"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
+
+        result: Dict[str, Optional[str]] = {}
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
-                    placeholder = ",".join(["%s"] * len(order_nos))
-                    sql = f"SELECT OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo IN ({placeholder}) AND Deleted=0"
-                    await cur.execute(sql, tuple(order_nos))
-                    rows = await cur.fetchall()
-                    return {r[0]: r[1] for r in rows}
-        raise ValueError("不支持的连接池类型")
+                    for order_no in order_nos:
+                        is_numeric = order_no.isdigit()
+
+                        queries = []
+                        if is_numeric:
+                            doc_id = int(order_no)
+                            queries = [
+                                ("SELECT OrderNo, AuditTime FROM tb_orderinfo WHERE Id=%s LIMIT 1", (doc_id,)),
+                                ("SELECT OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                            ]
+                        else:
+                            queries = [
+                                ("SELECT OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                                ("SELECT OrderNo, AuditTime FROM tb_orderinfo WHERE Id=%s LIMIT 1", (order_no,)),
+                            ]
+
+                        for sql, params in queries:
+                            await cur.execute(sql, params)
+                            row = await cur.fetchone()
+                            if row:
+                                result[order_no] = row[1]
+                                break
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        return result
 
     async def fetch_order_ids_by_nos(self, order_nos: List[str]) -> Dict[str, int]:
-        """根据订单编码获取对应的Id（使用指定连接池）"""
+        """根据订单编码或数字Id获取对应的Id，优先按输入类型匹配"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
+
+        result: Dict[str, int] = {}
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
-                    placeholder = ",".join(["%s"] * len(order_nos))
-                    sql = f"SELECT OrderNo, Id FROM tb_orderinfo WHERE OrderNo IN ({placeholder}) AND Deleted=0"
-                    await cur.execute(sql, tuple(order_nos))
-                    rows = await cur.fetchall()
-                    return {r[0]: r[1] for r in rows}
-        raise ValueError("不支持的连接池类型")
+                    for order_no in order_nos:
+                        is_numeric = order_no.isdigit()
+
+                        queries = []
+                        if is_numeric:
+                            doc_id = int(order_no)
+                            queries = [
+                                ("SELECT Id FROM tb_orderinfo WHERE Id=%s LIMIT 1", (doc_id,)),
+                                ("SELECT Id FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                            ]
+                        else:
+                            queries = [
+                                ("SELECT Id FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                                ("SELECT Id FROM tb_orderinfo WHERE Id=%s LIMIT 1", (order_no,)),
+                            ]
+
+                        for sql, params in queries:
+                            await cur.execute(sql, params)
+                            row = await cur.fetchone()
+                            if row:
+                                result[order_no] = row[0]
+                                break
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        return result
 
     async def fetch_deleted_order_by_no(self, order_no: str, deleted_by_id: str = None) -> Optional[Dict]:
-        """根据订单编码查询已删除的订单（Deleted=1），验证唯一性"""
+        """根据订单编码或数字Id查询已删除的订单（Deleted=1），验证唯一性"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
+
+        is_numeric = order_no.isdigit()
+
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
-                    # 构建查询条件
-                    if deleted_by_id:
-                        count_sql = "SELECT COUNT(*) FROM tb_orderinfo WHERE OrderNo = %s AND Deleted=1 AND DeletedById = %s"
-                        await cur.execute(count_sql, (order_no, deleted_by_id))
+                    # 根据输入类型构建查询条件
+                    if is_numeric:
+                        doc_id = int(order_no)
+                        conditions = [
+                            ("Id", doc_id),
+                            ("OrderNo", order_no),
+                        ]
                     else:
-                        count_sql = "SELECT COUNT(*) FROM tb_orderinfo WHERE OrderNo = %s AND Deleted=1"
-                        await cur.execute(count_sql, (order_no,))
-                    
-                    count_row = await cur.fetchone()
-                    count = count_row[0] if count_row else 0
-                    
-                    # 如果不是恰好1条，返回None表示验证失败
-                    if count != 1:
-                        return None
-                    
-                    # 查询唯一的那条记录
-                    if deleted_by_id:
-                        sql = "SELECT Id, OrderNo, Deleted, DeletedById FROM tb_orderinfo WHERE OrderNo = %s AND Deleted=1 AND DeletedById = %s"
-                        await cur.execute(sql, (order_no, deleted_by_id))
-                    else:
-                        sql = "SELECT Id, OrderNo, Deleted, DeletedById FROM tb_orderinfo WHERE OrderNo = %s AND Deleted=1"
-                        await cur.execute(sql, (order_no,))
-                    
-                    row = await cur.fetchone()
-                    if row:
-                        return {"id": row[0], "order_no": row[1], "deleted": row[2], "deleted_by_id": row[3] if len(row) > 3 else None}
+                        conditions = [
+                            ("OrderNo", order_no),
+                            ("Id", order_no),
+                        ]
+
+                    for col_name, col_val in conditions:
+                        deleted_cond = " AND DeletedById = %s" if deleted_by_id else ""
+                        count_params = (col_val, deleted_by_id) if deleted_by_id else (col_val,)
+                        count_sql = f"SELECT COUNT(*) FROM tb_orderinfo WHERE {col_name} = %s AND Deleted=1{deleted_cond}"
+                        await cur.execute(count_sql, count_params)
+                        count_row = await cur.fetchone()
+                        count = count_row[0] if count_row else 0
+
+                        if count == 1:
+                            sel_params = (col_val, deleted_by_id) if deleted_by_id else (col_val,)
+                            sql = f"SELECT Id, OrderNo, Deleted, DeletedById FROM tb_orderinfo WHERE {col_name} = %s AND Deleted=1{deleted_cond}"
+                            await cur.execute(sql, sel_params)
+                            row = await cur.fetchone()
+                            if row:
+                                return {
+                                    "id": row[0],
+                                    "order_no": row[1],
+                                    "deleted": row[2],
+                                    "deleted_by_id": row[3] if len(row) > 3 else None,
+                                }
+
                     return None
         raise ValueError("不支持的连接池类型")
 

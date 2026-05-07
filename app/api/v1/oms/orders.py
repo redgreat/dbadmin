@@ -15,13 +15,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/update_audit_time_batch", summary="按订单编码批量更新审核时间")
+@router.post("/update_audit_time_batch", summary="批量更新审核时间（支持订单编码或订单Id）")
 async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
-    """批量更新订单审核时间"""
+    """批量更新订单审核时间，支持传入订单编码或订单Id"""
     try:
         order_nos: List[str] = [s.strip() for s in body.order_nos if s and s.strip()]
         if not order_nos:
-            return Fail(code=400, msg="订单编码不能为空")
+            return Fail(code=400, msg="订单编码或订单Id不能为空")
 
         if not body.audit_time:
             return Fail(code=400, msg="修改时间不能为空")
@@ -89,13 +89,13 @@ async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
         return Fail(code=500, msg="服务异常")
 
 
-@router.post("/delete_logical_batch", summary="按订单编码批量逻辑删除")
+@router.post("/delete_logical_batch", summary="批量逻辑删除（支持订单编码或订单Id）")
 async def delete_logical_batch(req: Request, body: DeleteBatchIn):
-    """批量逻辑删除订单"""
+    """批量逻辑删除订单，支持传入订单编码或订单Id"""
     try:
         order_nos: List[str] = [s.strip() for s in body.order_nos if s and s.strip()]
         if not order_nos:
-            return Fail(code=400, msg="订单编码不能为空")
+            return Fail(code=400, msg="订单编码或订单Id不能为空")
 
         try:
             # 先通过订单编码获取对应的Id
@@ -162,13 +162,13 @@ async def delete_logical_batch(req: Request, body: DeleteBatchIn):
         return Fail(code=500, msg="服务异常")
 
 
-@router.post("/delete_physical_batch", summary="按订单编码批量物理删除")
+@router.post("/delete_physical_batch", summary="批量物理删除（支持订单编码或订单Id）")
 async def delete_physical_batch(req: Request, body: DeleteBatchIn):
-    """批量物理删除订单"""
+    """批量物理删除订单，支持传入订单编码或订单Id"""
     try:
         order_nos: List[str] = [s.strip() for s in body.order_nos if s and s.strip()]
         if not order_nos:
-            return Fail(code=400, msg="订单编码不能为空")
+            return Fail(code=400, msg="订单编码或订单Id不能为空")
 
         try:
             # 先通过订单编码获取对应的Id
@@ -235,9 +235,9 @@ async def delete_physical_batch(req: Request, body: DeleteBatchIn):
         return Fail(code=500, msg="服务异常")
 
 
-@router.post("/restore_logical", summary="订单逻辑删除恢复")
+@router.post("/restore_logical", summary="订单逻辑删除恢复（支持订单编码或订单Id）")
 async def restore_logical(req: Request, body: RestoreLogicalIn):
-    """恢复被逻辑删除的订单"""
+    """恢复被逻辑删除的订单，支持传入订单编码或订单Id"""
     try:
         # 先查询订单是否已删除（Deleted=1），同时验证 DeletedById
         deleted_order = await order_service.fetch_deleted_order_by_no(body.order_no, body.operator_id)
@@ -247,7 +247,7 @@ async def restore_logical(req: Request, body: RestoreLogicalIn):
             order_no_id_map = await order_service.fetch_order_ids_by_nos([body.order_no])
             if order_no_id_map:
                 return Success(msg="该订单未删除，无需恢复", data={"order_no": body.order_no, "restored": False})
-            return Success(msg=f"未找到订单编码为 {body.order_no} 且删除人为 {body.operator_id} 的已删除订单", data={"order_no": body.order_no, "restored": False})
+            return Success(msg=f"未找到订单 {body.order_no} 且删除人为 {body.operator_id} 的已删除订单", data={"order_no": body.order_no, "restored": False})
         
         order_id = deleted_order["id"]
 
