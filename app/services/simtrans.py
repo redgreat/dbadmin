@@ -242,7 +242,7 @@ class SIMTransService:
                 NULL AS DeletedAt,
                 0 AS Deleted,
                 NULL AS Remark,
-                DATE_FORMAT(d.AuditTime, '%Y-%m-%d 00:00:00') AS SilentBeginTime,
+                DATE_FORMAT(d.AuditTime, '%%Y-%%m-%%d 00:00:00') AS SilentBeginTime,
                 NULL AS EnableTime
             FROM whcenter.tb_materialstock a
             JOIN whcenter.tb_instockno b ON b.MaterialNo = a.MaterialNo AND b.Deleted = 0
