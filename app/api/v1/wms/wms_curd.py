@@ -4,7 +4,8 @@ from typing import List
 from fastapi import APIRouter, Request
 
 from app.core.dependency import AuthControl
-from app.models.admin import AuditLog, User
+from app.models.admin import User
+from app.utils.audit_log import create_operation_audit_log
 from app.schemas.base import Fail, Success
 from app.schemas.wms import (
     WmsDeleteBatchIn,
@@ -74,7 +75,7 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
         for dno in nos:
             status = 200 if dno not in failed_ids else 500
             try:
-                await AuditLog.create(
+                await create_operation_audit_log(
                     user_id=user_id,
                     username=username,
                     module="WMS",
@@ -82,7 +83,8 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
                     method="POST",
                     path="/api/v1/wms/wms_curd/delete_logical_batch",
                     status=status,
-                    response_time=0,
+                    request_body=body.model_dump(mode="json"),
+                    response_body={"stock_no": dno, "failed": dno in failed_ids},
                 )
             except Exception as e:
                 logger.warning(f"审计日志记录失败: {e}")
@@ -134,7 +136,7 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
         for dno in nos:
             status = 200 if dno not in failed_ids else 500
             try:
-                await AuditLog.create(
+                await create_operation_audit_log(
                     user_id=user_id,
                     username=username,
                     module="WMS",
@@ -142,7 +144,8 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
                     method="POST",
                     path="/api/v1/wms/wms_curd/delete_physical_batch",
                     status=status,
-                    response_time=0,
+                    request_body=body.model_dump(mode="json"),
+                    response_body={"stock_no": dno, "failed": dno in failed_ids},
                 )
             except Exception as e:
                 logger.warning(f"审计日志记录失败: {e}")
@@ -182,7 +185,7 @@ async def restore_logical(req: Request, body: WmsRestoreLogicalIn):
             username = ""
 
         try:
-            await AuditLog.create(
+            await create_operation_audit_log(
                 user_id=user_id,
                 username=username,
                 module="WMS",
@@ -190,7 +193,8 @@ async def restore_logical(req: Request, body: WmsRestoreLogicalIn):
                 method="POST",
                 path="/api/v1/wms/wms_curd/restore_logical",
                 status=200,
-                response_time=0,
+                request_body=body.model_dump(mode="json"),
+                response_body={"stock_no": body.stock_no, "restored": True},
             )
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")
@@ -241,7 +245,7 @@ async def price_modify(req: Request, body: PriceModifyIn):
             username = ""
 
         try:
-            await AuditLog.create(
+            await create_operation_audit_log(
                 user_id=user_id,
                 username=username,
                 module="WMS",
@@ -249,7 +253,8 @@ async def price_modify(req: Request, body: PriceModifyIn):
                 method="POST",
                 path="/api/v1/wms/wms_curd/price_modify",
                 status=200,
-                response_time=0,
+                request_body=body.model_dump(mode="json"),
+                response_body={"detail_id": body.detail_id, "new_price": body.new_price},
             )
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")

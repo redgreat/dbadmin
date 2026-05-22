@@ -5,7 +5,8 @@ from typing import List
 from fastapi import APIRouter, Request
 
 from app.core.dependency import AuthControl
-from app.models.admin import AuditLog, User
+from app.models.admin import User
+from app.utils.audit_log import create_operation_audit_log
 from app.schemas.base import Fail, Success
 from app.schemas.oms import UpdateAuditTimeBatchIn, DeleteBatchIn, RestoreLogicalIn
 from app.services.order_service import order_service
@@ -64,7 +65,7 @@ async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
             before = old_map.get(order_no)
             after = new_map.get(order_no)
             try:
-                await AuditLog.create(
+                await create_operation_audit_log(
                     user_id=user_id,
                     username=username,
                     module="OMS",
@@ -72,7 +73,8 @@ async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
                     method="POST",
                     path="/api/v1/oms/orders/update_audit_time_batch",
                     status=200,
-                    response_time=0,
+                    request_body=body.model_dump(mode="json"),
+                    response_body={"order_no": order_no, "before": str(before), "after": str(after)},
                 )
             except Exception as e:
                 logger.warning(f"审计日志记录失败: {e}")
@@ -134,7 +136,7 @@ async def delete_logical_batch(req: Request, body: DeleteBatchIn):
             order_id = order_no_id_map.get(order_no)
             status = 200 if order_id not in failed_ids else 500
             try:
-                await AuditLog.create(
+                await create_operation_audit_log(
                     user_id=user_id,
                     username=username,
                     module="OMS",
@@ -142,7 +144,12 @@ async def delete_logical_batch(req: Request, body: DeleteBatchIn):
                     method="POST",
                     path="/api/v1/oms/orders/delete_logical_batch",
                     status=status,
-                    response_time=0,
+                    request_body=body.model_dump(mode="json"),
+                    response_body={
+                        "order_no": order_no,
+                        "order_id": order_id,
+                        "failed": order_no in not_found_nos or order_no in failed_nos,
+                    },
                 )
             except Exception as e:
                 logger.warning(f"审计日志记录失败: {e}")
@@ -207,7 +214,7 @@ async def delete_physical_batch(req: Request, body: DeleteBatchIn):
             order_id = order_no_id_map.get(order_no)
             status = 200 if order_id not in failed_ids else 500
             try:
-                await AuditLog.create(
+                await create_operation_audit_log(
                     user_id=user_id,
                     username=username,
                     module="OMS",
@@ -215,7 +222,12 @@ async def delete_physical_batch(req: Request, body: DeleteBatchIn):
                     method="POST",
                     path="/api/v1/oms/orders/delete_physical_batch",
                     status=status,
-                    response_time=0,
+                    request_body=body.model_dump(mode="json"),
+                    response_body={
+                        "order_no": order_no,
+                        "order_id": order_id,
+                        "failed": order_no in not_found_nos or order_no in failed_nos,
+                    },
                 )
             except Exception as e:
                 logger.warning(f"审计日志记录失败: {e}")
@@ -269,7 +281,7 @@ async def restore_logical(req: Request, body: RestoreLogicalIn):
             username = ""
 
         try:
-            await AuditLog.create(
+            await create_operation_audit_log(
                 user_id=user_id,
                 username=username,
                 module="OMS",
@@ -277,7 +289,8 @@ async def restore_logical(req: Request, body: RestoreLogicalIn):
                 method="POST",
                 path="/api/v1/oms/orders/restore_logical",
                 status=200,
-                response_time=0,
+                request_body=body.model_dump(mode="json"),
+                response_body={"order_no": body.order_no, "order_id": order_id, "restored": True},
             )
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")

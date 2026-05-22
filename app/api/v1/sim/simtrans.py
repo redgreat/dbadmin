@@ -2,7 +2,8 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from app.schemas.base import Success, Fail
 from app.core.dependency import AuthControl
-from app.models.admin import AuditLog, User
+from app.models.admin import User
+from app.utils.audit_log import create_operation_audit_log
 from app.services.simtrans import sim_trans_service
 
 router = APIRouter()
@@ -40,7 +41,7 @@ async def sync_sim_cards(req: Request, body: SyncRequest):
             receipt_list = body.receipt_numbers.strip().split('\n')
             receipt_count = len([r for r in receipt_list if r.strip()])
             
-            await AuditLog.create(
+            await create_operation_audit_log(
                 user_id=user_id,
                 username=username,
                 module="SIM",
@@ -48,7 +49,8 @@ async def sync_sim_cards(req: Request, body: SyncRequest):
                 method="POST",
                 path="/api/v1/sim/simtrans/sync",
                 status=200 if result.get('success') else 400,
-                response_time=0,
+                request_body=body.model_dump(mode="json"),
+                response_body=result,
             )
         except Exception:
             pass

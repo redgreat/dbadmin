@@ -3,7 +3,8 @@ import asyncio
 from pydantic import BaseModel
 from app.schemas.base import Success, Fail
 from app.core.dependency import AuthControl
-from app.models.admin import AuditLog, User
+from app.models.admin import User
+from app.utils.audit_log import create_operation_audit_log
 from app.services.sim_service import sim_service
 
 router = APIRouter()
@@ -27,7 +28,7 @@ async def upload_sim_iccid(req: Request, file: UploadFile = File(...)):
             user_id = 0
             username = ""
         try:
-            await AuditLog.create(
+            await create_operation_audit_log(
                 user_id=user_id,
                 username=username,
                 module="SIM",
@@ -35,7 +36,8 @@ async def upload_sim_iccid(req: Request, file: UploadFile = File(...)):
                 method="POST",
                 path="/api/v1/sim/simiccid/upload",
                 status=200,
-                response_time=0,
+                skip_request_body=True,
+                response_body={"file_key": file_key},
             )
         except Exception:
             pass
@@ -65,7 +67,7 @@ async def process_sim_iccid(req: Request, body: ProcessBody):
             user_id = 0
             username = ""
         try:
-            await AuditLog.create(
+            await create_operation_audit_log(
                 user_id=user_id,
                 username=username,
                 module="SIM",
@@ -73,7 +75,8 @@ async def process_sim_iccid(req: Request, body: ProcessBody):
                 method="POST",
                 path="/api/v1/sim/simiccid/process",
                 status=200,
-                response_time=0,
+                request_body=body.model_dump(mode="json"),
+                response_body={"file_key": body.file_key},
             )
         except Exception:
             pass
@@ -108,15 +111,16 @@ async def submit_sim_iccid(req: Request, file: UploadFile = File(...)):
             user_id = 0
             username = ""
         try:
-            await AuditLog.create(
+            await create_operation_audit_log(
                 user_id=user_id,
                 username=username,
                 module="SIM",
-                summary=f"SIM-ICCID一次性提交处理完成: {filename} ({file_key})",
+                summary=f"SIM-ICCID一次性提交处理: {filename} ({file_key})",
                 method="POST",
                 path="/api/v1/sim/simiccid/submit",
                 status=200,
-                response_time=0,
+                skip_request_body=True,
+                response_body={"file_key": file_key},
             )
         except Exception:
             pass

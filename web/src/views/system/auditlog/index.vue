@@ -154,7 +154,7 @@ const columns = [
                 style:
                   'max-height: 400px; overflow: auto; background-color: #f5f5f5; padding: 8px; border-radius: 4px;',
               },
-              formatJSON(row.request_args)
+              formatJSON(row.request_body)
             ),
         }
       )
@@ -189,7 +189,7 @@ const columns = [
     },
   },
   {
-    title: '响应时间(s)',
+    title: '响应时间(ms)',
     key: 'response_time',
     align: 'center',
     width: 'auto',

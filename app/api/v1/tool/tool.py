@@ -7,7 +7,8 @@ from typing import Optional
 from app.schemas.base import Success
 from app.services.excelimp_service import generate_sql, submit_and_generate, get_progress
 from app.services.formatter_service import format_sql
-from app.models.admin import AuditLog, User
+from app.models.admin import User
+from app.utils.audit_log import create_operation_audit_log
 from app.core.dependency import DependAuth
 from app.controllers.conn import conn_controller
 from app.services.conn_permission_service import ensure_conn_access
@@ -145,7 +146,7 @@ async def submit_excel_sql(
         
         # 记录审计日志
         try:
-            await AuditLog.create(
+            await create_operation_audit_log(
                 user_id=current_user.id,
                 username=current_user.username,
                 module="日常工具",
@@ -153,7 +154,8 @@ async def submit_excel_sql(
                 method="POST",
                 path="/api/v1/tool/excelimp/submit",
                 status=200,
-                response_time=0,
+                skip_request_body=True,
+                response_body={"file_key": file_key},
             )
         except Exception:
             pass

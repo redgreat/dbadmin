@@ -5,7 +5,8 @@ import logging
 from fastapi import APIRouter, Request
 
 from app.core.dependency import AuthControl
-from app.models.admin import AuditLog, User
+from app.models.admin import User
+from app.utils.audit_log import create_operation_audit_log
 from app.schemas.base import Fail, Success
 from app.schemas.wms import FccParseIn, FccValidateIn, FccSubmitIn
 from app.services.fcc_relation_service import fcc_relation_service
@@ -73,7 +74,7 @@ async def submit_task(req: Request, body: FccSubmitIn):
             username = ""
 
         try:
-            await AuditLog.create(
+            await create_operation_audit_log(
                 user_id=user_id,
                 username=username,
                 module="WMS",
@@ -81,7 +82,8 @@ async def submit_task(req: Request, body: FccSubmitIn):
                 method="POST",
                 path="/api/v1/wms/fcc/submit",
                 status=200,
-                response_time=0,
+                request_body=body.model_dump(mode="json"),
+                response_body={"task_id": task_id},
             )
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")

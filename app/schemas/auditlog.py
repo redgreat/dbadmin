@@ -15,6 +15,8 @@ class AuditLogSchema(BaseModel):
     method: str
     path: str
     status: int
+    request_body: Optional[str] = None
+    response_body: Optional[str] = None
     response_time: int
     created_at: datetime
     updated_at: datetime
