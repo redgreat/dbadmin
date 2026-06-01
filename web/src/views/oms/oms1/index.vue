@@ -1,8 +1,8 @@
 <template>
   <CommonPage show-footer>
     <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" :label-width="100">
-      <n-form-item label="订单Id" path="orderIds">
-        <n-input v-model:value="form.orderIds" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单Id，逗号分隔" />
+      <n-form-item label="订单Id/编码" path="orderIds">
+        <n-input v-model:value="form.orderIds" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单Id或订单编码，逗号分隔" />
       </n-form-item>
       <n-form-item label="修改时间" path="auditTime">
         <n-date-picker v-model:value="form.auditTime" type="datetime" placeholder="请选择日期时间" />
@@ -30,17 +30,15 @@ const executing = ref(false)
 
 const rules = {
   orderIds: [
-    { required: true, message: '请输入订单Id' },
+    { required: true, message: '请输入订单Id或订单编码' },
     {
       validator: (_, value) => {
-        if (!value) return new Error('请输入订单Id')
+        if (!value) return new Error('请输入订单Id或订单编码')
         const ids = value
           .split(',')
           .map((s) => s.trim())
           .filter((s) => s.length)
-        if (!ids.length) return new Error('请输入订单Id')
-        const allNumeric = ids.every((s) => /^\d+$/.test(s))
-        if (!allNumeric) return new Error('订单Id需为数字，逗号分隔')
+        if (!ids.length) return new Error('请输入订单Id或订单编码')
         return true
       },
     },
