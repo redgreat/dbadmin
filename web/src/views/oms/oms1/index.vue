@@ -58,11 +58,15 @@ const handleExecute = async () => {
     .filter((s) => s.length)
   executing.value = true
   try {
-    const payload = { order_ids: ids, audit_time: form.value.auditTime }
+    const payload = { order_nos: ids, audit_time: form.value.auditTime }
     const res = await api.updateOrdersAuditTimeBatch(payload)
     if (res.code === 200) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
-      message.success(`执行成功：${success_count} 条${failed_ids.length ? `，失败 ${failed_ids.length} 条` : ''}`)
+      if (failed_ids.length > 0) {
+        message.warning(`执行完成：成功 ${success_count} 条，失败 ${failed_ids.length} 条。未找到的订单：${failed_ids.join(', ')}`)
+      } else {
+        message.success(`执行成功：${success_count} 条`)
+      }
     } else {
       message.error(res.msg || '执行失败')
     }
