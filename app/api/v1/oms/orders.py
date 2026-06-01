@@ -31,10 +31,10 @@ async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
 
         try:
             # 先通过订单编码获取对应的Id
-            order_no_id_map = await order_service.fetch_order_ids_by_nos(order_nos)
+            order_result = await order_service.fetch_order_ids_by_nos(order_nos)
+            order_no_id_map = order_result.get("order_id_map", {})
+            not_found_nos = order_result.get("not_found_docs", [])
             
-            # 找出未找到的订单编码
-            not_found_nos = [no for no in order_nos if no not in order_no_id_map]
             if not_found_nos:
                 logger.warning(f"以下订单编码未找到: {not_found_nos}")
             
@@ -43,9 +43,11 @@ async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
 
             # 使用获取到的Id进行更新
             order_ids = list(order_no_id_map.values())
-            old_map = await order_service.fetch_audit_time_map(order_nos)
+            audit_time_result = await order_service.fetch_audit_time_map(order_nos)
+            old_map = audit_time_result.get("audit_time_map", {})
             affected = await order_service.update_audit_time_batch(order_ids, new_time)
-            new_map = await order_service.fetch_audit_time_map(order_nos)
+            new_audit_time_result = await order_service.fetch_audit_time_map(order_nos)
+            new_map = new_audit_time_result.get("audit_time_map", {})
         except Exception as e:
             logger.error(f"执行更新失败: {e}")
             return Fail(code=500, msg=f"执行失败: {str(e)}")
@@ -101,10 +103,10 @@ async def delete_logical_batch(req: Request, body: DeleteBatchIn):
 
         try:
             # 先通过订单编码获取对应的Id
-            order_no_id_map = await order_service.fetch_order_ids_by_nos(order_nos)
+            order_result = await order_service.fetch_order_ids_by_nos(order_nos)
+            order_no_id_map = order_result.get("order_id_map", {})
+            not_found_nos = order_result.get("not_found_docs", [])
             
-            # 找出未找到的订单编码
-            not_found_nos = [no for no in order_nos if no not in order_no_id_map]
             if not_found_nos:
                 logger.warning(f"以下订单编码未找到: {not_found_nos}")
             
@@ -179,10 +181,10 @@ async def delete_physical_batch(req: Request, body: DeleteBatchIn):
 
         try:
             # 先通过订单编码获取对应的Id
-            order_no_id_map = await order_service.fetch_order_ids_by_nos(order_nos)
+            order_result = await order_service.fetch_order_ids_by_nos(order_nos)
+            order_no_id_map = order_result.get("order_id_map", {})
+            not_found_nos = order_result.get("not_found_docs", [])
             
-            # 找出未找到的订单编码
-            not_found_nos = [no for no in order_nos if no not in order_no_id_map]
             if not_found_nos:
                 logger.warning(f"以下订单编码未找到: {not_found_nos}")
             
@@ -256,7 +258,8 @@ async def restore_logical(req: Request, body: RestoreLogicalIn):
         
         if not deleted_order:
             # 检查订单是否存在但未删除
-            order_no_id_map = await order_service.fetch_order_ids_by_nos([body.order_no])
+            order_result = await order_service.fetch_order_ids_by_nos([body.order_no])
+            order_no_id_map = order_result.get("order_id_map", {})
             if order_no_id_map:
                 return Success(msg="该订单未删除，无需恢复", data={"order_no": body.order_no, "restored": False})
             return Success(msg=f"未找到订单 {body.order_no} 且删除人为 {body.operator_id} 的已删除订单", data={"order_no": body.order_no, "restored": False})

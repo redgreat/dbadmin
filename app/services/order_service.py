@@ -1,9 +1,12 @@
 from typing import Dict, List, Optional, Tuple
 import aiomysql
+import logging
 
 from app.services.db_pool import db_pool
 from app.controllers.conn import conn_controller
 from app.settings.config import settings
+
+logger = logging.getLogger(__name__)
 
 # 订单固定连接的Id（延迟获取，避免模块加载时Tortoise未初始化）
 _order_conn_id = None
@@ -36,81 +39,144 @@ class OrderService:
             params=conn["params"],
         )
 
-    async def fetch_audit_time_map(self, order_nos: List[str]) -> Dict[str, Optional[str]]:
-        """根据订单编码或数字Id获取审核时间"""
+    async def fetch_audit_time_map(self, order_nos: List[str]) -> Dict:
+        """根据订单编码或数字Id获取审核时间，返回详细的验证结果"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
 
-        result: Dict[str, Optional[str]] = {}
+        found_docs = []
+        not_found_docs = []
+
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     for order_no in order_nos:
                         is_numeric = order_no.isdigit()
 
+                        # 根据输入类型决定主查和备查
                         queries = []
                         if is_numeric:
                             doc_id = int(order_no)
                             queries = [
-                                ("SELECT OrderNo, AuditTime FROM tb_orderinfo WHERE Id=%s LIMIT 1", (doc_id,)),
-                                ("SELECT OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                                ("SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE Id=%s LIMIT 1", (doc_id,)),
+                                ("SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
                             ]
                         else:
                             queries = [
-                                ("SELECT OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
-                                ("SELECT OrderNo, AuditTime FROM tb_orderinfo WHERE Id=%s LIMIT 1", (order_no,)),
+                                ("SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                                ("SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE Id=%s LIMIT 1", (order_no,)),
                             ]
 
+                        # 按优先级逐条查询，找到第一个命中的就停
+                        result = None
                         for sql, params in queries:
                             await cur.execute(sql, params)
                             row = await cur.fetchone()
                             if row:
-                                result[order_no] = row[1]
+                                result = row
                                 break
+
+                        if not result:
+                            not_found_docs.append(order_no)
+                            logger.warning(f"订单未找到: {order_no}")
+                        else:
+                            order_id, order_no_actual, audit_time = result
+                            found_docs.append({
+                                "order_id": order_id,
+                                "order_no": order_no,
+                                "actual_order_no": order_no_actual,
+                                "audit_time": audit_time
+                            })
+                            logger.info(f"找到订单: {order_no} -> Id={order_id}, OrderNo={order_no_actual}")
         else:
             raise ValueError("不支持的连接池类型")
 
-        return result
+        return {
+            "success": len(not_found_docs) == 0,
+            "total_count": len(order_nos),
+            "found_count": len(found_docs),
+            "not_found_count": len(not_found_docs),
+            "found_docs": found_docs,
+            "not_found_docs": not_found_docs,
+            "message": self._build_fetch_message(len(found_docs), len(not_found_docs)),
+            "audit_time_map": {doc["order_no"]: doc["audit_time"] for doc in found_docs}
+        }
 
-    async def fetch_order_ids_by_nos(self, order_nos: List[str]) -> Dict[str, int]:
-        """根据订单编码或数字Id获取对应的Id，优先按输入类型匹配"""
+    async def fetch_order_ids_by_nos(self, order_nos: List[str]) -> Dict:
+        """根据订单编码或数字Id获取对应的Id，优先按输入类型匹配，返回详细的验证结果"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
 
-        result: Dict[str, int] = {}
+        found_docs = []
+        not_found_docs = []
+
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     for order_no in order_nos:
                         is_numeric = order_no.isdigit()
 
+                        # 根据输入类型决定主查和备查
                         queries = []
                         if is_numeric:
                             doc_id = int(order_no)
                             queries = [
-                                ("SELECT Id FROM tb_orderinfo WHERE Id=%s LIMIT 1", (doc_id,)),
-                                ("SELECT Id FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                                ("SELECT Id, OrderNo FROM tb_orderinfo WHERE Id=%s LIMIT 1", (doc_id,)),
+                                ("SELECT Id, OrderNo FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
                             ]
                         else:
                             queries = [
-                                ("SELECT Id FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
-                                ("SELECT Id FROM tb_orderinfo WHERE Id=%s LIMIT 1", (order_no,)),
+                                ("SELECT Id, OrderNo FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                                ("SELECT Id, OrderNo FROM tb_orderinfo WHERE Id=%s LIMIT 1", (order_no,)),
                             ]
 
+                        # 按优先级逐条查询，找到第一个命中的就停
+                        result = None
                         for sql, params in queries:
                             await cur.execute(sql, params)
                             row = await cur.fetchone()
                             if row:
-                                result[order_no] = row[0]
+                                result = row
                                 break
+
+                        if not result:
+                            not_found_docs.append(order_no)
+                            logger.warning(f"订单未找到: {order_no}")
+                        else:
+                            order_id, order_no_actual = result
+                            found_docs.append({
+                                "order_id": order_id,
+                                "order_no": order_no,
+                                "actual_order_no": order_no_actual
+                            })
+                            logger.info(f"找到订单: {order_no} -> Id={order_id}, OrderNo={order_no_actual}")
         else:
             raise ValueError("不支持的连接池类型")
 
-        return result
+        return {
+            "success": len(not_found_docs) == 0,
+            "total_count": len(order_nos),
+            "found_count": len(found_docs),
+            "not_found_count": len(not_found_docs),
+            "found_docs": found_docs,
+            "not_found_docs": not_found_docs,
+            "message": self._build_fetch_message(len(found_docs), len(not_found_docs)),
+            "order_id_map": {doc["order_no"]: doc["order_id"] for doc in found_docs}
+        }
+
+    def _build_fetch_message(self, found_count: int, not_found_count: int) -> str:
+        """构建获取订单的消息"""
+        parts = []
+        if found_count > 0:
+            parts.append(f"找到 {found_count} 条订单")
+        if not_found_count > 0:
+            parts.append(f"{not_found_count} 条订单不存在")
+
+        return "，".join(parts) if parts else "所有订单均找到"
 
     async def fetch_deleted_order_by_no(self, order_no: str, deleted_by_id: str = None) -> Optional[Dict]:
         """根据订单编码或数字Id查询已删除的订单（Deleted=1），验证唯一性"""

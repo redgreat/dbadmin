@@ -64,22 +64,42 @@ class OMSController:
                 raise HTTPException(status_code=400, detail=f"不支持的数据库类型: {conn_info['db_type']}，当前只支持MySQL")
             
             for order_no in order_nos:
-                sql = "SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo = %s AND Deleted=0 LIMIT 1"
-                result = await db_manager.execute_query(request.conn_id, sql, [order_no])
+                is_numeric = order_no.isdigit()
                 
-                if result and len(result) > 1 and result[1]:
-                    data_list = result[1]
-                    if data_list and len(data_list) > 0:
-                        order_data = data_list[0]
-                        found_orders.append({
-                            "id": order_data.get('Id'),
-                            "orderNo": order_data.get('OrderNo'),
-                            "auditTime": order_data.get('AuditTime').strftime('%Y-%m-%d %H:%M:%S') if order_data.get('AuditTime') else None
-                        })
-                    else:
-                        not_found_orders.append(order_no)
+                # 根据输入类型决定主查和备查
+                queries = []
+                if is_numeric:
+                    doc_id = int(order_no)
+                    queries = [
+                        ("SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE Id=%s AND Deleted=0 LIMIT 1", (doc_id,)),
+                        ("SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                    ]
                 else:
+                    queries = [
+                        ("SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                        ("SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE Id=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                    ]
+                
+                # 按优先级逐条查询，找到第一个命中的就停
+                result = None
+                for sql, params in queries:
+                    result = await db_manager.execute_query(request.conn_id, sql, list(params))
+                    if result and len(result) > 1 and result[1]:
+                        data_list = result[1]
+                        if data_list and len(data_list) > 0:
+                            order_data = data_list[0]
+                            found_orders.append({
+                                "id": order_data.get('Id'),
+                                "orderNo": order_data.get('OrderNo'),
+                                "auditTime": order_data.get('AuditTime').strftime('%Y-%m-%d %H:%M:%S') if order_data.get('AuditTime') else None
+                            })
+                            logger.info(f"找到订单: {order_no} -> Id={order_data.get('Id')}, OrderNo={order_data.get('OrderNo')}")
+                            break
+                    result = None
+                
+                if not result or not found_orders or (found_orders and found_orders[-1]["orderNo"] != order_no and not any(o["orderNo"] == order_no or str(o["id"]) == order_no for o in found_orders)):
                     not_found_orders.append(order_no)
+                    logger.warning(f"订单未找到: {order_no}")
             
             return {
                 "success": len(not_found_orders) == 0,
@@ -99,7 +119,7 @@ class OMSController:
     @staticmethod
     async def validate_orders_for_delete(request: OrderDeleteValidationRequest) -> Dict[str, Any]:
         """
-        验证订单是否存在且可删除（支持订单编码）
+        验证订单是否存在且可删除（支持订单编码或订单Id）
         """
         try:
             order_nos = [oid.strip() for oid in request.order_nos.split(',') if oid.strip()]
@@ -117,24 +137,44 @@ class OMSController:
                 raise HTTPException(status_code=400, detail=f"不支持的数据库类型: {conn_info['db_type']}，当前只支持MySQL")
             
             for order_no in order_nos:
-                # 使用订单编码查询，同时返回Id
-                sql = "SELECT Id, OrderNo, OrderStatus, CreatedAt FROM tb_orderinfo WHERE OrderNo = %s AND Deleted=1 LIMIT 1"
-                result = await db_manager.execute_query(request.conn_id, sql, [order_no])
+                is_numeric = order_no.isdigit()
                 
-                if result and len(result) > 1 and result[1]:
-                    data_list = result[1]
-                    if data_list and len(data_list) > 0:
-                        order_data = data_list[0]
-                        found_orders.append({
-                            "id": order_data.get('Id'),
-                            "orderNo": order_data.get('OrderNo'),
-                            "status": order_data.get('OrderStatus', '未知'),
-                            "createTime": order_data.get('CreatedAt').strftime('%Y-%m-%d %H:%M:%S') if order_data.get('CreatedAt') else None
-                        })
-                    else:
-                        not_found_orders.append(order_no)
+                # 根据输入类型决定主查和备查
+                queries = []
+                if is_numeric:
+                    doc_id = int(order_no)
+                    queries = [
+                        ("SELECT Id, OrderNo, OrderStatus, CreatedAt FROM tb_orderinfo WHERE Id=%s AND Deleted=1 LIMIT 1", (doc_id,)),
+                        ("SELECT Id, OrderNo, OrderStatus, CreatedAt FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=1 LIMIT 1", (order_no,)),
+                    ]
+                else:
+                    queries = [
+                        ("SELECT Id, OrderNo, OrderStatus, CreatedAt FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=1 LIMIT 1", (order_no,)),
+                        ("SELECT Id, OrderNo, OrderStatus, CreatedAt FROM tb_orderinfo WHERE Id=%s AND Deleted=1 LIMIT 1", (order_no,)),
+                    ]
+                
+                # 按优先级逐条查询，找到第一个命中的就停
+                result = None
+                for sql, params in queries:
+                    result = await db_manager.execute_query(request.conn_id, sql, list(params))
+                    if result and len(result) > 1 and result[1]:
+                        data_list = result[1]
+                        if data_list and len(data_list) > 0:
+                            result = data_list[0]
+                            break
+                    result = None
+                
+                if result:
+                    found_orders.append({
+                        "id": result.get('Id'),
+                        "orderNo": result.get('OrderNo'),
+                        "status": result.get('OrderStatus', '未知'),
+                        "createTime": result.get('CreatedAt').strftime('%Y-%m-%d %H:%M:%S') if result.get('CreatedAt') else None
+                    })
+                    logger.info(f"找到订单: {order_no} -> Id={result.get('Id')}, OrderNo={result.get('OrderNo')}")
                 else:
                     not_found_orders.append(order_no)
+                    logger.warning(f"订单未找到: {order_no}")
             
             return {
                 "success": len(not_found_orders) == 0,
@@ -181,16 +221,39 @@ class OMSController:
             beijing_time = utc_time.astimezone(beijing_tz)
             formatted_time = beijing_time.strftime('%Y-%m-%d %H:%M:%S')
             
-            # 先查询订单编码对应的Id
+            # 先查询订单编码或订单Id对应的Id
             order_no_id_map = {}
             for order_no in order_nos:
-                sql = "SELECT Id FROM tb_orderinfo WHERE OrderNo = %s AND Deleted=0 LIMIT 1"
-                result = await db_manager.execute_query(request.conn_id, sql, [order_no])
+                is_numeric = order_no.isdigit()
                 
-                if result and len(result) > 1 and result[1]:
-                    data_list = result[1]
-                    if data_list and len(data_list) > 0:
-                        order_no_id_map[order_no] = data_list[0].get('Id')
+                # 根据输入类型决定主查和备查
+                queries = []
+                if is_numeric:
+                    doc_id = int(order_no)
+                    queries = [
+                        ("SELECT Id FROM tb_orderinfo WHERE Id=%s AND Deleted=0 LIMIT 1", (doc_id,)),
+                        ("SELECT Id FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                    ]
+                else:
+                    queries = [
+                        ("SELECT Id FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                        ("SELECT Id FROM tb_orderinfo WHERE Id=%s AND Deleted=0 LIMIT 1", (order_no,)),
+                    ]
+                
+                # 按优先级逐条查询，找到第一个命中的就停
+                result = None
+                for sql, params in queries:
+                    result = await db_manager.execute_query(request.conn_id, sql, list(params))
+                    if result and len(result) > 1 and result[1]:
+                        data_list = result[1]
+                        if data_list and len(data_list) > 0:
+                            order_no_id_map[order_no] = data_list[0].get('Id')
+                            logger.info(f"找到订单: {order_no} -> Id={order_no_id_map[order_no]}")
+                            break
+                    result = None
+                
+                if order_no not in order_no_id_map:
+                    logger.warning(f"订单未找到: {order_no}")
             
             for order_no in order_nos:
                 order_id = order_no_id_map.get(order_no)
@@ -275,16 +338,39 @@ class OMSController:
             beijing_tz = pytz.timezone('Asia/Shanghai')
             current_time = datetime.now(beijing_tz)
             
-            # 先查询订单编码对应的Id
+            # 先查询订单编码或订单Id对应的Id
             order_no_id_map = {}
             for order_no in order_nos:
-                sql = "SELECT Id FROM tb_orderinfo WHERE OrderNo = %s AND Deleted=1 LIMIT 1"
-                result = await db_manager.execute_query(request.conn_id, sql, [order_no])
+                is_numeric = order_no.isdigit()
                 
-                if result and len(result) > 1 and result[1]:
-                    data_list = result[1]
-                    if data_list and len(data_list) > 0:
-                        order_no_id_map[order_no] = data_list[0].get('Id')
+                # 根据输入类型决定主查和备查
+                queries = []
+                if is_numeric:
+                    doc_id = int(order_no)
+                    queries = [
+                        ("SELECT Id FROM tb_orderinfo WHERE Id=%s AND Deleted=1 LIMIT 1", (doc_id,)),
+                        ("SELECT Id FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=1 LIMIT 1", (order_no,)),
+                    ]
+                else:
+                    queries = [
+                        ("SELECT Id FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=1 LIMIT 1", (order_no,)),
+                        ("SELECT Id FROM tb_orderinfo WHERE Id=%s AND Deleted=1 LIMIT 1", (order_no,)),
+                    ]
+                
+                # 按优先级逐条查询，找到第一个命中的就停
+                result = None
+                for sql, params in queries:
+                    result = await db_manager.execute_query(request.conn_id, sql, list(params))
+                    if result and len(result) > 1 and result[1]:
+                        data_list = result[1]
+                        if data_list and len(data_list) > 0:
+                            order_no_id_map[order_no] = data_list[0].get('Id')
+                            logger.info(f"找到订单: {order_no} -> Id={order_no_id_map[order_no]}")
+                            break
+                    result = None
+                
+                if order_no not in order_no_id_map:
+                    logger.warning(f"订单未找到: {order_no}")
             
             # 使用Id执行删除操作
             for order_no in order_nos:
