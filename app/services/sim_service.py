@@ -4,7 +4,6 @@ import csv
 import uuid
 import aiomysql
 from app.services.db_pool import db_pool
-from app.controllers.conn import conn_controller
 from app.settings.config import settings
 
 # SIM导入固定连接的Id（延迟获取，避免模块加载时Tortoise未初始化）
@@ -51,30 +50,7 @@ class SIMService:
 
     async def _ensure_pool(self) -> None:
         """确保连接池已注册"""
-        pool = db_pool.get_pool(await _get_sim_conn_id())
-        if pool is not None:
-            try:
-                if hasattr(pool, "closed") and pool.closed:
-                    pool = None
-                elif hasattr(pool, "_closed") and pool._closed:
-                    pool = None
-            except Exception:
-                pool = None
-        if pool is not None:
-            return
-        conn = await conn_controller.get_decrypted_connection(await _get_sim_conn_id())
-        if not conn:
-            raise ValueError("连接记录不存在或密码无法解密，请在连接管理重新保存密码")
-        await db_pool.register_pool(
-            conn_id=conn["id"],
-            db_type=conn["db_type"],
-            host=conn["host"],
-            port=conn["port"],
-            username=conn["username"],
-            password=conn["password"],
-            database=conn["database"],
-            params=conn["params"],
-        )
+        await db_pool.ensure_pool(await _get_sim_conn_id())
 
     async def _insert_rows(self, stamp: str, rows: List[Tuple[str, str]]) -> int:
         """批量写入临时表"""

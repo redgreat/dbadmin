@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 from app.schemas.base import Success, Fail
 from app.core.dependency import AuthControl
 from app.models.admin import User
 from app.utils.audit_log import create_operation_audit_log
-from app.services.simtrans import sim_trans_service
+from app.services.simtrans_task import get_simtrans_sync_status, submit_simtrans_sync
 
 router = APIRouter()
 
@@ -33,8 +33,8 @@ async def sync_sim_cards(req: Request, body: SyncRequest):
             user_id = 0
             username = ""
 
-        # 执行同步
-        result = await sim_trans_service.sync_sim_cards(body.receipt_numbers)
+        # 提交后台同步任务，避免大批量同步阻塞 HTTP 请求
+        result = await submit_simtrans_sync(body.receipt_numbers)
 
         # 记录审计日志
         try:
@@ -45,22 +45,27 @@ async def sync_sim_cards(req: Request, body: SyncRequest):
                 user_id=user_id,
                 username=username,
                 module="SIM",
-                summary=f"SIM卡同步: {receipt_count}个入库单, 结果: {result.get('message', '未知')}",
+                summary=f"提交SIM卡同步任务: {receipt_count}个入库单, task_id={result.get('task_id')}",
                 method="POST",
                 path="/api/v1/sim/simtrans/sync",
-                status=200 if result.get('success') else 400,
+                status=200,
                 request_body=body.model_dump(mode="json"),
                 response_body=result,
             )
         except Exception:
             pass
 
-        if result.get('success'):
-            return Success(data=result, msg=result.get('message', '同步成功'))
-        else:
-            return Fail(code=400, msg=result.get('message', '同步失败'), data=result)
+        return Success(data=result, msg=result.get('message', '同步任务已提交'))
 
     except ValueError as e:
         return Fail(code=400, msg=str(e))
     except Exception as e:
         return Fail(code=500, msg=f"同步失败: {str(e)}")
+
+
+@router.get("/sync/status", summary="查询SIM卡同步任务状态")
+async def get_sync_status(task_id: str = Query(..., description="同步任务ID")):
+    try:
+        return Success(data=get_simtrans_sync_status(task_id), msg="OK")
+    except Exception as e:
+        return Fail(code=500, msg=f"查询同步状态失败: {str(e)}")

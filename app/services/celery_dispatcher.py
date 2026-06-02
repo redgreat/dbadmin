@@ -75,5 +75,13 @@ def dispatch_notify_sql_alert(task_id: int) -> Optional[str]:
     return _safe_delay("dbadmin.notify.sql_alert", execute_sql_alert_task, task_id)
 
 
+def dispatch_simtrans_sync(receipt_numbers_text: str) -> Optional[str]:
+    if not settings.CELERY_ENABLED or not _has_active_worker():
+        return None
+    from app.tasks.celery_tasks import sync_simtrans_task
+
+    return _safe_delay("dbadmin.simtrans.sync", sync_simtrans_task, receipt_numbers_text)
+
+
 def fallback_async(coro):
     asyncio.create_task(coro)

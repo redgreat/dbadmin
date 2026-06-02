@@ -3,7 +3,6 @@ import aiomysql
 import logging
 
 from app.services.db_pool import db_pool
-from app.controllers.conn import conn_controller
 from app.settings.config import settings
 
 logger = logging.getLogger(__name__)
@@ -22,22 +21,7 @@ class OrderService:
 
     async def _ensure_pool(self) -> None:
         """确保连接池已注册"""
-        pool = db_pool.get_pool(await _get_conn_id())
-        if pool is not None:
-            return
-        conn = await conn_controller.get_decrypted_connection(await _get_conn_id())
-        if not conn:
-            raise ValueError("连接池不存在")
-        await db_pool.register_pool(
-            conn_id=conn["id"],
-            db_type=conn["db_type"],
-            host=conn["host"],
-            port=conn["port"],
-            username=conn["username"],
-            password=conn["password"],
-            database=conn["database"],
-            params=conn["params"],
-        )
+        await db_pool.ensure_pool(await _get_conn_id())
 
     async def fetch_audit_time_map(self, order_nos: List[str]) -> Dict:
         """根据订单编码或数字Id获取审核时间，返回详细的验证结果"""
