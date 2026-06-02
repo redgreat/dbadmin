@@ -82,6 +82,7 @@ import CrudTable from '@/components/table/CrudTable.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
 
 import api from '@/api'
+import { formatDateTime } from '@/utils'
 
 defineOptions({ name: '运维日志' })
 
@@ -93,13 +94,10 @@ const vPermission = resolveDirective('permission')
 const detailModalVisible = ref(false)
 const selectedOplogContent = ref({})
 
-// 格式化时间
-const formatDateTime = (timestamp) => {
-  if (!timestamp) return ''
-  if (typeof timestamp === 'number') {
-    return new Date(timestamp).toISOString().replace('T', ' ').slice(0, 19)
-  }
-  return timestamp
+const normalizeDateTime = (value) => {
+  if (!value) return ''
+  if (typeof value === 'number') return formatDateTime(value, 'YYYY-MM-DD HH:mm:ss')
+  return value
 }
 
 // 获取运维日志数据
@@ -107,10 +105,10 @@ const getData = async (params = {}) => {
   try {
     const queryParams = { ...params }
     if (queryParams.start_date && typeof queryParams.start_date === 'number') {
-      queryParams.start_date = formatDateTime(queryParams.start_date)
+      queryParams.start_date = normalizeDateTime(queryParams.start_date)
     }
     if (queryParams.end_date && typeof queryParams.end_date === 'number') {
-      queryParams.end_date = formatDateTime(queryParams.end_date)
+      queryParams.end_date = normalizeDateTime(queryParams.end_date)
     }
     
     const response = await api.getOpLogList(queryParams)
@@ -153,7 +151,7 @@ const columns = [
     key: 'final_modify_time', 
     width: 180,
     render(row) {
-      return formatDateTime(row.final_modify_time)
+      return normalizeDateTime(row.final_modify_time)
     }
   },
   { 
@@ -161,7 +159,7 @@ const columns = [
     key: 'created_at', 
     width: 180,
     render(row) {
-      return formatDateTime(row.created_at)
+      return normalizeDateTime(row.created_at)
     }
   },
   {

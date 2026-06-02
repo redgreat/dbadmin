@@ -107,6 +107,7 @@ import TheIcon from '@/components/icon/TheIcon.vue'
 
 import { useCRUD } from '@/composables'
 import api from '@/api'
+import { formatDateTime } from '@/utils'
 
 defineOptions({ name: '壹好车服' })
 
@@ -247,11 +248,19 @@ const {
     status: 1,
   },
   doCreate: (data) => {
-    console.log('创建数据', data)
+    const payload = { ...data }
+    if (payload.serviceTime && typeof payload.serviceTime === 'number') {
+      payload.serviceTime = formatDateTime(payload.serviceTime, 'YYYY-MM-DD HH:mm:ss')
+    }
+    console.log('创建数据', payload)
     return Promise.resolve()
   },
   doUpdate: (data) => {
-    console.log('更新数据', data)
+    const payload = { ...data }
+    if (payload.serviceTime && typeof payload.serviceTime === 'number') {
+      payload.serviceTime = formatDateTime(payload.serviceTime, 'YYYY-MM-DD HH:mm:ss')
+    }
+    console.log('更新数据', payload)
     return Promise.resolve()
   },
   doDelete: (id) => {

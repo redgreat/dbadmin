@@ -20,6 +20,7 @@ import { ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import api from '@/api'
+import dayjs from 'dayjs'
 
 defineOptions({ name: '订单审核时间修改' })
 
@@ -58,7 +59,8 @@ const handleExecute = async () => {
     .filter((s) => s.length)
   executing.value = true
   try {
-    const payload = { order_nos: ids, audit_time: form.value.auditTime }
+    const audit_time = dayjs(form.value.auditTime).tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')
+    const payload = { order_nos: ids, audit_time }
     const res = await api.updateOrdersAuditTimeBatch(payload)
     if (res.code === 200) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
