@@ -288,7 +288,7 @@ class SIMTransService:
         # ══════════════════════════════════════════════════════════
         # Step 1: 从 WMS_CONN 查询 whcenter 源数据
         # ══════════════════════════════════════════════════════════
-        wms_query = f"""
+        wms_query = """
             SELECT a.MaterialNo, a.OwnerId, a.StockStatus,
                    a.StockLocationId, a.StockLocationName, a.CustSettleId, a.CustSettleName,
                    a.ParentWarehouseId,
