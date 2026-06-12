@@ -30,24 +30,27 @@
           </n-form-item>
 
           <n-form-item label="密码长度">
-            <n-space align="center" style="width: 100%">
-              <n-slider
-                v-model:value="options.length"
-                :min="4"
-                :max="64"
-                :step="1"
-                style="flex: 1; max-width: 300px"
-              />
-              <n-input-number
-                v-model:value="options.length"
-                :min="4"
-                :max="64"
-                :step="1"
-                style="width: 100px"
-              >
-                <template #suffix>位</template>
-              </n-input-number>
-            </n-space>
+            <n-grid :cols="2" x-gap="12">
+              <n-grid-item>
+                <n-slider
+                  v-model:value="options.length"
+                  :min="4"
+                  :max="64"
+                  :step="1"
+                />
+              </n-grid-item>
+              <n-grid-item>
+                <n-input-number
+                  v-model:value="options.length"
+                  :min="4"
+                  :max="64"
+                  :step="1"
+                  style="width: 100px"
+                >
+                  <template #suffix>位</template>
+                </n-input-number>
+              </n-grid-item>
+            </n-grid>
           </n-form-item>
 
           <n-form-item label="密码数量">
@@ -366,9 +369,39 @@ function handleClearResult() {
   passwords.value = []
 }
 
+async function copyToClipboard(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.left = '-9999px'
+      textarea.style.top = '-9999px'
+      document.body.appendChild(textarea)
+      textarea.focus()
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    textarea.style.top = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+  }
+}
+
 async function handleCopyOne(text) {
   try {
-    await navigator.clipboard.writeText(text)
+    await copyToClipboard(text)
     message.success('已复制到剪贴板')
   } catch {
     message.error('复制失败，请手动复制')
@@ -378,7 +411,7 @@ async function handleCopyOne(text) {
 async function handleCopyAll() {
   const all = passwords.value.map(p => p.value).join('\n')
   try {
-    await navigator.clipboard.writeText(all)
+    await copyToClipboard(all)
     message.success('已复制全部密码到剪贴板')
   } catch {
     message.error('复制失败，请手动复制')
