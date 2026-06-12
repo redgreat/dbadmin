@@ -8,3 +8,4 @@ from .report import *
 from .dict import *
 from .alert import *
 from .task_notify import *
+from .password import *

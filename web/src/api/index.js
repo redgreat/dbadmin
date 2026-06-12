@@ -87,6 +87,10 @@ export default {
   getExcelProgress: (params) => request.get('/tool/excelimp/progress', { params }),
   // tool - formatter
   formatSql: (data) => request.post('/tool/formatter/format', data),
+  // tool - passwordgen
+  savePasswordHistory: (data) => request.post('/tool/passwordgen/save', data),
+  getPasswordHistory: (params = {}) => request.get('/tool/passwordgen/history', { params }),
+  deletePasswordHistory: (params = {}) => request.delete('/tool/passwordgen/history', { params }),
   // imptask - Excel导入任务
   getExcelImportTaskList: (params = {}) => request.get('/imptask/list', { params }),
   getExcelImportTaskDetail: (id) => request.get(`/imptask/detail/${id}`),

@@ -221,3 +221,75 @@ async def format_sql_statement(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"格式化SQL时出错: {str(e)}")
+
+
+@router.post("/passwordgen/save", summary="保存密码生成记录")
+async def save_password_history(
+    passwords: str = Form(...),
+    length: int = Form(...),
+    char_types: str = Form(""),
+    exclude_chars: str = Form(""),
+    count: int = Form(1),
+    current_user: User = DependAuth,
+):
+    from app.models.password import PasswordHistory
+    import json
+
+    try:
+        password_list = json.loads(passwords)
+        if not isinstance(password_list, list):
+            raise HTTPException(status_code=400, detail="passwords must be a JSON array")
+    except (json.JSONDecodeError, TypeError):
+        raise HTTPException(status_code=400, detail="passwords must be a valid JSON array")
+
+    try:
+        char_types_list = json.loads(char_types) if char_types else []
+    except (json.JSONDecodeError, TypeError):
+        char_types_list = []
+
+    records = []
+    for pwd in password_list:
+        record = await PasswordHistory.create(
+            password=pwd,
+            length=length,
+            char_types=char_types_list,
+            exclude_chars=exclude_chars,
+            count=count,
+        )
+        records.append(record)
+
+    return Success(data={"count": len(records)}, msg=f"已保存 {len(records)} 条密码记录")
+
+
+@router.get("/passwordgen/history", summary="获取密码生成历史")
+async def get_password_history(
+    page: int = Query(1, description="页码"),
+    page_size: int = Query(20, description="每页数量"),
+):
+    from app.models.password import PasswordHistory
+    from app.schemas.base import SuccessExtra
+
+    total = await PasswordHistory.all().count()
+    records = await PasswordHistory.all().order_by("-created_at").offset((page - 1) * page_size).limit(page_size)
+    data = [await r.to_dict() for r in records]
+
+    return SuccessExtra(data=data, total=total, page=page, page_size=page_size)
+
+
+@router.delete("/passwordgen/history", summary="删除密码生成历史")
+async def delete_password_history(
+    ids: str = Query("", description="要删除的记录ID，逗号分隔。为空则清空全部"),
+    current_user: User = DependAuth,
+):
+    from app.models.password import PasswordHistory
+
+    if ids.strip():
+        id_list = [int(x.strip()) for x in ids.split(",") if x.strip().isdigit()]
+        if id_list:
+            await PasswordHistory.filter(id__in=id_list).delete()
+            return Success(msg=f"已删除 {len(id_list)} 条记录")
+        return Success(msg="没有需要删除的记录")
+    else:
+        cnt = await PasswordHistory.all().count()
+        await PasswordHistory.all().delete()
+        return Success(msg=f"已清空全部 {cnt} 条历史记录")
