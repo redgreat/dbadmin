@@ -31,7 +31,7 @@
 
           <n-form-item label="密码长度">
             <n-grid :cols="2" x-gap="12">
-              <n-grid-item>
+              <n-grid-item style="padding-right: 16px">
                 <n-slider
                   v-model:value="options.length"
                   :min="4"
@@ -325,6 +325,37 @@ function generateSecureRandom(length, chars) {
     }
   }
 
+  if (options.value.specials) {
+    const specialPositions = []
+    for (let i = 0; i < result.length; i++) {
+      if (/[^a-zA-Z0-9]/.test(result[i])) {
+        specialPositions.push(i)
+      }
+    }
+
+    if (specialPositions.length > 2) {
+      let nonSpecialPool = ''
+      if (options.value.lowercase) nonSpecialPool += CHAR_SETS.lowercase
+      if (options.value.uppercase) nonSpecialPool += CHAR_SETS.uppercase
+      if (options.value.digits) nonSpecialPool += CHAR_SETS.digits
+      nonSpecialPool = [...nonSpecialPool]
+        .filter((c) => !new Set(options.value.excludeChars).has(c))
+        .join('')
+
+      if (nonSpecialPool.length > 0) {
+        for (let i = specialPositions.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1))
+          ;[specialPositions[i], specialPositions[j]] = [specialPositions[j], specialPositions[i]]
+        }
+        for (let i = 2; i < specialPositions.length; i++) {
+          const pos = specialPositions[i]
+          const newChar = nonSpecialPool[Math.floor(Math.random() * nonSpecialPool.length)]
+          result = result.substring(0, pos) + newChar + result.substring(pos + 1)
+        }
+      }
+    }
+  }
+
   return result
 }
 
@@ -370,32 +401,35 @@ function handleClearResult() {
 }
 
 async function copyToClipboard(text) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
       await navigator.clipboard.writeText(text)
-    } else {
-      const textarea = document.createElement('textarea')
-      textarea.value = text
-      textarea.style.position = 'fixed'
-      textarea.style.left = '-9999px'
-      textarea.style.top = '-9999px'
-      document.body.appendChild(textarea)
-      textarea.focus()
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
+      return
+    } catch (err) {
+      console.warn('Clipboard API failed, falling back', err)
     }
-  } catch {
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    textarea.style.position = 'fixed'
-    textarea.style.left = '-9999px'
-    textarea.style.top = '-9999px'
-    document.body.appendChild(textarea)
-    textarea.focus()
-    textarea.select()
-    document.execCommand('copy')
-    document.body.removeChild(textarea)
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'absolute'
+  textarea.style.left = '-9999px'
+  textarea.style.top = '0'
+  document.body.appendChild(textarea)
+
+  const selection = document.getSelection()
+  const range = document.createRange()
+  range.selectNodeContents(textarea)
+  selection.removeAllRanges()
+  selection.addRange(range)
+
+  const success = document.execCommand('copy')
+  document.body.removeChild(textarea)
+  selection.removeAllRanges()
+
+  if (!success) {
+    throw new Error('Copy command failed')
   }
 }
 
