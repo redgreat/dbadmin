@@ -1,4 +1,5 @@
 from fastapi.routing import APIRoute
+from tortoise import connections
 
 from app.core.crud import CRUDBase
 from app.log import logger
@@ -10,13 +11,32 @@ class ApiController(CRUDBase[Api, ApiCreate, ApiUpdate]):
     def __init__(self):
         super().__init__(model=Api)
 
+    async def sync_api_sequence(self):
+        """同步PostgreSQL自增序列，避免手工插入ID后刷新API主键冲突。"""
+        try:
+            conn = connections.get("default")
+            await conn.execute_query(
+                """
+                SELECT setval(
+                    pg_get_serial_sequence('"api"', 'id'),
+                    GREATEST(
+                        COALESCE((SELECT MAX(id) FROM "api"), 0),
+                        COALESCE((SELECT last_value FROM api_id_seq), 0)
+                    ),
+                    true
+                )
+                """
+            )
+        except Exception as e:
+            logger.debug(f"同步API序列跳过或失败: {e}")
+
     async def refresh_api(self):
         from app.main import app
 
         all_api_list = []
         for route in app.routes:
             if isinstance(route, APIRoute) and len(route.dependencies) > 0:
-                all_api_list.append((list(route.methods)[0], route.path_format))
+                all_api_list.append((sorted(route.methods)[0], route.path_format))
         delete_api = []
         for api in await Api.all():
             if (api.method, api.path) not in all_api_list:
@@ -26,9 +46,11 @@ class ApiController(CRUDBase[Api, ApiCreate, ApiUpdate]):
             logger.debug(f"API Deleted {method} {path}")
             await Api.filter(method=method, path=path).delete()
 
+        await self.sync_api_sequence()
+
         for route in app.routes:
             if isinstance(route, APIRoute) and len(route.dependencies) > 0:
-                method = list(route.methods)[0]
+                method = sorted(route.methods)[0]
                 path = route.path_format
                 summary = route.summary
                 tags = list(route.tags)[0]

@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, Body, Query
 from fastapi.routing import APIRoute
+from tortoise import connections
 
 from app.controllers.menu import menu_controller
 from app.controllers.api import api_controller
@@ -12,6 +13,42 @@ from app.schemas.menus import *
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def ensure_menu_api(menu_id: int, api_id: int) -> bool:
+    """确保菜单-API关系存在，返回是否新增。"""
+    exists = await MenuApi.filter(menu_id=menu_id, api_id=api_id).exists()
+    if exists:
+        return False
+    try:
+        await MenuApi.create(menu_id=menu_id, api_id=api_id)
+        return True
+    except Exception as e:
+        # 并发刷新或历史重复数据导致唯一约束命中时，不影响刷新流程。
+        if await MenuApi.filter(menu_id=menu_id, api_id=api_id).exists():
+            logger.debug(f"菜单-API关系已存在: menu_id={menu_id}, api_id={api_id}")
+            return False
+        raise e
+
+
+async def sync_menu_api_sequence():
+    """同步PostgreSQL菜单-API关系表序列，避免手工插入ID后刷新冲突。"""
+    try:
+        conn = connections.get("default")
+        await conn.execute_query(
+            """
+            SELECT setval(
+                pg_get_serial_sequence('menu_api', 'id'),
+                GREATEST(
+                    COALESCE((SELECT MAX(id) FROM menu_api), 0),
+                    COALESCE((SELECT last_value FROM menu_api_id_seq), 0)
+                ),
+                true
+            )
+            """
+        )
+    except Exception as e:
+        logger.debug(f"同步菜单-API序列跳过或失败: {e}")
 
 
 @router.get("/list", summary="查看菜单列表")
@@ -129,12 +166,13 @@ async def update_menu_apis(
     
     # 删除现有关联
     await MenuApi.filter(menu_id=menu_id).delete()
+    await sync_menu_api_sequence()
     
     # 添加新关联
-    for api_id in api_ids:
+    for api_id in set(api_ids):
         api = await Api.filter(id=api_id).first()
         if api:
-            await MenuApi.create(menu_id=menu_id, api_id=api_id)
+            await ensure_menu_api(menu_id, api_id)
     
     return Success(msg="更新成功")
 
@@ -181,6 +219,7 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
         # 1. 先刷新API表
         await api_controller.refresh_api()
         logger.info("API表刷新完成")
+        await sync_menu_api_sequence()
         
         # 2. 获取所有菜单（只处理menu类型，不处理catalog类型）
         menus = await Menu.filter(menu_type="menu")
@@ -236,8 +275,8 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
                     
                     new_api_ids = matched_api_ids - existing_api_ids
                     for api_id in new_api_ids:
-                        await MenuApi.create(menu_id=menu.id, api_id=api_id)
-                        new_count += 1
+                        if await ensure_menu_api(menu.id, api_id):
+                            new_count += 1
                     
                     if new_api_ids:
                         updated_count += 1
@@ -262,8 +301,8 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
                     
                     # 添加新关联
                     for api_id in new_api_ids:
-                        await MenuApi.create(menu_id=menu.id, api_id=api_id)
-                        new_count += 1
+                        if await ensure_menu_api(menu.id, api_id):
+                            new_count += 1
                     
                     # 删除不再匹配的关联（保留多菜单共用的）
                     for api_id in removed_api_ids:
@@ -278,8 +317,8 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
                 else:  # mode == "full"
                     # 完全刷新模式：直接添加所有关联
                     for api_id in matched_api_ids:
-                        await MenuApi.create(menu_id=menu.id, api_id=api_id)
-                        new_count += 1
+                        if await ensure_menu_api(menu.id, api_id):
+                            new_count += 1
                     updated_count += 1
                     logger.info(f"菜单 [{menu.name}] 关联了 {len(matched_api_ids)} 个API")
         
