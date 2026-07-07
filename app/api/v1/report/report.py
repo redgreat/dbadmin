@@ -3,6 +3,7 @@ import hmac
 import logging
 import os
 import time
+from datetime import datetime
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
@@ -246,11 +247,41 @@ async def generate_report(
     current_user: User = Depends(get_current_user)
 ):
     """触发生成报表（异步处理，立即返回）"""
-    # 立即返回响应，释放前端资源
-    import asyncio
-    asyncio.create_task(_generate_report_async(request, current_user))
+    try:
+        config = await ReportConfig.get_or_none(id=request.config_id)
+        if not config:
+            return Fail(code=404, msg="报表配置不存在")
 
-    return Success(msg="生成任务已提交，请稍后查看进度", data={"generation_id": None})
+        report_name = f"{config.report_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        generation = await ReportGeneration.create(
+            report_name=report_name,
+            report_config_id=config.id,
+            generator=current_user.username,
+            status="exporting",
+            progress=0,
+            progress_text="排队中",
+            exported_rows=0,
+            error_message=None,
+        )
+
+        celery_task_id = dispatch_report_export(generation.id)
+        if not celery_task_id:
+            import asyncio
+
+            generation.progress_text = "Celery不可用，已进入本地后台队列"
+            await generation.save(update_fields=["progress_text"])
+            asyncio.create_task(ExcelExportService().export_report(generation.id))
+            logger.info(f"使用本地异步任务处理报表生成: {report_name}, ID: {generation.id}")
+        else:
+            logger.info(f"使用Celery任务处理报表生成: {report_name}, ID: {generation.id}, task_id: {celery_task_id}")
+
+        return Success(
+            msg="生成任务已提交，请稍后查看进度",
+            data={"generation_id": generation.id, "celery_task_id": celery_task_id},
+        )
+    except Exception as e:
+        logger.error(f"提交报表生成失败: config_id={request.config_id}, user={current_user.username}, error={str(e)}", exc_info=True)
+        return Fail(code=500, msg=f"提交报表生成失败: {str(e)}")
 
 
 @router.get("/generation/list", summary="获取报表生成记录列表")

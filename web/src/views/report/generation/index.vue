@@ -34,7 +34,7 @@
 </template>
 
 <script setup>
-import { h, ref, computed, onMounted } from 'vue'
+import { h, ref, computed, onBeforeUnmount, onMounted } from 'vue'
 import { NButton, NTag, NSpace, NIcon, useMessage, useDialog } from 'naive-ui'
 import { useUserStore } from '@/store'
 
@@ -53,6 +53,7 @@ const queryItems = ref({})
 const $message = useMessage()
 const $dialog = useDialog()
 const userStore = useUserStore()
+const refreshTimer = ref(null)
 
 // 判断是否为管理员（超级管理员或拥有admin角色）
 const isAdmin = computed(() => userStore.isSuperUser || userStore.role?.includes('admin'))
@@ -184,6 +185,7 @@ const getData = async (params) => {
   try {
     const res = await api.getReportGenerationList(params)
     if (res.code === 200) {
+      scheduleAutoRefresh(res.data || [])
       return { data: res.data, total: res.total }
     } else {
       $message.error(res.msg || '获取数据失败')
@@ -193,6 +195,18 @@ const getData = async (params) => {
     console.error('获取报表生成列表失败', error)
     $message.error('获取数据失败')
     return { data: [], total: 0 }
+  }
+}
+
+const scheduleAutoRefresh = (items) => {
+  if (refreshTimer.value) {
+    clearTimeout(refreshTimer.value)
+    refreshTimer.value = null
+  }
+  if ((items || []).some((item) => item.status === 'exporting')) {
+    refreshTimer.value = setTimeout(() => {
+      $table.value?.handleSearch()
+    }, 3000)
   }
 }
 
@@ -311,6 +325,12 @@ onMounted(() => {
   loadSystemNameOptions()
   // 首次加载数据
   $table.value?.handleSearch()
+})
+
+onBeforeUnmount(() => {
+  if (refreshTimer.value) {
+    clearTimeout(refreshTimer.value)
+  }
 })
 </script>
 

@@ -70,7 +70,7 @@
 </template>
 
 <script setup>
-import { h, onMounted, ref, watch, computed } from 'vue'
+import { h, onBeforeUnmount, onMounted, ref, watch, computed } from 'vue'
 import { NButton, NTag, NSpace, NProgress, useMessage, NPopconfirm } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
@@ -91,6 +91,7 @@ const userStore = useUserStore()
 
 const isAdmin = computed(() => userStore.isSuperUser || userStore.role.includes('admin'))
 const $table = ref(null)
+const refreshTimer = ref(null)
 
 const queryItems = ref({ task_name: null })
 const connOptions = ref([])
@@ -138,6 +139,7 @@ const columns = [
     render: (row) => {
       const map = {
         pending: { text: '未执行', type: 'default' },
+        processing: { text: '执行中', type: 'info' },
         success: { text: '成功', type: 'success' },
         failed: { text: '失败', type: 'error' },
       }
@@ -163,6 +165,7 @@ const columns = [
     },
   },
   { title: '消息', key: 'message', width: 180, ellipsis: { tooltip: true } },
+  { title: '执行消息', key: 'execute_message', width: 220, ellipsis: { tooltip: true } },
   { title: '创建时间', key: 'created_at', width: 180 },
   {
     title: '操作',
@@ -180,7 +183,7 @@ const columns = [
             { default: () => '下载SQL' }
           )
         )
-        if (row.target_conn_id) {
+        if (row.target_conn_id && row.execute_status !== 'processing') {
           buttons.push(
             h(
               NButton,
@@ -216,7 +219,26 @@ const getData = async (params) => {
     page_size: params.page_size,
     task_name: queryItems.value.task_name,
   })
+  scheduleAutoRefresh(res.data.items || [])
   return { data: res.data.items, total: res.data.total }
+}
+
+const scheduleAutoRefresh = (items) => {
+  if (refreshTimer.value) {
+    clearTimeout(refreshTimer.value)
+    refreshTimer.value = null
+  }
+  const hasRunning = items.some(
+    (item) =>
+      item.status === 'pending' ||
+      item.status === 'processing' ||
+      item.execute_status === 'processing'
+  )
+  if (hasRunning) {
+    refreshTimer.value = setTimeout(() => {
+      $table.value?.handleSearch()
+    }, 3000)
+  }
 }
 
 const { modalVisible, modalLoading, modalForm, modalFormRef, handleAdd, handleDelete } = useCRUD({
@@ -345,12 +367,18 @@ const handleExecuteImport = async (row) => {
       message.error(res.msg || '执行失败')
       return
     }
-    message.success(res.msg || '执行成功')
+    message.success(res.msg || '导入执行任务已提交')
     handleRefresh()
   } catch {
     // 全局请求拦截器已弹出错误，避免重复提示
   }
 }
+
+onBeforeUnmount(() => {
+  if (refreshTimer.value) {
+    clearTimeout(refreshTimer.value)
+  }
+})
 
 const formatFileSize = (bytes) => {
   if (!bytes) return '0 B'

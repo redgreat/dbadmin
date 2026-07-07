@@ -13,6 +13,7 @@ from .tasks import tasks_router
 from .users import users_router
 from .oplog import oplog_router
 from .oms import oms_router
+from .oa import oa_router
 from .sim import sim_router
 from .tool import tool_router
 from .imptask import router as imptask_router
@@ -35,6 +36,7 @@ v1_router.include_router(conns_router, prefix="/conn", tags=["连接管理"], de
 v1_router.include_router(dicts_router, prefix="/dict", tags=["字典管理"], dependencies=[DependPermisson])
 v1_router.include_router(oplog_router, prefix="/oplog", tags=["运维日志"], dependencies=[DependPermisson])
 v1_router.include_router(oms_router, prefix="/oms", tags=["订单中心"], dependencies=[DependPermisson])
+v1_router.include_router(oa_router, prefix="/oa", tags=["OA运维"], dependencies=[DependPermisson])
 v1_router.include_router(sim_router, prefix="/sim", tags=["SIM卡中心"], dependencies=[DependPermisson])
 v1_router.include_router(tool_router, prefix="/tool", tags=["日常工具"], dependencies=[DependPermisson])
 # report下载接口 - 单独注册，不需要权限验证（在接口内部验证token/签名）

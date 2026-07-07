@@ -5,13 +5,36 @@ from io import BytesIO
 from datetime import datetime, date
 from typing import List, Tuple, Any, Literal, Dict, Optional
 import hashlib
+import json
+import os
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
 from pypinyin import lazy_pinyin, Style
 import uuid
 
+from app.services.sql_apply_service import execute_sql_on_connection
+
 # 进度存储
 _PROGRESS: Dict[str, Dict[str, Any]] = {}
+EXCELIMP_TASK_DIR = "data/excelimp_tasks"
+os.makedirs(EXCELIMP_TASK_DIR, exist_ok=True)
+
+
+def _progress_path(stamp: str) -> str:
+    return os.path.join(EXCELIMP_TASK_DIR, f"{stamp}.json")
+
+
+def _sql_path(stamp: str) -> str:
+    return os.path.join(EXCELIMP_TASK_DIR, f"{stamp}.sql")
+
+
+def _persist_progress(stamp: str):
+    data = _PROGRESS.get(stamp)
+    if not data:
+        return
+    safe_data = {k: v for k, v in data.items() if k != "sql"}
+    with open(_progress_path(stamp), "w", encoding="utf-8") as f:
+        json.dump(safe_data, f, ensure_ascii=False, default=str)
 
 
 def _progress_start(stamp: str, filename: str):
@@ -24,13 +47,16 @@ def _progress_start(stamp: str, filename: str):
         "message": "开始解析Excel文件",
         "success": False,
         "sql": None,
+        "sql_file_path": None,
     }
+    _persist_progress(stamp)
 
 
 def _progress_update(stamp: str, **kwargs):
     """更新进度"""
     if stamp in _PROGRESS:
         _PROGRESS[stamp].update(kwargs)
+        _persist_progress(stamp)
 
 
 def _progress_fail(stamp: str, message: str):
@@ -40,19 +66,35 @@ def _progress_fail(stamp: str, message: str):
 
 def _progress_done(stamp: str, sql: str):
     """完成"""
+    sql_file = _sql_path(stamp)
+    with open(sql_file, "w", encoding="utf-8") as f:
+        f.write(sql)
     _progress_update(
         stamp,
         stage="done",
         message="SQL生成完成",
         success=True,
-        sql=sql,
+        sql=None,
+        sql_file_path=sql_file,
         sql_sha256=hashlib.sha256(sql.encode("utf-8")).hexdigest(),
     )
 
 
 def get_progress(stamp: str) -> Dict[str, Any]:
     """获取进度"""
-    return _PROGRESS.get(stamp, {"stage": "", "message": ""})
+    if stamp not in _PROGRESS and os.path.exists(_progress_path(stamp)):
+        try:
+            with open(_progress_path(stamp), "r", encoding="utf-8") as f:
+                _PROGRESS[stamp] = json.load(f)
+        except Exception:
+            pass
+
+    data = dict(_PROGRESS.get(stamp, {"stage": "", "message": ""}))
+    sql_file = data.get("sql_file_path") or _sql_path(stamp)
+    if data.get("stage") == "done" and os.path.exists(sql_file):
+        with open(sql_file, "r", encoding="utf-8") as f:
+            data["sql"] = f.read()
+    return data
 
 
 async def submit_and_generate(
@@ -85,6 +127,77 @@ async def submit_and_generate(
         _progress_fail(stamp, str(e))
 
     return stamp
+
+
+def generate_sql_file_task(
+    file_path: str,
+    filename: str,
+    db_type: Literal["mysql", "postgresql"],
+    stamp: str,
+) -> Dict[str, Any]:
+    """后台生成Excel临时表SQL，状态和结果均落盘，便于跨进程查询。"""
+    _progress_start(stamp, filename)
+    try:
+        _progress_update(stamp, stage="parsing", message="正在解析Excel文件...")
+        sql_file = _sql_path(stamp)
+        _progress_update(stamp, stage="generating", message="正在生成SQL文件...")
+        meta = generate_sql_file_from_excel(file_path, filename, db_type, sql_file)
+        _progress_update(
+            stamp,
+            stage="done",
+            message="SQL生成完成",
+            success=True,
+            sql_file_path=sql_file,
+            sql_sha256=meta["sql_sha256"],
+            row_count=meta.get("row_count"),
+            table_name=meta.get("table_name"),
+        )
+        return get_progress(stamp)
+    except Exception as exc:
+        _progress_fail(stamp, str(exc))
+        raise
+
+
+async def execute_sql_file_task(stamp: str, target_conn_id: int) -> Dict[str, Any]:
+    """后台执行Excel临时表SQL，并把执行状态写入同一个进度文件。"""
+    data = get_progress(stamp)
+    sql_file = data.get("sql_file_path") or _sql_path(stamp)
+    if data.get("stage") != "done" or not os.path.exists(sql_file):
+        raise ValueError("SQL生成任务未完成或SQL文件不存在")
+
+    _progress_update(
+        stamp,
+        execute_status="processing",
+        execute_message="导入执行已进入后台",
+    )
+    with open(sql_file, "r", encoding="utf-8") as f:
+        sql_text = f.read()
+
+    async def progress_cb(done: int, total: int, _stmt: str):
+        _progress_update(
+            stamp,
+            execute_status="processing",
+            execute_message=f"导入执行中: 已执行 {done}/{total} 条SQL",
+            execute_done=done,
+            execute_total=total,
+        )
+
+    try:
+        result = await execute_sql_on_connection(target_conn_id, sql_text, progress_cb=progress_cb)
+        _progress_update(
+            stamp,
+            execute_status="success",
+            execute_message=f"执行成功，共执行 {result['executed_count']} 条语句",
+            execute_result=result,
+        )
+        return get_progress(stamp)
+    except Exception as exc:
+        _progress_update(
+            stamp,
+            execute_status="failed",
+            execute_message=str(exc),
+        )
+        raise
 
 
 def generate_sql(content: bytes, filename: str, db_type: Literal["mysql", "postgresql"]) -> str:
@@ -140,6 +253,181 @@ def generate_sql(content: bytes, filename: str, db_type: Literal["mysql", "postg
         f"-- DB_TYPE:{db_type}\n"
         f"{create_table_sql}\n\n{insert_sql}\n\n{index_sql}"
     )
+
+
+def generate_sql_file_from_excel(
+    excel_path: str,
+    filename: str,
+    db_type: Literal["mysql", "postgresql"],
+    sql_file_path: str,
+    batch_size: int = 500,
+) -> Dict[str, Any]:
+    """从Excel文件流式生成SQL文件，避免大文件导入时占用过多内存。"""
+
+    columns, field_names, primary_key_name, field_types, row_count = _analyze_excel_file(
+        excel_path,
+        db_type,
+    )
+    if not columns:
+        raise ValueError("Excel文件中没有找到列名（第一行）")
+    if row_count <= 0:
+        raise ValueError("Excel文件中没有找到数据行")
+
+    table_name = _generate_table_name()
+    create_table_sql = _generate_create_table(table_name, field_names, field_types, db_type, primary_key_name)
+    index_sql = _generate_index_statements(table_name, field_names, db_type, primary_key_name)
+
+    sha = hashlib.sha256()
+
+    def write_sql(file_obj, text: str):
+        file_obj.write(text)
+        sha.update(text.encode("utf-8"))
+
+    with open(sql_file_path, "w", encoding="utf-8") as sql_file:
+        write_sql(sql_file, f"-- GENERATED_BY:EXCELIMP\n")
+        write_sql(sql_file, f"-- SOURCE_FILE:{filename}\n")
+        write_sql(sql_file, f"-- DB_TYPE:{db_type}\n")
+        write_sql(sql_file, f"{create_table_sql}\n\n")
+
+        workbook = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
+        try:
+            sheet = workbook.active
+            batch = []
+            first = True
+            for row in sheet.iter_rows(values_only=True):
+                if first:
+                    first = False
+                    continue
+                normalized = _normalize_data_row(row, len(field_names))
+                if _is_empty_row(normalized):
+                    continue
+                batch.append(normalized)
+                if len(batch) >= batch_size:
+                    write_sql(sql_file, _generate_insert_statements(table_name, field_names, batch, db_type, batch_size))
+                    write_sql(sql_file, "\n\n")
+                    batch = []
+            if batch:
+                write_sql(sql_file, _generate_insert_statements(table_name, field_names, batch, db_type, batch_size))
+                write_sql(sql_file, "\n\n")
+        finally:
+            workbook.close()
+
+        write_sql(sql_file, index_sql)
+
+    return {
+        "table_name": table_name,
+        "row_count": row_count,
+        "sql_sha256": sha.hexdigest(),
+    }
+
+
+def _analyze_excel_file(
+    excel_path: str,
+    db_type: Literal["mysql", "postgresql"],
+) -> Tuple[List[str], List[str], str, List[str], int]:
+    workbook = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
+    try:
+        sheet = workbook.active
+        row_iter = sheet.iter_rows(values_only=True)
+        try:
+            header = next(row_iter)
+        except StopIteration:
+            return [], [], "id", [], 0
+
+        columns = [str(cell) if cell is not None else f"column_{i+1}" for i, cell in enumerate(header)]
+        field_names, primary_key_name = _generate_field_names(columns)
+        stats = [_new_type_stats() for _ in field_names]
+        row_count = 0
+
+        for row in row_iter:
+            normalized = _normalize_data_row(row, len(field_names))
+            if _is_empty_row(normalized):
+                continue
+            row_count += 1
+            for idx, val in enumerate(normalized):
+                _update_type_stats(stats[idx], val)
+
+        field_types = [_stats_to_field_type(stat, db_type) for stat in stats]
+        return columns, field_names, primary_key_name, field_types, row_count
+    finally:
+        workbook.close()
+
+
+def _normalize_data_row(row: Tuple[Any, ...], width: int) -> List[Any]:
+    values = list(row or [])
+    values = values + [None] * (width - len(values))
+    return values[:width]
+
+
+def _is_empty_row(row: List[Any]) -> bool:
+    return all(cell is None or str(cell).strip() == "" for cell in row)
+
+
+def _new_type_stats() -> Dict[str, Any]:
+    return {
+        "has_int": False,
+        "has_float": False,
+        "has_date": False,
+        "has_datetime": False,
+        "has_string": False,
+        "has_bool": False,
+        "max_int_value": 0,
+        "max_str_length": 0,
+    }
+
+
+def _update_type_stats(stat: Dict[str, Any], val: Any):
+    if val is None:
+        return
+    if isinstance(val, bool):
+        stat["has_bool"] = True
+    elif isinstance(val, datetime):
+        stat["has_datetime"] = True
+    elif isinstance(val, date):
+        stat["has_date"] = True
+    elif isinstance(val, int):
+        stat["has_int"] = True
+        stat["max_int_value"] = max(stat["max_int_value"], abs(val))
+    elif isinstance(val, float):
+        stat["has_float"] = True
+    elif isinstance(val, str):
+        parsed_date = _try_parse_date(val)
+        if parsed_date:
+            if isinstance(parsed_date, datetime):
+                stat["has_datetime"] = True
+            else:
+                stat["has_date"] = True
+        else:
+            stat["has_string"] = True
+            stat["max_str_length"] = max(stat["max_str_length"], len(val))
+    else:
+        stat["has_string"] = True
+        stat["max_str_length"] = max(stat["max_str_length"], len(str(val)))
+
+
+def _stats_to_field_type(stat: Dict[str, Any], db_type: Literal["mysql", "postgresql"]) -> str:
+    if stat["has_datetime"]:
+        return "DATETIME" if db_type == "mysql" else "TIMESTAMP"
+    if stat["has_date"] and not stat["has_string"]:
+        return "DATE"
+    if stat["has_string"] or stat["has_bool"]:
+        max_str_length = stat["max_str_length"]
+        if stat["has_int"] or stat["has_float"] or stat["has_date"] or stat["has_datetime"]:
+            max_str_length = max(max_str_length, 50)
+        if max_str_length == 0:
+            max_str_length = 255
+        elif max_str_length < 255:
+            max_str_length = min(max_str_length * 2, 255)
+        if max_str_length > 1000:
+            return "TEXT"
+        return f"VARCHAR({max_str_length})"
+    if stat["has_float"]:
+        return "DECIMAL(18,2)"
+    if stat["has_int"]:
+        if stat["max_int_value"] < 2147483647:
+            return "INT"
+        return "BIGINT"
+    return "VARCHAR(255)"
 
 
 def _parse_sheet(sheet: Worksheet) -> Tuple[List[str], List[List[Any]]]:

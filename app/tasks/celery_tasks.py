@@ -2,18 +2,121 @@ from app.core.celery_app import celery_app
 from app.core.celery_runtime import run_async_with_tortoise
 
 
-@celery_app.task(name="dbadmin.report.export", time_limit=7200, soft_time_limit=6300)
-def export_report_task(generation_id: int):
-    from app.services.excel_export_service import ExcelExportService
+@celery_app.task(
+    name="dbadmin.report.export",
+    bind=True,
+    ignore_result=False,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=12,
+)
+def export_report_task(self, generation_id: int):
+    from app.services.excel_export_service import ExcelExportService, RetryableReportError
 
-    return run_async_with_tortoise(ExcelExportService().export_report, generation_id)
+    try:
+        return run_async_with_tortoise(ExcelExportService().export_report, generation_id, True)
+    except RetryableReportError as exc:
+        countdown = _retry_countdown(self.request.retries)
+        if self.request.retries >= self.max_retries:
+            run_async_with_tortoise(ExcelExportService().mark_retry_exhausted, generation_id, str(exc))
+            raise
+        raise self.retry(exc=exc, countdown=countdown)
 
 
-@celery_app.task(name="dbadmin.imptask.process")
-def process_imptask_task(task_id: int):
-    from app.services.imptask_processor import process_imptask
+def _retry_countdown(retries: int) -> int:
+    return min(300, 15 * (2 ** retries))
 
-    return run_async_with_tortoise(process_imptask, task_id)
+
+@celery_app.task(
+    name="dbadmin.imptask.process",
+    bind=True,
+    ignore_result=False,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=12,
+)
+def process_imptask_task(self, task_id: int):
+    from app.services.imptask_processor import (
+        RetryableImportError,
+        mark_imptask_retry_exhausted,
+        process_imptask,
+    )
+
+    try:
+        return run_async_with_tortoise(process_imptask, task_id, True)
+    except RetryableImportError as exc:
+        countdown = _retry_countdown(self.request.retries)
+        if self.request.retries >= self.max_retries:
+            run_async_with_tortoise(mark_imptask_retry_exhausted, task_id, str(exc))
+            raise
+        raise self.retry(exc=exc, countdown=countdown)
+
+
+@celery_app.task(
+    name="dbadmin.imptask.execute",
+    bind=True,
+    ignore_result=False,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=12,
+)
+def execute_imptask_sql_task(self, task_id: int, user_id: int, username: str):
+    from app.services.imptask_processor import (
+        RetryableImportError,
+        execute_imptask_sql,
+        mark_imptask_execute_retry_exhausted,
+    )
+
+    try:
+        return run_async_with_tortoise(execute_imptask_sql, task_id, user_id, username, True)
+    except RetryableImportError as exc:
+        countdown = _retry_countdown(self.request.retries)
+        if self.request.retries >= self.max_retries:
+            run_async_with_tortoise(mark_imptask_execute_retry_exhausted, task_id, str(exc))
+            raise
+        raise self.retry(exc=exc, countdown=countdown)
+
+
+@celery_app.task(
+    name="dbadmin.excelimp.generate",
+    bind=True,
+    ignore_result=False,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=12,
+)
+def generate_excelimp_sql_task(self, file_path: str, filename: str, db_type: str, stamp: str):
+    from app.services.excelimp_service import generate_sql_file_task
+    from app.services.imptask_processor import RetryableImportError
+
+    try:
+        return generate_sql_file_task(file_path, filename, db_type, stamp)
+    except (MemoryError, OSError, TimeoutError, ConnectionError) as exc:
+        countdown = _retry_countdown(self.request.retries)
+        if self.request.retries >= self.max_retries:
+            raise
+        raise self.retry(exc=RetryableImportError(str(exc)), countdown=countdown)
+
+
+@celery_app.task(
+    name="dbadmin.excelimp.execute",
+    bind=True,
+    ignore_result=False,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=12,
+)
+def execute_excelimp_sql_task(self, stamp: str, target_conn_id: int):
+    from app.services.excelimp_service import execute_sql_file_task
+    from app.services.imptask_processor import RetryableImportError
+
+    try:
+        return run_async_with_tortoise(execute_sql_file_task, stamp, target_conn_id)
+    except (MemoryError, OSError, TimeoutError, ConnectionError) as exc:
+        countdown = _retry_countdown(self.request.retries)
+        if self.request.retries >= self.max_retries:
+            raise
+        raise self.retry(exc=RetryableImportError(str(exc)), countdown=countdown)
 
 
 @celery_app.task(name="dbadmin.notify.report_send")

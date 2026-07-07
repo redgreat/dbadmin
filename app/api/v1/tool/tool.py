@@ -1,17 +1,19 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from typing import Literal
 import asyncio
+import os
 import uuid
 from typing import Optional
 
 from app.schemas.base import Success
-from app.services.excelimp_service import generate_sql, submit_and_generate, get_progress
+from app.services.excelimp_service import EXCELIMP_TASK_DIR, generate_sql, generate_sql_file_task, get_progress
 from app.services.formatter_service import format_sql
 from app.models.admin import User
 from app.utils.audit_log import create_operation_audit_log
 from app.core.dependency import DependAuth
 from app.controllers.conn import conn_controller
 from app.services.conn_permission_service import ensure_conn_access
+from app.services.celery_dispatcher import dispatch_excelimp_generate
 
 router = APIRouter(tags=["日常工具"])
 
@@ -130,19 +132,22 @@ async def submit_excel_sql(
         elif db_type not in ("mysql", "postgresql"):
             db_type = "mysql"
         
-        # 生成任务标识
+        # 生成任务标识并保存上传文件，避免后台任务依赖请求内存
         file_key = str(uuid.uuid4())
+        file_ext = file.filename.split(".")[-1].lower()
+        file_path = os.path.join(EXCELIMP_TASK_DIR, f"{file_key}.{file_ext}")
+        with open(file_path, "wb") as f:
+            f.write(content)
         
-        # 启动后台任务
-        async def _runner():
-            try:
-                await submit_and_generate(
-                    content, file.filename, db_type, stamp=file_key
-                )
-            except Exception:
-                return
-        
-        asyncio.create_task(_runner())
+        celery_task_id = dispatch_excelimp_generate(file_path, file.filename, db_type, file_key)
+        if not celery_task_id:
+            async def _runner():
+                try:
+                    await asyncio.to_thread(generate_sql_file_task, file_path, file.filename, db_type, file_key)
+                except Exception:
+                    return
+
+            asyncio.create_task(_runner())
         
         # 记录审计日志
         try:

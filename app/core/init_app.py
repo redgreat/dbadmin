@@ -23,7 +23,7 @@ from app.core.exceptions import (
     ResponseValidationHandle,
 )
 from app.log import logger
-from app.models.admin import Api, Menu, Role
+from app.models.admin import Api, Menu, MenuApi, Role
 from app.schemas.menus import MenuType
 from app.services.task_scheduler import scheduler
 from app.settings.config import settings
@@ -142,10 +142,58 @@ async def init_menus():
                 "========================================"
             )
             return False
+        await ensure_oa_menus()
         return True
     except Exception as e:
         logger.error(f"检查菜单表失败: {e}", exc_info=True)
         return False
+
+
+async def ensure_oa_menus():
+    """确保OA运维菜单存在"""
+    parent = await Menu.get_or_none(path="/oa", parent_id=0)
+    if not parent:
+        parent = await Menu.create(
+            name="OA运维",
+            menu_type=MenuType.CATALOG.value,
+            icon="material-symbols:engineering-outline",
+            path="/oa",
+            order=60,
+            parent_id=0,
+            is_hidden=False,
+            component="/oa",
+            keepalive=True,
+        )
+
+    child = await Menu.get_or_none(path="positive-time", parent_id=parent.id)
+    if not child:
+        child = await Menu.create(
+            name="转正时间修改",
+            menu_type=MenuType.MENU.value,
+            icon="mdi:calendar-edit-outline",
+            path="positive-time",
+            order=1,
+            parent_id=parent.id,
+            is_hidden=False,
+            component="/oa/positive-time",
+            keepalive=True,
+        )
+
+    admin_role = await Role.get_or_none(name="管理员")
+    if admin_role:
+        await admin_role.menus.add(parent, child)
+
+    api_specs = [
+        ("POST", "/api/v1/oa/positive-time/validate", "验证转正时间"),
+        ("POST", "/api/v1/oa/positive-time/execute", "修改转正时间"),
+    ]
+    for method, path, summary in api_specs:
+        api_obj = await Api.filter(method=method, path=path).first()
+        if not api_obj:
+            api_obj = await Api.create(method=method, path=path, summary=summary, tags="OA运维")
+        relation_exists = await MenuApi.filter(menu_id=child.id, api_id=api_obj.id).exists()
+        if not relation_exists:
+            await MenuApi.create(menu_id=child.id, api_id=api_obj.id)
 
 async def init_apis():
     apis = await api_controller.model.exists()

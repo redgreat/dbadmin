@@ -1,5 +1,5 @@
 import hashlib
-from typing import List
+from typing import Awaitable, Callable, List, Optional
 
 import aiomysql
 import asyncpg
@@ -59,7 +59,14 @@ def validate_excel_generated_sql(sql_text: str) -> List[str]:
     return [s for s in statements if _strip_leading_comments(s)]
 
 
-async def execute_sql_on_connection(conn_id: int, sql_text: str) -> dict:
+ProgressCallback = Callable[[int, int, str], Awaitable[None]]
+
+
+async def execute_sql_on_connection(
+    conn_id: int,
+    sql_text: str,
+    progress_cb: Optional[ProgressCallback] = None,
+) -> dict:
     conn_info = await conn_controller.get_decrypted_connection(conn_id)
     if not conn_info:
         raise ValueError("目标连接不存在或密码不可用")
@@ -67,6 +74,7 @@ async def execute_sql_on_connection(conn_id: int, sql_text: str) -> dict:
     statements = validate_excel_generated_sql(sql_text)
     db_type = conn_info["db_type"]
     executed = 0
+    total = len(statements)
 
     if db_type == "mysql":
         conn = await aiomysql.connect(
@@ -83,6 +91,8 @@ async def execute_sql_on_connection(conn_id: int, sql_text: str) -> dict:
                 for stmt in statements:
                     await cur.execute(stmt)
                     executed += 1
+                    if progress_cb:
+                        await progress_cb(executed, total, stmt)
             await conn.commit()
         except Exception:
             await conn.rollback()
@@ -102,6 +112,8 @@ async def execute_sql_on_connection(conn_id: int, sql_text: str) -> dict:
                 for stmt in statements:
                     await conn.execute(stmt)
                     executed += 1
+                    if progress_cb:
+                        await progress_cb(executed, total, stmt)
         finally:
             await conn.close()
     else:

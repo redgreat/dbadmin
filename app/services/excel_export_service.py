@@ -15,9 +15,14 @@ from app.models.report import ReportGeneration, ReportConfig
 from app.models.conn import DBConnection
 from app.services.sql_execution_service import SQLExecutionService
 from app.services.oss_service import oss_service
+from app.services.db_pool import is_connection_error
 from app.log import logger
 from app.core.config_loader import config
 from app.settings import settings
+
+
+class RetryableReportError(Exception):
+    """报表导出可自动重试的临时错误。"""
 
 
 class ExcelExportService:
@@ -32,7 +37,7 @@ class ExcelExportService:
     STREAM_FULL_STYLE_MAX_ROWS = config.report.stream_full_style_max_rows
     ZIP_THRESHOLD_BYTES = 10 * 1024 * 1024  # 单文件超过10MB则压缩
 
-    async def export_report(self, generation_id: int):
+    async def export_report(self, generation_id: int, raise_retryable: bool = False):
         """
         导出报表主流程
         :param generation_id: 报表生成记录ID
@@ -154,13 +159,34 @@ class ExcelExportService:
             logger.error(f"报表导出失败: {str(e)}", exc_info=True)
             if generation:
                 try:
+                    if raise_retryable and self._is_retryable_error(e):
+                        generation.status = "exporting"
+                        generation.progress_text = f"遇到临时错误，等待自动重试: {str(e)[:120]}"
+                        generation.error_message = str(e)
+                        await generation.save(update_fields=["status", "progress_text", "error_message"])
+                        raise RetryableReportError(str(e)) from e
                     await self._update_generation_status(
                         generation,
                         "failed",
                         error_msg=str(e)
                     )
                 except Exception as update_error:
+                    if isinstance(update_error, RetryableReportError):
+                        raise
                     logger.error(f"更新状态失败: {str(update_error)}")
+
+    def _is_retryable_error(self, exc: Exception) -> bool:
+        return isinstance(exc, (MemoryError, OSError, TimeoutError, ConnectionError)) or is_connection_error(exc)
+
+    async def mark_retry_exhausted(self, generation_id: int, error_message: str):
+        generation = await ReportGeneration.get_or_none(id=generation_id)
+        if not generation:
+            return
+        await self._update_generation_status(
+            generation,
+            "failed",
+            error_msg=f"自动重试已耗尽: {error_message}",
+        )
 
     async def _execute_export(
         self,

@@ -57,6 +57,9 @@ export default {
   restoreOrderLogical: (data = {}) => request.post('/oms/orders/restore_logical', data),
   validateOrders: (data = {}) => request.post('/oms/validate-orders', data),
   batchUpdateAuditTime: (data = {}) => request.post('/oms/batch-update-audit-time', data),
+  // oa - 转正时间修改
+  validateOaPositiveTime: (data = {}) => request.post('/oa/positive-time/validate', data),
+  executeOaPositiveTime: (data = {}) => request.post('/oa/positive-time/execute', data),
   
   // oms 订单删除相关API
   validateOrdersForDelete: (data) => request.post('/oms/validate-orders-for-delete', data),

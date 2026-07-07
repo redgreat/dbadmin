@@ -12,13 +12,14 @@ from fastapi.responses import FileResponse
 from app.schemas.base import Success
 from app.schemas.imptask import ImpTaskOut
 from app.controllers.imptask import imptask_controller
-from app.services.imptask_processor import submit_imptask
+from app.services.imptask_processor import submit_imptask, submit_imptask_execute
 from app.models.admin import User
 from app.core.dependency import DependAuth
 from app.controllers.conn import conn_controller
 from app.services.excelimp_service import get_progress
 from app.services.sql_apply_service import execute_sql_on_connection, calc_sha256
 from app.services.conn_permission_service import ensure_conn_access
+from app.services.celery_dispatcher import dispatch_excelimp_execute
 
 router = APIRouter()
 
@@ -200,26 +201,11 @@ async def execute_task_sql(
         if task.sql_sha256 and task.sql_sha256 != current_sha:
             raise HTTPException(status_code=400, detail="SQL文件摘要校验失败，疑似被篡改")
 
-        try:
-            result = await execute_sql_on_connection(task.target_conn_id, sql_text)
-            task.execute_status = "success"
-            task.execute_message = f"执行成功，共执行 {result['executed_count']} 条语句"
-            task.executed_at = datetime.now()
-            task.executor_user_id = user_id
-            task.executor_username = username
-            await task.save()
-            return Success(
-                msg="执行成功",
-                data={"task_id": task.id, "executed_count": result["executed_count"], "db_type": result["db_type"]},
-            )
-        except Exception as exc:
-            task.execute_status = "failed"
-            task.execute_message = str(exc)
-            task.executed_at = datetime.now()
-            task.executor_user_id = user_id
-            task.executor_username = username
-            await task.save()
-            raise HTTPException(status_code=400, detail=f"执行失败: {str(exc)}")
+        await submit_imptask_execute(task.id, user_id, username)
+        return Success(
+            msg="导入执行任务已提交，请稍后查看执行状态",
+            data={"task_id": task.id, "execute_status": "processing"},
+        )
 
     elif source_type == "excelimp":
         file_key = payload.get("file_key")
@@ -242,18 +228,17 @@ async def execute_task_sql(
         if progress.get("sql_sha256") and progress.get("sql_sha256") != current_sha:
             raise HTTPException(status_code=400, detail="SQL摘要校验失败，疑似被篡改")
 
-        try:
-            result = await execute_sql_on_connection(int(target_conn_id), sql_text)
-            return Success(
-                msg="执行成功",
-                data={
-                    "file_key": file_key,
-                    "executed_count": result["executed_count"],
-                    "db_type": result["db_type"],
-                },
-            )
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=f"执行失败: {str(exc)}")
+        celery_task_id = dispatch_excelimp_execute(file_key, int(target_conn_id))
+        if not celery_task_id:
+            import asyncio
+            from app.services.excelimp_service import execute_sql_file_task
+
+            asyncio.create_task(execute_sql_file_task(file_key, int(target_conn_id)))
+
+        return Success(
+            msg="导入执行任务已提交，请稍后查看执行状态",
+            data={"file_key": file_key, "execute_status": "processing", "celery_task_id": celery_task_id},
+        )
 
     else:
         raise HTTPException(status_code=400, detail="source_type仅支持 imptask 或 excelimp")

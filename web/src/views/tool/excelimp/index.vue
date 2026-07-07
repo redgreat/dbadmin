@@ -306,7 +306,8 @@ const handleExecute = async () => {
       message.error(res.msg || '执行失败')
       return
     }
-    message.success(res.msg || '执行成功')
+    message.success(res.msg || '导入执行任务已提交')
+    startPolling()
   } catch {
     // 全局请求拦截器已弹出错误，避免重复提示
   }
@@ -321,10 +322,19 @@ const startPolling = () => {
       if (res.code === 200) {
         progress.value = res.data
         if (progress.value?.stage === 'done') {
-          stopPolling()
           if (progress.value?.sql) {
             sqlResult.value = progress.value.sql
-            message.success('SQL生成完成')
+            if (progress.value?.execute_status === 'processing') {
+              return
+            }
+            stopPolling()
+            if (progress.value?.execute_status === 'success') {
+              message.success(progress.value?.execute_message || '执行完成')
+            } else if (progress.value?.execute_status === 'failed') {
+              message.error(progress.value?.execute_message || '执行失败')
+            } else {
+              message.success('SQL生成完成')
+            }
           }
         } else if (progress.value?.stage === 'failed') {
           stopPolling()
@@ -356,6 +366,9 @@ const statusText = computed(() => {
   const p = progress.value
   if (!p) return '等待中'
   if (p.stage === 'failed') return `失败：${p.message || ''}`
+  if (p.execute_status === 'processing') return p.execute_message || '执行中'
+  if (p.execute_status === 'success') return p.execute_message || '执行完成'
+  if (p.execute_status === 'failed') return `执行失败：${p.execute_message || ''}`
   if (p.stage === 'done') return '完成'
   if (p.stage === 'generating') return '生成SQL中'
   if (p.stage === 'parsing') return '解析中'
@@ -366,6 +379,7 @@ const statusTagType = computed(() => {
   const p = progress.value
   if (!p) return 'default'
   if (p.stage === 'failed') return 'error'
+  if (p.execute_status === 'failed') return 'error'
   if (p.stage === 'done') return 'success'
   return 'info'
 })
