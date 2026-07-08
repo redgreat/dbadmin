@@ -205,11 +205,13 @@ class OAPositiveTimeService:
 
         code_by_id = {row["Id"]: row["Code"] for row in users}
         rows: List[Dict[str, Any]] = []
+        seen_tables_by_user_id: Dict[str, set[str]] = {user_id: set() for user_id in user_ids}
         async with pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cur:
                 for table_name, sql in queries:
                     await cur.execute(sql, tuple(user_ids))
                     for row in await cur.fetchall():
+                        seen_tables_by_user_id.setdefault(row["user_id"], set()).add(table_name)
                         rows.append(
                             {
                                 "source": "OA",
@@ -219,6 +221,17 @@ class OAPositiveTimeService:
                                 "positive_time": self._format_value(row.get("positive_time")),
                             }
                         )
+        for user_id in user_ids:
+            if "membership_positiveconfirm" not in seen_tables_by_user_id.get(user_id, set()):
+                rows.append(
+                    {
+                        "source": "OA",
+                        "table": "membership_positiveconfirm",
+                        "code": code_by_id.get(user_id),
+                        "user_id": user_id,
+                        "positive_time": None,
+                    }
+                )
         return rows, not_found_codes
 
     async def _fetch_fcc_positive_times(self, conn_id: int, codes: Sequence[str]) -> List[Dict[str, Any]]:
@@ -229,7 +242,7 @@ class OAPositiveTimeService:
 
         placeholders = self._sqlserver_in_clause(codes)
         sql = (
-            "SELECT Code, PositiveTime "
+            "SELECT Id, Code, PositiveTime "
             "FROM MemberShip_UserBaseInfo "
             f"WHERE Code IN ({placeholders}) AND Deleted=0"
         )
@@ -245,7 +258,7 @@ class OAPositiveTimeService:
                             "source": "FCC",
                             "table": "MemberShip_UserBaseInfo",
                             "code": data.get("Code"),
-                            "user_id": None,
+                            "user_id": self._format_value(data.get("Id")),
                             "positive_time": self._format_value(data.get("PositiveTime")),
                         }
                     )
@@ -315,7 +328,7 @@ class OAPositiveTimeService:
 
         placeholders = self._sqlserver_in_clause(codes)
         sql = (
-            "SELECT Code, EntryTime "
+            "SELECT Id, Code, EntryTime "
             "FROM MemberShip_UserBaseInfo "
             f"WHERE Code IN ({placeholders}) AND Deleted=0"
         )
@@ -331,7 +344,7 @@ class OAPositiveTimeService:
                             "source": "FCC",
                             "table": "MemberShip_UserBaseInfo",
                             "code": data.get("Code"),
-                            "user_id": None,
+                            "user_id": self._format_value(data.get("Id")),
                             "entry_time": self._format_value(data.get("EntryTime")),
                         }
                     )

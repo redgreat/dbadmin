@@ -83,7 +83,7 @@ const columns = [
       ),
   },
   { title: '表', key: 'table', minWidth: 220 },
-  { title: '人员Id', key: 'user_id', width: 180 },
+  { title: '人员Id', key: 'user_id', minWidth: 260 },
   { title: '当前转正时间', key: 'positive_time', minWidth: 180 },
 ]
 
