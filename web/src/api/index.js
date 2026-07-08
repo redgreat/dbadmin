@@ -60,6 +60,8 @@ export default {
   // oa - 转正时间修改
   validateOaPositiveTime: (data = {}) => request.post('/oa/positive-time/validate', data),
   executeOaPositiveTime: (data = {}) => request.post('/oa/positive-time/execute', data),
+  validateOaEntryTime: (data = {}) => request.post('/oa/entry-time/validate', data),
+  executeOaEntryTime: (data = {}) => request.post('/oa/entry-time/execute', data),
   
   // oms 订单删除相关API
   validateOrdersForDelete: (data) => request.post('/oms/validate-orders-for-delete', data),

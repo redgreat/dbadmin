@@ -165,9 +165,9 @@ async def ensure_oa_menus():
             keepalive=True,
         )
 
-    child = await Menu.get_or_none(path="positive-time", parent_id=parent.id)
-    if not child:
-        child = await Menu.create(
+    positive_child = await Menu.get_or_none(path="positive-time", parent_id=parent.id)
+    if not positive_child:
+        positive_child = await Menu.create(
             name="转正时间修改",
             menu_type=MenuType.MENU.value,
             icon="mdi:calendar-edit-outline",
@@ -179,21 +179,37 @@ async def ensure_oa_menus():
             keepalive=True,
         )
 
+    entry_child = await Menu.get_or_none(path="entry-time", parent_id=parent.id)
+    if not entry_child:
+        entry_child = await Menu.create(
+            name="修改入职时间",
+            menu_type=MenuType.MENU.value,
+            icon="mdi:calendar-account-outline",
+            path="entry-time",
+            order=2,
+            parent_id=parent.id,
+            is_hidden=False,
+            component="/oa/entry-time",
+            keepalive=True,
+        )
+
     admin_role = await Role.get_or_none(name="管理员")
     if admin_role:
-        await admin_role.menus.add(parent, child)
+        await admin_role.menus.add(parent, positive_child, entry_child)
 
     api_specs = [
-        ("POST", "/api/v1/oa/positive-time/validate", "验证转正时间"),
-        ("POST", "/api/v1/oa/positive-time/execute", "修改转正时间"),
+        (positive_child.id, "POST", "/api/v1/oa/positive-time/validate", "验证转正时间"),
+        (positive_child.id, "POST", "/api/v1/oa/positive-time/execute", "修改转正时间"),
+        (entry_child.id, "POST", "/api/v1/oa/entry-time/validate", "验证入职时间"),
+        (entry_child.id, "POST", "/api/v1/oa/entry-time/execute", "修改入职时间"),
     ]
-    for method, path, summary in api_specs:
+    for menu_id, method, path, summary in api_specs:
         api_obj = await Api.filter(method=method, path=path).first()
         if not api_obj:
             api_obj = await Api.create(method=method, path=path, summary=summary, tags="OA运维")
-        relation_exists = await MenuApi.filter(menu_id=child.id, api_id=api_obj.id).exists()
+        relation_exists = await MenuApi.filter(menu_id=menu_id, api_id=api_obj.id).exists()
         if not relation_exists:
-            await MenuApi.create(menu_id=child.id, api_id=api_obj.id)
+            await MenuApi.create(menu_id=menu_id, api_id=api_obj.id)
 
 async def init_apis():
     apis = await api_controller.model.exists()
