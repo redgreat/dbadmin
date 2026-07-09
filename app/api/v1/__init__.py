@@ -22,6 +22,7 @@ from .wms import wms_router
 from .alert import alert_router
 from .imptask.imptask import download_sql_file
 from .report.report import download_report_direct, download_report_public
+from .usercenter import usercenter_router
 
 v1_router = APIRouter()
 
@@ -50,3 +51,5 @@ v1_router.include_router(alert_router, prefix="/alert", tags=["预警管理"], d
 v1_router.get("/imptask/download/{task_id}", summary="下载SQL文件")(download_sql_file)
 # imptask其他接口 - 需要权限验证
 v1_router.include_router(imptask_router, prefix="/imptask", tags=["Excel导入任务"], dependencies=[DependPermisson])
+# 用户中心查询接口（用于运维操作选择删除人/操作人）
+v1_router.include_router(usercenter_router, prefix="/usercenter", tags=["用户中心"])

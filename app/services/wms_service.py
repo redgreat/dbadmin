@@ -339,11 +339,10 @@ class WmsService:
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
-                    # TODO: 请根据实际业务需求修改SQL查询语句
-                    # 示例SQL：根据入库单编码、物料名称、修改后价格查询明细信息
+                    # 根据入库单编码、物料名称、修改后价格查询明细信息
                     sql = """
                         SELECT b.Id AS detail_id,b.MaterialName AS material_name,
-                        b.InStockPrice AS original_price
+                        b.InStockPrice AS original_price,b.InStockedNum AS instocked_num
                         FROM tb_instockinfohis a
                         JOIN tb_instockdetailhis b
                           ON b.InStockId=a.Id
@@ -362,6 +361,7 @@ class WmsService:
                             "detail_id": str(row[0]),
                             "material_name": str(row[1]),
                             "original_price": str(row[2]),
+                            "instocked_num": str(row[3]) if row[3] is not None else "0",
                             "new_price": new_price
                         })
         else:

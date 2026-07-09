@@ -5,7 +5,10 @@
         <n-input v-model:value="form.orderIds" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单Id或订单编码，逗号分隔" />
       </n-form-item>
       <n-form-item label="修改时间" path="auditTime">
-        <n-date-picker v-model:value="form.auditTime" type="datetime" placeholder="请选择日期时间" />
+        <n-date-picker v-model:value="form.auditTime" type="datetime" placeholder="请选择日期时间（东八区）" />
+      </n-form-item>
+      <n-form-item label="备注" path="remark">
+        <n-input v-model:value="form.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
       </n-form-item>
       <n-space>
         <n-button type="primary" :loading="executing" @click="handleExecute">执行</n-button>
@@ -26,7 +29,7 @@ defineOptions({ name: '订单审核时间修改' })
 
 const message = useMessage()
 const formRef = ref(null)
-const form = ref({ orderIds: '', auditTime: null })
+const form = ref({ orderIds: '', auditTime: null, remark: '' })
 const executing = ref(false)
 
 const rules = {
@@ -48,7 +51,7 @@ const rules = {
 }
 
 const handleReset = () => {
-  form.value = { orderIds: '', auditTime: null }
+  form.value = { orderIds: '', auditTime: null, remark: '' }
 }
 
 const handleExecute = async () => {
@@ -60,7 +63,8 @@ const handleExecute = async () => {
   executing.value = true
   try {
     const audit_time = dayjs(form.value.auditTime).tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')
-    const payload = { order_nos: ids, audit_time }
+    const remark = String(form.value.remark || '').trim()
+    const payload = { order_nos: ids, audit_time, remark }
     const res = await api.updateOrdersAuditTimeBatch(payload)
     if (res.code === 200) {
       const { success_count = 0, failed_ids = [] } = res.data || {}

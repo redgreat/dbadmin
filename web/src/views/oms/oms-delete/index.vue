@@ -6,6 +6,9 @@
           <n-form-item label="订单编码/Id" path="orderNos">
             <n-input v-model:value="logicalForm.orderNos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单编码或Id，逗号分隔" />
           </n-form-item>
+          <n-form-item label="备注" path="remark">
+            <n-input v-model:value="logicalForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
+          </n-form-item>
           <n-space>
             <n-button type="primary" :loading="logicalExecuting" @click="handleLogicalExecute">执行逻辑删除</n-button>
             <n-button @click="handleLogicalReset">重置</n-button>
@@ -17,6 +20,9 @@
         <n-form ref="physicalFormRef" :model="physicalForm" :rules="rules" label-placement="left" :label-width="100">
           <n-form-item label="订单编码/Id" path="orderNos">
             <n-input v-model:value="physicalForm.orderNos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单编码或Id，逗号分隔" />
+          </n-form-item>
+          <n-form-item label="备注" path="remark">
+            <n-input v-model:value="physicalForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
           </n-form-item>
           <n-space>
             <n-button type="error" :loading="physicalExecuting" @click="handlePhysicalExecute">执行物理删除</n-button>
@@ -30,8 +36,20 @@
           <n-form-item label="订单编码/Id" path="orderNo">
             <n-input v-model:value="restoreForm.orderNo" clearable placeholder="输入单个订单编码或Id" />
           </n-form-item>
-          <n-form-item label="删除人Id" path="operatorId">
-            <n-input v-model:value="restoreForm.operatorId" clearable placeholder="输入删除人Id" />
+          <n-form-item label="删除人" path="operatorId">
+            <n-select
+              v-model:value="restoreForm.operatorId"
+              filterable
+              remote
+              clearable
+              placeholder="输入姓名搜索用户中心用户"
+              :options="operatorOptions"
+              :loading="operatorLoading"
+              @search="handleSearchOperator"
+            />
+          </n-form-item>
+          <n-form-item label="备注" path="remark">
+            <n-input v-model:value="restoreForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
           </n-form-item>
           <n-space>
             <n-button type="primary" :loading="restoreExecuting" @click="handleRestoreExecute">执行恢复</n-button>
@@ -58,9 +76,9 @@ const logicalFormRef = ref(null)
 const physicalFormRef = ref(null)
 const restoreFormRef = ref(null)
 
-const logicalForm = ref({ orderNos: '' })
-const physicalForm = ref({ orderNos: '' })
-const restoreForm = ref({ orderNo: '', operatorId: '' })
+const logicalForm = ref({ orderNos: '', remark: '' })
+const physicalForm = ref({ orderNos: '', remark: '' })
+const restoreForm = ref({ orderNo: '', operatorId: '', remark: '' })
 
 const logicalExecuting = ref(false)
 const physicalExecuting = ref(false)
@@ -88,39 +106,62 @@ const restoreRules = {
     { required: true, message: '请输入订单编码或Id' },
   ],
   operatorId: [
-    { required: true, message: '请输入删除人Id' },
-    {
-      validator: (_, value) => {
-        const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-        if (!guidRegex.test(String(value || '').trim())) {
-          return new Error('删除人Id需为GUID格式（如：550e8400-e29b-41d4-a716-446655440000）')
-        }
-        return true
-      },
-    },
+    { required: true, message: '请选择删除人' },
   ],
+}
+
+// 删除人远程搜索：从用户中心查 basic_userinfo
+const operatorOptions = ref([])
+const operatorLoading = ref(false)
+let searchTimer = null
+
+const handleSearchOperator = (query) => {
+  if (!query) {
+    operatorOptions.value = []
+    return
+  }
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(async () => {
+    operatorLoading.value = true
+    try {
+      const res = await api.searchUserCenterUsers({ keyword: query, limit: 20 })
+      if (res.code === 200) {
+        operatorOptions.value = (res.data || []).map((u) => ({
+          label: `${u.name} (${u.id})`,
+          value: u.id,
+        }))
+      } else {
+        operatorOptions.value = []
+      }
+    } catch (e) {
+      operatorOptions.value = []
+    } finally {
+      operatorLoading.value = false
+    }
+  }, 300)
 }
 
 const parseIds = (text) => text.split(',').map((s) => s.trim()).filter((s) => s.length)
 
 const handleLogicalReset = () => {
-  logicalForm.value = { orderNos: '' }
+  logicalForm.value = { orderNos: '', remark: '' }
 }
 
 const handlePhysicalReset = () => {
-  physicalForm.value = { orderNos: '' }
+  physicalForm.value = { orderNos: '', remark: '' }
 }
 
 const handleRestoreReset = () => {
-  restoreForm.value = { orderNo: '', operatorId: '' }
+  restoreForm.value = { orderNo: '', operatorId: '', remark: '' }
 }
 
 const handleLogicalExecute = async () => {
   await logicalFormRef.value?.validate()
   const ids = parseIds(logicalForm.value.orderNos)
+  const remark = String(logicalForm.value.remark || '').trim()
   logicalExecuting.value = true
   try {
-    const res = await api.deleteOrdersLogicalBatch({ order_nos: ids })
+    const res = await api.deleteOrdersLogicalBatch({ order_nos: ids, remark })
     if (res.code === 200 || res.code === 0) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
       if (failed_ids.length > 0) {
@@ -141,9 +182,10 @@ const handleLogicalExecute = async () => {
 const handlePhysicalExecute = async () => {
   await physicalFormRef.value?.validate()
   const ids = parseIds(physicalForm.value.orderNos)
+  const remark = String(physicalForm.value.remark || '').trim()
   physicalExecuting.value = true
   try {
-    const res = await api.deleteOrdersPhysicalBatch({ order_nos: ids })
+    const res = await api.deleteOrdersPhysicalBatch({ order_nos: ids, remark })
     if (res.code === 200 || res.code === 0) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
       if (failed_ids.length > 0) {
@@ -167,7 +209,8 @@ const handleRestoreExecute = async () => {
   try {
     const order_no = String(restoreForm.value.orderNo).trim()
     const operator_id = String(restoreForm.value.operatorId).trim()
-    const res = await api.restoreOrderLogical({ order_no, operator_id })
+    const remark = String(restoreForm.value.remark || '').trim()
+    const res = await api.restoreOrderLogical({ order_no, operator_id, remark })
     if (res.code === 200 || res.code === 0) {
       const { restored = false } = res.data || {}
       if (restored) {

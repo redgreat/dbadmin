@@ -8,12 +8,14 @@ class WmsDeleteBatchIn(BaseModel):
     """批量删除入参"""
     stock_nos: List[str] = Field(default_factory=list, description="单据编码或单据Id列表")
     operator_id: str = Field(default="", description="操作人Id（GUID格式）")
+    remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
 
 
 class WmsRestoreLogicalIn(BaseModel):
     """逻辑删除恢复入参"""
     stock_no: str = Field(..., description="单据编码或单据Id")
     operator_id: str = Field(..., description="删除人Id（GUID格式）")
+    remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
 
 
 class WmsValidateRequest(BaseModel):
@@ -21,6 +23,7 @@ class WmsValidateRequest(BaseModel):
     stock_nos: List[str] = Field(default_factory=list, description="单据编码或单据Id列表")
     validate_type: str = Field(..., description="验证类型: logical_delete, physical_delete, restore")
     operator_id: str = Field(default="", description="删除人Id（恢复时需要）")
+    remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
 
 
 class PriceQueryIn(BaseModel):
@@ -28,6 +31,7 @@ class PriceQueryIn(BaseModel):
     stock_code: str = Field(default="", description="入库单编码")
     material_name: str = Field(default="", description="物料名称")
     new_price: str = Field(default="", description="修改后价格")
+    remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
 
     @field_validator('new_price')
     @classmethod
@@ -44,6 +48,7 @@ class PriceModifyIn(BaseModel):
     """价格修改入参"""
     detail_id: str = Field(..., description="明细Id")
     new_price: str = Field(..., description="修改后价格")
+    remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
 
     @field_validator('new_price')
     @classmethod

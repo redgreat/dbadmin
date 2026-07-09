@@ -210,6 +210,10 @@ class Settings:
     async def FCC_CONN_ID(self) -> int:
         """FCC数据库连接ID（从数据库读取）"""
         return await self._get_conn_id_by_alias('FCC_CONN')
+
+    async def USER_CONN_ID(self) -> int:
+        """用户中心数据库连接ID（从数据库读取）"""
+        return await self._get_conn_id_by_alias('USER_CONN')
     
     async def _get_conn_id_by_alias(self, alias: str) -> int:
         """

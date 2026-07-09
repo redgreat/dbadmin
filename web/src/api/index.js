@@ -161,4 +161,7 @@ export default {
   fccValidate: (data = {}) => request.post('/wms/fcc/validate', data),
   fccSubmit: (data = {}) => request.post('/wms/fcc/submit', data),
   fccGetTaskStatus: (taskId) => request.get(`/wms/fcc/task/${taskId}`),
+  // usercenter - 用户中心查询
+  searchUserCenterUsers: (params = {}) => request.get('/usercenter/search', { params }),
+  getUserCenterByName: (params = {}) => request.get('/usercenter/get_by_name', { params }),
 }

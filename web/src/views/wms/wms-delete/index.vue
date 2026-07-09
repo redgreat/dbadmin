@@ -6,8 +6,20 @@
           <n-form-item label="单据编码/Id" path="stock_nos">
             <n-input v-model:value="logicalForm.stock_nos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据编码或Id，逗号分隔" />
           </n-form-item>
-          <n-form-item label="操作人Id" path="operatorId">
-            <n-input v-model:value="logicalForm.operatorId" clearable placeholder="输入操作人Id" />
+          <n-form-item label="操作人" path="operatorId">
+            <n-select
+              v-model:value="logicalForm.operatorId"
+              filterable
+              remote
+              clearable
+              placeholder="输入姓名搜索用户中心用户"
+              :options="operatorOptions"
+              :loading="operatorLoading"
+              @search="handleSearchOperator"
+            />
+          </n-form-item>
+          <n-form-item label="备注" path="remark">
+            <n-input v-model:value="logicalForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
           </n-form-item>
           <n-space>
             <n-button type="primary" :loading="logicalExecuting" @click="handleLogicalExecute">执行逻辑删除</n-button>
@@ -21,6 +33,9 @@
           <n-form-item label="单据编码/Id" path="stock_nos">
             <n-input v-model:value="physicalForm.stock_nos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个单据编码或Id，逗号分隔" />
           </n-form-item>
+          <n-form-item label="备注" path="remark">
+            <n-input v-model:value="physicalForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
+          </n-form-item>
           <n-space>
             <n-button type="error" :loading="physicalExecuting" @click="handlePhysicalExecute">执行物理删除</n-button>
             <n-button @click="handlePhysicalReset">重置</n-button>
@@ -33,8 +48,20 @@
           <n-form-item label="单据编码/Id" path="stock_no">
             <n-input v-model:value="restoreForm.stock_no" clearable placeholder="输入单个单据编码或Id" />
           </n-form-item>
-          <n-form-item label="删除人Id" path="operatorId">
-            <n-input v-model:value="restoreForm.operatorId" clearable placeholder="输入删除人Id" />
+          <n-form-item label="删除人" path="operatorId">
+            <n-select
+              v-model:value="restoreForm.operatorId"
+              filterable
+              remote
+              clearable
+              placeholder="输入姓名搜索用户中心用户"
+              :options="operatorOptions"
+              :loading="operatorLoading"
+              @search="handleSearchOperator"
+            />
+          </n-form-item>
+          <n-form-item label="备注" path="remark">
+            <n-input v-model:value="restoreForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
           </n-form-item>
           <n-space>
             <n-button type="primary" :loading="restoreExecuting" @click="handleRestoreExecute">执行恢复</n-button>
@@ -61,17 +88,43 @@ const logicalFormRef = ref(null)
 const physicalFormRef = ref(null)
 const restoreFormRef = ref(null)
 
-const logicalForm = ref({ stock_nos: '', operatorId: '' })
-const physicalForm = ref({ stock_nos: '' })
-const restoreForm = ref({ stock_no: '', operatorId: '' })
+const logicalForm = ref({ stock_nos: '', operatorId: '', remark: '' })
+const physicalForm = ref({ stock_nos: '', remark: '' })
+const restoreForm = ref({ stock_no: '', operatorId: '', remark: '' })
 
 const logicalExecuting = ref(false)
 const physicalExecuting = ref(false)
 const restoreExecuting = ref(false)
 
-const guidValidator = (value) => {
-  const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  return guidRegex.test(String(value || '').trim())
+// 操作人/删除人远程搜索：从用户中心查 basic_userinfo
+const operatorOptions = ref([])
+const operatorLoading = ref(false)
+let searchTimer = null
+
+const handleSearchOperator = (query) => {
+  if (!query) {
+    operatorOptions.value = []
+    return
+  }
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(async () => {
+    operatorLoading.value = true
+    try {
+      const res = await api.searchUserCenterUsers({ keyword: query, limit: 20 })
+      if (res.code === 200) {
+        operatorOptions.value = (res.data || []).map((u) => ({
+          label: `${u.name} (${u.id})`,
+          value: u.id,
+        }))
+      } else {
+        operatorOptions.value = []
+      }
+    } catch (e) {
+      operatorOptions.value = []
+    } finally {
+      operatorLoading.value = false
+    }
+  }, 300)
 }
 
 const logicalRules = {
@@ -87,15 +140,7 @@ const logicalRules = {
     },
   ],
   operatorId: [
-    { required: true, message: '请输入操作人Id' },
-    {
-      validator: (_, value) => {
-        if (!guidValidator(value)) {
-          return new Error('操作人Id需为GUID格式（如：550e8400-e29b-41d4-a716-446655440000）')
-        }
-        return true
-      },
-    },
+    { required: true, message: '请选择操作人' },
   ],
 }
 
@@ -118,30 +163,22 @@ const restoreRules = {
     { required: true, message: '请输入单据编码或Id' },
   ],
   operatorId: [
-    { required: true, message: '请输入删除人Id' },
-    {
-      validator: (_, value) => {
-        if (!guidValidator(value)) {
-          return new Error('删除人Id需为GUID格式（如：550e8400-e29b-41d4-a716-446655440000）')
-        }
-        return true
-      },
-    },
+    { required: true, message: '请选择删除人' },
   ],
 }
 
 const parseNos = (text) => text.split(',').map((s) => s.trim()).filter((s) => s.length)
 
 const handleLogicalReset = () => {
-  logicalForm.value = { stock_nos: '', operatorId: '' }
+  logicalForm.value = { stock_nos: '', operatorId: '', remark: '' }
 }
 
 const handlePhysicalReset = () => {
-  physicalForm.value = { stock_nos: '' }
+  physicalForm.value = { stock_nos: '', remark: '' }
 }
 
 const handleRestoreReset = () => {
-  restoreForm.value = { stock_no: '', operatorId: '' }
+  restoreForm.value = { stock_no: '', operatorId: '', remark: '' }
 }
 
 const handleLogicalExecute = async () => {
@@ -152,10 +189,11 @@ const handleLogicalExecute = async () => {
   }
   const nos = parseNos(logicalForm.value.stock_nos)
   const operator_id = String(logicalForm.value.operatorId).trim()
+  const remark = String(logicalForm.value.remark || '').trim()
 
   logicalExecuting.value = true
   try {
-    const res = await api.deleteWmsDocumentsLogicalBatch({ stock_nos: nos, operator_id })
+    const res = await api.deleteWmsDocumentsLogicalBatch({ stock_nos: nos, operator_id, remark })
     if (res.code === 200 || res.code === 0) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
       if (failed_ids.length > 0) {
@@ -180,10 +218,11 @@ const handlePhysicalExecute = async () => {
     return
   }
   const nos = parseNos(physicalForm.value.stock_nos)
+  const remark = String(physicalForm.value.remark || '').trim()
 
   physicalExecuting.value = true
   try {
-    const res = await api.deleteWmsDocumentsPhysicalBatch({ stock_nos: nos })
+    const res = await api.deleteWmsDocumentsPhysicalBatch({ stock_nos: nos, remark })
     if (res.code === 200 || res.code === 0) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
       if (failed_ids.length > 0) {
@@ -209,10 +248,11 @@ const handleRestoreExecute = async () => {
   }
   const stock_no = String(restoreForm.value.stock_no).trim()
   const operator_id = String(restoreForm.value.operatorId).trim()
+  const remark = String(restoreForm.value.remark || '').trim()
 
   restoreExecuting.value = true
   try {
-    const res = await api.restoreWmsDocumentLogical({ stock_no, operator_id })
+    const res = await api.restoreWmsDocumentLogical({ stock_no, operator_id, remark })
     if (res.code === 200 || res.code === 0) {
       const { restored = false } = res.data || {}
       if (restored) {

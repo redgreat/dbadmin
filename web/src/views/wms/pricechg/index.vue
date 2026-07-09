@@ -11,6 +11,9 @@
         <n-form-item label="修改后价格" path="new_price">
           <n-input v-model:value="priceForm.new_price" clearable placeholder="请输入修改后价格（decimal(18,2)）" />
         </n-form-item>
+        <n-form-item label="备注" path="remark">
+          <n-input v-model:value="priceForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
+        </n-form-item>
         <n-space>
           <n-button type="primary" :loading="priceQuerying" @click="handlePriceQuery">查询</n-button>
           <n-button type="warning" :loading="priceModifying" :disabled="!canModify" @click="handlePriceModify">修改</n-button>
@@ -44,7 +47,7 @@ defineOptions({ name: '价格修改' })
 const message = useMessage()
 
 const priceFormRef = ref(null)
-const priceForm = ref({ stock_code: '', material_name: '', new_price: '' })
+const priceForm = ref({ stock_code: '', material_name: '', new_price: '', remark: '' })
 const priceResults = ref([])
 const priceQuerying = ref(false)
 const priceModifying = ref(false)
@@ -66,6 +69,7 @@ const priceColumns = [
   { title: '明细Id', key: 'detail_id' },
   { title: '物料名称', key: 'material_name' },
   { title: '原价格', key: 'original_price' },
+  { title: '入库数量', key: 'instocked_num' },
   { title: '新价格', key: 'new_price' },
 ]
 
@@ -78,6 +82,7 @@ const handlePriceQuery = async () => {
       stock_code: priceForm.value.stock_code,
       material_name: priceForm.value.material_name,
       new_price: priceForm.value.new_price,
+      remark: priceForm.value.remark,
     })
     if (res.code === 200) {
       priceResults.value = res.data || []
@@ -110,6 +115,7 @@ const handlePriceModify = async () => {
     const res = await api.modifyPrice({
       detail_id: detail.detail_id,
       new_price: priceForm.value.new_price,
+      remark: priceForm.value.remark,
     })
     if (res.code === 200) {
       message.success('价格修改成功')
@@ -126,7 +132,7 @@ const handlePriceModify = async () => {
 }
 
 const handlePriceReset = () => {
-  priceForm.value = { stock_code: '', material_name: '', new_price: '' }
+  priceForm.value = { stock_code: '', material_name: '', new_price: '', remark: '' }
   priceResults.value = []
 }
 </script>
