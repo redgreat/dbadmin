@@ -96,7 +96,7 @@ const logicalExecuting = ref(false)
 const physicalExecuting = ref(false)
 const restoreExecuting = ref(false)
 
-// 操作人/删除人远程搜索：从用户中心查 basic_userinfo
+// 操作人/删除人远程搜索：从OA查 membership_userbaseinfo
 const operatorOptions = ref([])
 const operatorLoading = ref(false)
 let searchTimer = null
@@ -113,8 +113,8 @@ const handleSearchOperator = (query) => {
       const res = await api.searchUserCenterUsers({ keyword: query, limit: 20 })
       if (res.code === 200) {
         operatorOptions.value = (res.data || []).map((u) => ({
-          label: `${u.name} (${u.id})`,
-          value: u.id,
+          label: `${u.user_name}-${u.code}-(${u.user_center_user_id})`,
+          value: u.user_center_user_id,
         }))
       } else {
         operatorOptions.value = []
