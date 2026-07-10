@@ -14,7 +14,13 @@ class UpdateAuditTimeBatchIn(BaseModel):
 class DeleteBatchIn(BaseModel):
     """批量删除入参"""
     order_nos: List[str] = Field(default_factory=list, description="订单编码或订单Id列表，逗号分隔后端已拆分")
+    operator_id: str = Field(default="", description="删除人Id（GUID格式，逻辑删除时需要）")
     remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
+
+
+class OrderQueryIn(BaseModel):
+    """查询订单状态入参"""
+    order_nos: List[str] = Field(default_factory=list, description="订单编码或订单Id列表")
 
 
 class RestoreLogicalIn(BaseModel):

@@ -8,7 +8,7 @@ from app.core.dependency import AuthControl
 from app.models.admin import User
 from app.utils.audit_log import create_operation_audit_log
 from app.schemas.base import Fail, Success
-from app.schemas.oms import UpdateAuditTimeBatchIn, DeleteBatchIn, RestoreLogicalIn
+from app.schemas.oms import UpdateAuditTimeBatchIn, DeleteBatchIn, RestoreLogicalIn, OrderQueryIn
 from app.services.order_service import order_service
 
 logger = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ async def delete_logical_batch(req: Request, body: DeleteBatchIn):
 
             # 使用获取到的Id进行删除
             order_ids = list(order_no_id_map.values())
-            success_count, failed_ids = await order_service.delete_logical_batch(order_ids)
+            success_count, failed_ids = await order_service.delete_logical_batch(order_ids, body.operator_id)
             # 将失败的Id转换回订单编码
             id_order_no_map = {v: k for k, v in order_no_id_map.items()}
             failed_nos = [id_order_no_map[fid] for fid in failed_ids if fid in id_order_no_map]
@@ -302,3 +302,18 @@ async def restore_logical(req: Request, body: RestoreLogicalIn):
     except Exception as e:
         logger.error(f"接口异常: {e}")
         return Fail(code=500, msg="服务异常")
+
+
+@router.post("/query_status", summary="查询订单状态（Id、OrderNo、AuditTime、Deleted、DeletedById、DeletedAt、删除人姓名）")
+async def query_order_status(body: OrderQueryIn):
+    """查询订单状态信息，支持传入订单编码或订单Id，返回删除状态和删除人姓名"""
+    try:
+        order_nos: List[str] = [s.strip() for s in body.order_nos if s and s.strip()]
+        if not order_nos:
+            return Fail(code=400, msg="订单编码或订单Id不能为空")
+
+        result = await order_service.query_order_status(order_nos)
+        return Success(data=result, msg=result["message"])
+    except Exception as e:
+        logger.error(f"查询订单状态失败: {e}")
+        return Fail(code=500, msg=f"查询失败: {str(e)}")

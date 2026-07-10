@@ -89,5 +89,83 @@ class UserService:
 
         return results
 
+    async def batch_get_by_user_center_ids(self, user_center_user_ids: List[str]) -> Dict[str, Dict]:
+        """根据多个 UserCenterUserId 批量查询 OA 人员信息
+
+        Args:
+            user_center_user_ids: UserCenterUserId 列表
+
+        Returns:
+            {user_center_user_id: {user_name, code, user_center_user_id}, ...}
+        """
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("OA连接池不存在")
+
+        result: Dict[str, Dict] = {}
+        ids = [str(i).strip() for i in (user_center_user_ids or []) if i and str(i).strip()]
+        if not ids:
+            return result
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    placeholders = ",".join(["%s"] * len(ids))
+                    sql = f"""
+                        SELECT UserName, Code, UserCenterUserId
+                        FROM membership_userbaseinfo
+                        WHERE Deleted=0
+                          AND UserType <> 'DT0000000501'
+                          AND UserCenterUserId IN ({placeholders})
+                    """
+                    await cur.execute(sql, tuple(ids))
+                    rows = await cur.fetchall()
+                    for row in rows:
+                        ucu_id = str(row[2]) if row[2] is not None else ""
+                        if ucu_id:
+                            result[ucu_id] = {
+                                "user_name": str(row[0]) if row[0] is not None else "",
+                                "code": str(row[1]) if row[1] is not None else "",
+                                "user_center_user_id": ucu_id,
+                            }
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        return result
+
+    async def get_user_names_by_user_center_ids(self, user_center_ids: List[str]) -> Dict[str, str]:
+        """根据UserCenterUserId批量获取用户姓名，返回 {user_center_user_id: user_name}"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("OA连接池不存在")
+
+        result: Dict[str, str] = {}
+        valid_ids = list(set(uid for uid in user_center_ids if uid))
+        if not valid_ids:
+            return result
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    placeholders = ",".join(["%s"] * len(valid_ids))
+                    sql = f"""
+                        SELECT UserCenterUserId, UserName
+                        FROM membership_userbaseinfo
+                        WHERE UserCenterUserId IN ({placeholders})
+                    """
+                    await cur.execute(sql, valid_ids)
+                    rows = await cur.fetchall()
+                    for row in rows:
+                        uid = str(row[0]) if row[0] is not None else ""
+                        name = str(row[1]) if row[1] is not None else ""
+                        if uid:
+                            result[uid] = name
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        return result
+
 
 user_service = UserService()

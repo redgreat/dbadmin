@@ -22,9 +22,38 @@
             <n-input v-model:value="logicalForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
           </n-form-item>
           <n-space>
+            <n-button :loading="logicalQuerying" @click="handleLogicalQuery">查询</n-button>
             <n-button type="primary" :loading="logicalExecuting" @click="handleLogicalExecute">执行逻辑删除</n-button>
             <n-button @click="handleLogicalReset">重置</n-button>
           </n-space>
+          <n-table v-if="logicalQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+            <thead>
+              <tr>
+                <th>单据Id</th>
+                <th>单据编号</th>
+                <th>类型</th>
+                <th>审核时间</th>
+                <th>删除状态</th>
+                <th>删除人</th>
+                <th>删除时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in logicalQueryResult" :key="item.id">
+                <td>{{ item.id }}</td>
+                <td>{{ item.stock_no }}</td>
+                <td>{{ item.doc_type === 'instock' ? '入库' : '出库' }}</td>
+                <td>{{ item.audit_time || '-' }}</td>
+                <td>
+                  <n-tag :type="item.deleted ? 'error' : 'success'" size="small">
+                    {{ item.deleted ? '已删除' : '正常' }}
+                  </n-tag>
+                </td>
+                <td>{{ item.deleted_by_name ? item.deleted_by_name + '-' + (item.deleted_by_code || '') + '-(' + item.deleted_by_id + ')' : (item.deleted_by_id || '-') }}</td>
+                <td>{{ item.deleted_at || '-' }}</td>
+              </tr>
+            </tbody>
+          </n-table>
         </n-form>
       </n-card>
 
@@ -37,9 +66,38 @@
             <n-input v-model:value="physicalForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
           </n-form-item>
           <n-space>
+            <n-button :loading="physicalQuerying" @click="handlePhysicalQuery">查询</n-button>
             <n-button type="error" :loading="physicalExecuting" @click="handlePhysicalExecute">执行物理删除</n-button>
             <n-button @click="handlePhysicalReset">重置</n-button>
           </n-space>
+          <n-table v-if="physicalQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+            <thead>
+              <tr>
+                <th>单据Id</th>
+                <th>单据编号</th>
+                <th>类型</th>
+                <th>审核时间</th>
+                <th>删除状态</th>
+                <th>删除人</th>
+                <th>删除时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in physicalQueryResult" :key="item.id">
+                <td>{{ item.id }}</td>
+                <td>{{ item.stock_no }}</td>
+                <td>{{ item.doc_type === 'instock' ? '入库' : '出库' }}</td>
+                <td>{{ item.audit_time || '-' }}</td>
+                <td>
+                  <n-tag :type="item.deleted ? 'error' : 'success'" size="small">
+                    {{ item.deleted ? '已删除' : '正常' }}
+                  </n-tag>
+                </td>
+                <td>{{ item.deleted_by_name ? item.deleted_by_name + '-' + (item.deleted_by_code || '') + '-(' + item.deleted_by_id + ')' : (item.deleted_by_id || '-') }}</td>
+                <td>{{ item.deleted_at || '-' }}</td>
+              </tr>
+            </tbody>
+          </n-table>
         </n-form>
       </n-card>
 
@@ -64,9 +122,38 @@
             <n-input v-model:value="restoreForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
           </n-form-item>
           <n-space>
+            <n-button :loading="restoreQuerying" @click="handleRestoreQuery">查询</n-button>
             <n-button type="primary" :loading="restoreExecuting" @click="handleRestoreExecute">执行恢复</n-button>
             <n-button @click="handleRestoreReset">重置</n-button>
           </n-space>
+          <n-table v-if="restoreQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+            <thead>
+              <tr>
+                <th>单据Id</th>
+                <th>单据编号</th>
+                <th>类型</th>
+                <th>审核时间</th>
+                <th>删除状态</th>
+                <th>删除人</th>
+                <th>删除时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in restoreQueryResult" :key="item.id">
+                <td>{{ item.id }}</td>
+                <td>{{ item.stock_no }}</td>
+                <td>{{ item.doc_type === 'instock' ? '入库' : '出库' }}</td>
+                <td>{{ item.audit_time || '-' }}</td>
+                <td>
+                  <n-tag :type="item.deleted ? 'error' : 'success'" size="small">
+                    {{ item.deleted ? '已删除' : '正常' }}
+                  </n-tag>
+                </td>
+                <td>{{ item.deleted_by_name ? item.deleted_by_name + '-' + (item.deleted_by_code || '') + '-(' + item.deleted_by_id + ')' : (item.deleted_by_id || '-') }}</td>
+                <td>{{ item.deleted_at || '-' }}</td>
+              </tr>
+            </tbody>
+          </n-table>
         </n-form>
       </n-card>
     </n-space>
@@ -95,6 +182,14 @@ const restoreForm = ref({ stock_no: '', operatorId: '', remark: '' })
 const logicalExecuting = ref(false)
 const physicalExecuting = ref(false)
 const restoreExecuting = ref(false)
+
+const logicalQuerying = ref(false)
+const physicalQuerying = ref(false)
+const restoreQuerying = ref(false)
+
+const logicalQueryResult = ref([])
+const physicalQueryResult = ref([])
+const restoreQueryResult = ref([])
 
 // 操作人/删除人远程搜索：从OA查 membership_userbaseinfo
 const operatorOptions = ref([])
@@ -171,14 +266,97 @@ const parseNos = (text) => text.split(',').map((s) => s.trim()).filter((s) => s.
 
 const handleLogicalReset = () => {
   logicalForm.value = { stock_nos: '', operatorId: '', remark: '' }
+  logicalQueryResult.value = []
 }
 
 const handlePhysicalReset = () => {
   physicalForm.value = { stock_nos: '', remark: '' }
+  physicalQueryResult.value = []
 }
 
 const handleRestoreReset = () => {
   restoreForm.value = { stock_no: '', operatorId: '', remark: '' }
+  restoreQueryResult.value = []
+}
+
+const handleLogicalQuery = async () => {
+  const nos = parseNos(logicalForm.value.stock_nos)
+  if (!nos.length) {
+    message.warning('请输入单据编码或Id')
+    return
+  }
+  logicalQuerying.value = true
+  try {
+    const res = await api.queryWmsStockStatus({ stock_nos: nos })
+    if (res.code === 200 || res.code === 0) {
+      logicalQueryResult.value = res.data?.found_docs || []
+      const notFound = res.data?.not_found_docs || []
+      if (notFound.length) {
+        message.warning(`查询完成，未找到 ${notFound.length} 条：${notFound.join(', ')}`)
+      } else {
+        message.success(`查询到 ${logicalQueryResult.value.length} 条`)
+      }
+    } else {
+      message.error(res.msg || '查询失败')
+    }
+  } catch (e) {
+    message.error('请求异常')
+  } finally {
+    logicalQuerying.value = false
+  }
+}
+
+const handlePhysicalQuery = async () => {
+  const nos = parseNos(physicalForm.value.stock_nos)
+  if (!nos.length) {
+    message.warning('请输入单据编码或Id')
+    return
+  }
+  physicalQuerying.value = true
+  try {
+    const res = await api.queryWmsStockStatus({ stock_nos: nos })
+    if (res.code === 200 || res.code === 0) {
+      physicalQueryResult.value = res.data?.found_docs || []
+      const notFound = res.data?.not_found_docs || []
+      if (notFound.length) {
+        message.warning(`查询完成，未找到 ${notFound.length} 条：${notFound.join(', ')}`)
+      } else {
+        message.success(`查询到 ${physicalQueryResult.value.length} 条`)
+      }
+    } else {
+      message.error(res.msg || '查询失败')
+    }
+  } catch (e) {
+    message.error('请求异常')
+  } finally {
+    physicalQuerying.value = false
+  }
+}
+
+const handleRestoreQuery = async () => {
+  const stockNo = String(restoreForm.value.stock_no || '').trim()
+  if (!stockNo) {
+    message.warning('请输入单据编码或Id')
+    return
+  }
+  restoreQuerying.value = true
+  try {
+    const res = await api.queryWmsStockStatus({ stock_nos: [stockNo] })
+    if (res.code === 200 || res.code === 0) {
+      restoreQueryResult.value = res.data?.found_docs || []
+      if (!restoreQueryResult.value.length) {
+        message.warning('未找到该单据')
+      } else {
+        message.success('查询成功')
+      }
+    } else {
+      message.error(res.msg || '查询失败')
+    }
+  } catch (e) {
+    message.error('请求异常')
+  } finally {
+    restoreQuerying.value = false
+  }
 }
 
 const handleLogicalExecute = async () => {

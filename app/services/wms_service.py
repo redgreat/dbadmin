@@ -1,8 +1,11 @@
 from typing import Dict, List, Tuple
 import aiomysql
+import logging
 
 from app.services.db_pool import db_pool
 from app.settings.config import settings
+
+logger = logging.getLogger(__name__)
 
 # 仓储中心固定连接的Id（延迟获取，避免模块加载时Tortoise未初始化）
 _wms_conn_id = None
@@ -394,6 +397,95 @@ class WmsService:
                     return True
         else:
             raise ValueError("不支持的连接池类型")
+
+    async def query_stock_status(self, stock_nos: List[str]) -> Dict:
+        """查询单据状态信息，返回Id、单号、AuditTime、Deleted、DeletedById、DeletedAt，并关联OA获取删除人姓名"""
+        from app.services.user_service import user_service
+
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("连接池不存在")
+
+        found_docs = []
+        not_found_docs = []
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    for stock_no in stock_nos:
+                        is_numeric = stock_no.isdigit()
+                        queries = []
+                        if is_numeric:
+                            doc_id = int(stock_no)
+                            queries = [
+                                ("SELECT Id, InStockNo, AuditTime, Deleted, DeletedById, DeletedAt, 'instock' AS doc_type FROM tb_instockinfohis WHERE Id=%s LIMIT 1", (doc_id,)),
+                                ("SELECT Id, OutStockNo, AuditTime, Deleted, DeletedById, DeletedAt, 'outstock' AS doc_type FROM tb_outstockinfohis WHERE Id=%s LIMIT 1", (doc_id,)),
+                                ("SELECT Id, InStockNo, AuditTime, Deleted, DeletedById, DeletedAt, 'instock' AS doc_type FROM tb_instockinfohis WHERE InStockNo=%s LIMIT 1", (stock_no,)),
+                                ("SELECT Id, OutStockNo, AuditTime, Deleted, DeletedById, DeletedAt, 'outstock' AS doc_type FROM tb_outstockinfohis WHERE OutStockNo=%s LIMIT 1", (stock_no,)),
+                            ]
+                        else:
+                            queries = [
+                                ("SELECT Id, InStockNo, AuditTime, Deleted, DeletedById, DeletedAt, 'instock' AS doc_type FROM tb_instockinfohis WHERE InStockNo=%s LIMIT 1", (stock_no,)),
+                                ("SELECT Id, OutStockNo, AuditTime, Deleted, DeletedById, DeletedAt, 'outstock' AS doc_type FROM tb_outstockinfohis WHERE OutStockNo=%s LIMIT 1", (stock_no,)),
+                                ("SELECT Id, InStockNo, AuditTime, Deleted, DeletedById, DeletedAt, 'instock' AS doc_type FROM tb_instockinfohis WHERE Id=%s LIMIT 1", (stock_no,)),
+                                ("SELECT Id, OutStockNo, AuditTime, Deleted, DeletedById, DeletedAt, 'outstock' AS doc_type FROM tb_outstockinfohis WHERE Id=%s LIMIT 1", (stock_no,)),
+                            ]
+
+                        result = None
+                        for sql, params in queries:
+                            await cur.execute(sql, params)
+                            row = await cur.fetchone()
+                            if row:
+                                result = row
+                                break
+
+                        if not result:
+                            not_found_docs.append(stock_no)
+                        else:
+                            doc_type = result[6]
+                            stock_no_actual = result[1]
+                            found_docs.append({
+                                "id": str(result[0]),
+                                "stock_no": str(stock_no_actual) if stock_no_actual else stock_no,
+                                "doc_type": doc_type,
+                                "audit_time": str(result[2]) if result[2] else "",
+                                "deleted": result[3],
+                                "deleted_by_id": str(result[4]) if result[4] else "",
+                                "deleted_at": str(result[5]) if result[5] else "",
+                            })
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        deleted_by_ids = [doc["deleted_by_id"] for doc in found_docs if doc["deleted_by_id"]]
+        user_map = {}
+        if deleted_by_ids:
+            try:
+                user_map = await user_service.batch_get_by_user_center_ids(deleted_by_ids)
+            except Exception as e:
+                logger.warning(f"获取删除人信息失败: {e}")
+
+        for doc in found_docs:
+            u = user_map.get(doc["deleted_by_id"], {})
+            doc["deleted_by_name"] = u.get("user_name", "")
+            doc["deleted_by_code"] = u.get("code", "")
+
+        parts = []
+        if found_docs:
+            parts.append(f"找到 {len(found_docs)} 条")
+        if not_found_docs:
+            parts.append(f"{len(not_found_docs)} 条不存在")
+        message = "，".join(parts) if parts else "查询完成"
+
+        return {
+            "success": len(not_found_docs) == 0,
+            "total_count": len(stock_nos),
+            "found_count": len(found_docs),
+            "not_found_count": len(not_found_docs),
+            "found_docs": found_docs,
+            "not_found_docs": not_found_docs,
+            "message": message,
+        }
 
 
 wms_service = WmsService()

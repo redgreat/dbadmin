@@ -55,6 +55,7 @@ export default {
   deleteOrdersLogicalBatch: (data = {}) => request.post('/oms/orders/delete_logical_batch', data),
   deleteOrdersPhysicalBatch: (data = {}) => request.post('/oms/orders/delete_physical_batch', data),
   restoreOrderLogical: (data = {}) => request.post('/oms/orders/restore_logical', data),
+  queryOrderStatus: (data = {}) => request.post('/oms/orders/query_status', data),
   validateOrders: (data = {}) => request.post('/oms/validate-orders', data),
   batchUpdateAuditTime: (data = {}) => request.post('/oms/batch-update-audit-time', data),
   // oa - 转正时间修改
@@ -153,6 +154,7 @@ export default {
   deleteWmsDocumentsPhysicalBatch: (data = {}) => request.post('/wms/wms_curd/delete_physical_batch', data),
   restoreWmsDocumentLogical: (data = {}) => request.post('/wms/wms_curd/restore_logical', data),
   validateWmsDocuments: (data = {}) => request.post('/wms/wms_curd/validate_stock', data),
+  queryWmsStockStatus: (data = {}) => request.post('/wms/wms_curd/query_status', data),
   // wms - 价格查询与修改
   queryPrice: (data = {}) => request.post('/wms/wms_curd/price_query', data),
   modifyPrice: (data = {}) => request.post('/wms/wms_curd/price_modify', data),

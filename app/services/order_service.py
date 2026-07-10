@@ -288,5 +288,79 @@ class OrderService:
                     return True
         raise ValueError("不支持的连接池类型")
 
+    async def query_order_status(self, order_nos: List[str]) -> Dict:
+        """查询订单状态信息，返回Id、OrderNo、AuditTime、Deleted、DeletedById、DeletedAt，并关联OA获取删除人姓名"""
+        from app.services.user_service import user_service
+
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("连接池不存在")
+
+        found_docs = []
+        not_found_docs = []
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    for order_no in order_nos:
+                        is_numeric = order_no.isdigit()
+                        queries = []
+                        if is_numeric:
+                            doc_id = int(order_no)
+                            queries = [
+                                ("SELECT Id, OrderNo, AuditTime, Deleted, DeletedById, DeletedAt FROM tb_orderinfo WHERE Id=%s LIMIT 1", (doc_id,)),
+                            ]
+                        else:
+                            queries = [
+                                ("SELECT Id, OrderNo, AuditTime, Deleted, DeletedById, DeletedAt FROM tb_orderinfo WHERE OrderNo=%s LIMIT 1", (order_no,)),
+                                ("SELECT Id, OrderNo, AuditTime, Deleted, DeletedById, DeletedAt FROM tb_orderinfo WHERE Id=%s LIMIT 1", (order_no,)),
+                            ]
+
+                        result = None
+                        for sql, params in queries:
+                            await cur.execute(sql, params)
+                            row = await cur.fetchone()
+                            if row:
+                                result = row
+                                break
+
+                        if not result:
+                            not_found_docs.append(order_no)
+                        else:
+                            found_docs.append({
+                                "id": str(result[0]),
+                                "order_no": str(result[1]) if result[1] else "",
+                                "audit_time": str(result[2]) if result[2] else "",
+                                "deleted": result[3],
+                                "deleted_by_id": str(result[4]) if result[4] else "",
+                                "deleted_at": str(result[5]) if result[5] else "",
+                            })
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        deleted_by_ids = [doc["deleted_by_id"] for doc in found_docs if doc["deleted_by_id"]]
+        user_map = {}
+        if deleted_by_ids:
+            try:
+                user_map = await user_service.batch_get_by_user_center_ids(deleted_by_ids)
+            except Exception as e:
+                logger.warning(f"获取删除人信息失败: {e}")
+
+        for doc in found_docs:
+            u = user_map.get(doc["deleted_by_id"], {})
+            doc["deleted_by_name"] = u.get("user_name", "")
+            doc["deleted_by_code"] = u.get("code", "")
+
+        return {
+            "success": len(not_found_docs) == 0,
+            "total_count": len(order_nos),
+            "found_count": len(found_docs),
+            "not_found_count": len(not_found_docs),
+            "found_docs": found_docs,
+            "not_found_docs": not_found_docs,
+            "message": self._build_fetch_message(len(found_docs), len(not_found_docs)),
+        }
+
 
 order_service = OrderService()

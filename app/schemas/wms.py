@@ -18,6 +18,11 @@ class WmsRestoreLogicalIn(BaseModel):
     remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
 
 
+class WmsQueryIn(BaseModel):
+    """查询单据状态入参"""
+    stock_nos: List[str] = Field(default_factory=list, description="单据编码或单据Id列表")
+
+
 class WmsValidateRequest(BaseModel):
     """单据验证请求"""
     stock_nos: List[str] = Field(default_factory=list, description="单据编码或单据Id列表")

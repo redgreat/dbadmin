@@ -11,6 +11,7 @@ from app.schemas.wms import (
     WmsDeleteBatchIn,
     WmsRestoreLogicalIn,
     WmsValidateRequest,
+    WmsQueryIn,
     PriceQueryIn,
     PriceModifyIn,
 )
@@ -34,6 +35,25 @@ async def validate_stock(body: WmsValidateRequest):
     except Exception as e:
         logger.error(f"验证单据失败: {e}")
         return Fail(code=500, msg=f"验证失败: {str(e)}")
+
+
+@router.post("/wms_curd/query_status", summary="查询单据状态（Id、单号、AuditTime、Deleted、DeletedById、DeletedAt、删除人姓名）")
+async def query_stock_status(body: WmsQueryIn):
+    """查询单据状态信息，支持传入单据编码或单据Id
+
+    返回字段：Id、单据编码、AuditTime、Deleted、DeletedById、DeletedAt、删除人姓名、删除人编码
+    删除人通过 OA membership_userbaseinfo.UserCenterUserId 关联获取
+    """
+    try:
+        nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
+        if not nos:
+            return Fail(code=400, msg="单据编码或单据Id不能为空")
+
+        result = await wms_service.query_stock_status(nos)
+        return Success(data=result, msg=result["message"])
+    except Exception as e:
+        logger.error(f"查询单据状态失败: {e}")
+        return Fail(code=500, msg=f"查询失败: {str(e)}")
 
 
 @router.post("/wms_curd/delete_logical_batch", summary="批量逻辑删除（支持单据编码或单据Id）")
