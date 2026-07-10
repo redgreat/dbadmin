@@ -11,9 +11,36 @@
         <n-input v-model:value="form.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
       </n-form-item>
       <n-space>
+        <n-button :loading="querying" @click="handleQuery">查询</n-button>
         <n-button type="primary" :loading="executing" @click="handleExecute">执行</n-button>
         <n-button @click="handleReset">重置</n-button>
       </n-space>
+      <n-table v-if="queryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+        <thead>
+          <tr>
+            <th>订单Id</th>
+            <th>订单编号</th>
+            <th>审核时间</th>
+            <th>删除状态</th>
+            <th>删除人</th>
+            <th>删除时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in queryResult" :key="item.id">
+            <td>{{ item.id }}</td>
+            <td>{{ item.order_no }}</td>
+            <td>{{ item.audit_time || '-' }}</td>
+            <td>
+              <n-tag :type="item.deleted ? 'error' : 'success'" size="small">
+                {{ item.deleted ? '已删除' : '正常' }}
+              </n-tag>
+            </td>
+            <td>{{ item.deleted_by_name ? item.deleted_by_name + '-' + (item.deleted_by_code || '') + '-(' + item.deleted_by_id + ')' : (item.deleted_by_id || '-') }}</td>
+            <td>{{ item.deleted_at || '-' }}</td>
+          </tr>
+        </tbody>
+      </n-table>
     </n-form>
   </CommonPage>
 </template>
@@ -31,6 +58,8 @@ const message = useMessage()
 const formRef = ref(null)
 const form = ref({ orderIds: '', auditTime: null, remark: '' })
 const executing = ref(false)
+const querying = ref(false)
+const queryResult = ref([])
 
 const rules = {
   orderIds: [
@@ -52,6 +81,37 @@ const rules = {
 
 const handleReset = () => {
   form.value = { orderIds: '', auditTime: null, remark: '' }
+  queryResult.value = []
+}
+
+const handleQuery = async () => {
+  const ids = form.value.orderIds
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length)
+  if (!ids.length) {
+    message.warning('请输入订单Id或订单编码')
+    return
+  }
+  querying.value = true
+  try {
+    const res = await api.queryOrderStatus({ order_nos: ids })
+    if (res.code === 200 || res.code === 0) {
+      queryResult.value = res.data?.found_docs || []
+      const notFound = res.data?.not_found_docs || []
+      if (notFound.length) {
+        message.warning(`查询完成，未找到 ${notFound.length} 条：${notFound.join(', ')}`)
+      } else {
+        message.success(`查询到 ${queryResult.value.length} 条`)
+      }
+    } else {
+      message.error(res.msg || '查询失败')
+    }
+  } catch (e) {
+    message.error('请求异常')
+  } finally {
+    querying.value = false
+  }
 }
 
 const handleExecute = async () => {

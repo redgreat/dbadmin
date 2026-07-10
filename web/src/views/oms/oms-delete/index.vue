@@ -200,6 +200,9 @@ const rules = {
       },
     },
   ],
+  operatorId: [
+    { required: true, message: '请选择删除人' },
+  ],
 }
 
 const restoreRules = {
