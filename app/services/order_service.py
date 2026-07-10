@@ -347,6 +347,16 @@ class OrderService:
             except Exception as e:
                 logger.warning(f"获取删除人信息失败: {e}")
 
+        # 降级：OA 查不到的 ID，尝试从本库 user 表查询 DisplayName
+        unmatched_ids = [did for did in deleted_by_ids if did not in user_map]
+        if unmatched_ids:
+            try:
+                local_map = await user_service.get_local_user_display_names(unmatched_ids)
+                for did, display_name in local_map.items():
+                    user_map[did] = {"user_name": display_name, "code": "", "user_center_user_id": did}
+            except Exception as e:
+                logger.warning(f"本库用户查询降级失败: {e}")
+
         for doc in found_docs:
             u = user_map.get(doc["deleted_by_id"], {})
             doc["deleted_by_name"] = u.get("user_name", "")

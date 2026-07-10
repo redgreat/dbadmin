@@ -167,5 +167,41 @@ class UserService:
 
         return result
 
+    async def get_local_user_display_names(self, user_ids: List[str]) -> Dict[str, str]:
+        """从本库 user 表查询用户姓名，作为 OA 查不到的降级
+
+        DeletedById 实际存的是本库 membership_user / user 表的 Id，
+        当 OA 中查不到对应记录时，用此方法从本库获取 DisplayName(alias)
+
+        Args:
+            user_ids: 用户 Id 列表（来自 DeletedById）
+
+        Returns:
+            {user_id: display_name, ...}
+        """
+        from app.models.admin import User
+
+        result: Dict[str, str] = {}
+        int_ids = []
+        for uid in user_ids:
+            try:
+                int_ids.append(int(uid))
+            except (ValueError, TypeError):
+                pass
+        if not int_ids:
+            return result
+
+        try:
+            users = await User.filter(id__in=int_ids).values("id", "alias")
+            for u in users:
+                uid = str(u["id"]) if u["id"] is not None else ""
+                name = u.get("alias") or ""
+                if uid:
+                    result[uid] = name
+        except Exception as e:
+            logger.warning(f"本库用户查询降级失败: {e}")
+
+        return result
+
 
 user_service = UserService()
