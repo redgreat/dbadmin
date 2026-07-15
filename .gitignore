@@ -18,7 +18,6 @@ db.sqlite3-wal
 .trae
 .kiro
 .arts
-/aiagent
 config/config.yml
 log/
 data/
