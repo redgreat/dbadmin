@@ -1,0 +1,42 @@
+Using version ^2.45.0 for openai
+Using version ^0.139.0 for fastapi
+Using version ^1.28.1 for mcp
+Using version ^0.28.1 for httpx
+
+Updating dependencies
+Resolving dependencies...
+
+Package operations: 9 installs, 7 updates, 14 removals
+
+  - Removing fastapi-cli (0.0.7)
+  - Removing httptools (0.6.4)
+  - Removing jinja2 (3.1.6)
+  - Removing markdown-it-py (3.0.0)
+  - Removing markupsafe (3.0.2)
+  - Removing mdurl (0.1.2)
+  - Removing orjson (3.10.18)
+  - Removing rich (14.0.0)
+  - Removing rich-toolkit (0.14.7)
+  - Removing shellingham (1.5.4)
+  - Removing typer (0.16.0)
+  - Removing ujson (5.10.0)
+  - Removing watchfiles (1.0.5)
+  - Removing websockets (15.0.1)
+  - Installing attrs (26.1.0)
+  - Installing rpds-py (2026.6.3)
+  - Updating typing-extensions (4.15.0 -> 4.16.0)
+  - Installing referencing (0.37.0)
+  - Installing jsonschema-specifications (2025.9.1)
+  - Updating starlette (1.2.1 -> 1.3.1)
+  - Installing httpx-sse (0.4.3)
+  - Updating jiter (0.15.0 -> 0.16.0)
+  - Installing jsonschema (4.26.0)
+  - Installing pywin32 (312)
+  - Installing sse-starlette (3.4.5)
+  - Updating tqdm (4.67.3 -> 4.68.4)
+  - Downgrading uvicorn (0.49.0 -> 0.31.1)
+  - Updating fastapi (0.136.3 -> 0.139.0)
+  - Installing mcp (1.28.1)
+  - Updating openai (2.41.0 -> 2.45.0)
+
+Writing lock file
