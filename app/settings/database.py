@@ -50,7 +50,7 @@ def get_tortoise_config() -> Dict[str, Any]:
         "connections": connections,
         "apps": {
             "models": {
-                "models": ["app.models", "aerich.models"],
+                "models": ["app.models", "aerich.models", "aiagent.models"],
                 "default_connection": "default",
             }
         },

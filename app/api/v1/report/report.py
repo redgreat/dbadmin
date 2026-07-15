@@ -20,8 +20,9 @@ from app.services.excel_export_service import ExcelExportService
 from app.models.report import ReportConfig, ReportGeneration
 from app.models.admin import User
 from app.log import logger
-from app.services.celery_dispatcher import dispatch_report_export
+from app.services.celery_dispatcher import dispatch_report_export, revoke_celery_task
 from app.services.oss_service import oss_service
+from app.services.excel_export_service import register_local_report_task, cancel_local_report_task
 from app.settings import settings
 
 router = APIRouter()
@@ -269,10 +270,18 @@ async def generate_report(
             import asyncio
 
             generation.progress_text = "Celery不可用，已进入本地后台队列"
-            await generation.save(update_fields=["progress_text"])
-            asyncio.create_task(ExcelExportService().export_report(generation.id))
+            generation.celery_task_id = None
+            generation.stop_requested = False
+            generation.stopped_at = None
+            await generation.save(update_fields=["progress_text", "celery_task_id", "stop_requested", "stopped_at"])
+            bg_task = asyncio.create_task(ExcelExportService().export_report(generation.id))
+            register_local_report_task(generation.id, bg_task)
             logger.info(f"使用本地异步任务处理报表生成: {report_name}, ID: {generation.id}")
         else:
+            generation.celery_task_id = celery_task_id
+            generation.stop_requested = False
+            generation.stopped_at = None
+            await generation.save(update_fields=["celery_task_id", "stop_requested", "stopped_at"])
             logger.info(f"使用Celery任务处理报表生成: {report_name}, ID: {generation.id}, task_id: {celery_task_id}")
 
         return Success(
@@ -412,6 +421,61 @@ async def delete_generation(
     except Exception as e:
         logger.error(f"删除报表生成记录失败: {str(e)}")
         return Fail(msg=f"删除失败: {str(e)}")
+
+
+@router.post("/generation/stop", summary="停止报表生成任务")
+async def stop_generation(
+    generation_id: int = Query(..., description="报表生成记录ID"),
+    current_user: User = Depends(get_current_user)
+):
+    """停止报表生成任务。"""
+    try:
+        generation = await ReportGeneration.get_or_none(id=generation_id)
+        if not generation:
+            return Fail(msg="报表生成记录不存在")
+
+        is_admin = current_user.is_superuser
+        if not is_admin and generation.generator != current_user.username:
+            return Fail(code=403, msg="无权限停止此报表任务")
+
+        if generation.status != "exporting":
+            return Fail(msg="当前任务不是进行中状态，无法停止")
+
+        generation.stop_requested = True
+        generation.status = "manual_stopped"
+        generation.progress_text = "任务已手动停止"
+        generation.stopped_at = datetime.now()
+        generation.completed_at = datetime.now()
+        await generation.save(update_fields=["stop_requested", "status", "progress_text", "stopped_at", "completed_at"])
+
+        revoke_ok = revoke_celery_task(generation.celery_task_id, terminate=True) if generation.celery_task_id else False
+        cancel_ok = cancel_local_report_task(generation.id)
+
+        if generation.progress <= 0:
+            generation.stopped_at = datetime.now()
+            generation.status = "manual_stopped"
+            generation.progress_text = "任务已手动停止"
+            generation.error_message = None
+            generation.celery_task_id = None
+            generation.stop_requested = False
+            generation.completed_at = datetime.now()
+            await generation.save(update_fields=[
+                "stopped_at",
+                "status",
+                "progress_text",
+                "error_message",
+                "celery_task_id",
+                "stop_requested",
+                "completed_at",
+            ])
+
+        return Success(
+            msg="停止请求已提交",
+            data={"generation_id": generation.id, "revoke_sent": revoke_ok, "local_cancelled": cancel_ok},
+        )
+    except Exception as e:
+        logger.error(f"停止报表生成任务失败: {str(e)}", exc_info=True)
+        return Fail(msg=f"停止失败: {str(e)}")
 
 
 async def _generate_report_async(request: ReportGenerateRequest, current_user: User):

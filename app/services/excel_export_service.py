@@ -25,6 +25,32 @@ class RetryableReportError(Exception):
     """报表导出可自动重试的临时错误。"""
 
 
+class ManualStopError(Exception):
+    """报表导出任务被手动停止时抛出的异常。"""
+
+
+_LOCAL_REPORT_TASKS: dict[int, asyncio.Task] = {}
+
+
+def register_local_report_task(generation_id: int, bg_task: asyncio.Task):
+    _LOCAL_REPORT_TASKS[generation_id] = bg_task
+
+    def _cleanup(_):
+        current = _LOCAL_REPORT_TASKS.get(generation_id)
+        if current is bg_task:
+            _LOCAL_REPORT_TASKS.pop(generation_id, None)
+
+    bg_task.add_done_callback(_cleanup)
+
+
+def cancel_local_report_task(generation_id: int) -> bool:
+    bg_task = _LOCAL_REPORT_TASKS.get(generation_id)
+    if not bg_task or bg_task.done():
+        return False
+    bg_task.cancel()
+    return True
+
+
 class ExcelExportService:
     """Excel导出服务"""
 
@@ -52,13 +78,16 @@ class ExcelExportService:
                 logger.error(f"报表生成记录不存在: {generation_id}")
                 return
 
+            await self._raise_if_stop_requested(generation_id)
             logger.info(f"获取到生成记录: {generation.report_name}")
             generation.status = "exporting"
             generation.progress = 1
             generation.progress_text = "任务启动"
             generation.exported_rows = 0
             generation.error_message = None
-            await generation.save(update_fields=["status", "progress", "progress_text", "exported_rows", "error_message"])
+            generation.stop_requested = False
+            generation.stopped_at = None
+            await generation.save(update_fields=["status", "progress", "progress_text", "exported_rows", "error_message", "stop_requested", "stopped_at"])
 
             # 获取报表配置
             config = await generation.report_config
@@ -72,6 +101,7 @@ class ExcelExportService:
                 )
                 return
 
+            await self._raise_if_stop_requested(generation_id)
             logger.info(f"报表配置: {config.report_name}")
 
             # 获取数据库连接
@@ -86,6 +116,7 @@ class ExcelExportService:
                 )
                 return
 
+            await self._raise_if_stop_requested(generation_id)
             logger.info(f"数据库连接: {db_conn.name}")
 
             # 记录执行日志
@@ -107,10 +138,12 @@ class ExcelExportService:
                 db_conn=db_conn,
                 sql=config.sql_statement
             )
+            await self._raise_if_stop_requested(generation_id)
             file_path = local_file_path
 
             # 上传到OSS（启用时）
             oss_meta = await asyncio.to_thread(oss_service.upload_file, local_file_path)
+            await self._raise_if_stop_requested(generation_id)
             if oss_meta:
                 execution_log["storage"] = oss_meta
                 execution_log["local_file_path"] = local_file_path
@@ -144,6 +177,7 @@ class ExcelExportService:
                 execution_log["file_path"] = file_path
 
             # 更新生成记录状态
+            await self._raise_if_stop_requested(generation_id)
             generation.status = "completed"
             generation.completed_at = datetime.now()
             generation.progress = 100
@@ -151,10 +185,20 @@ class ExcelExportService:
             generation.error_message = None
             generation.file_path = file_path
             generation.execution_json = execution_log
+            generation.celery_task_id = None
+            generation.stop_requested = False
             await generation.save()
 
             logger.info(f"报表导出成功: {generation.report_name}, 文件: {file_path}")
 
+        except asyncio.CancelledError:
+            if generation:
+                await self._mark_generation_manual_stopped(generation)
+            raise
+        except ManualStopError:
+            if generation:
+                await self._mark_generation_manual_stopped(generation)
+            return
         except Exception as e:
             logger.error(f"报表导出失败: {str(e)}", exc_info=True)
             if generation:
@@ -181,6 +225,8 @@ class ExcelExportService:
     async def mark_retry_exhausted(self, generation_id: int, error_message: str):
         generation = await ReportGeneration.get_or_none(id=generation_id)
         if not generation:
+            return
+        if generation.status == "manual_stopped":
             return
         await self._update_generation_status(
             generation,
@@ -224,6 +270,7 @@ class ExcelExportService:
             has_any_data = False
             done = False
             while not done:
+                await self._raise_if_stop_requested(generation.id)
                 # 判断是否需要创建新文件
                 if current_sheet % self.MAX_SHEETS_PER_FILE == 0:
                     # 保存上一个文件
@@ -256,7 +303,8 @@ class ExcelExportService:
                     sql=sql,
                     offset=current_row,
                     limit=self.MAX_ROWS_PER_SHEET,
-                    headers=headers
+                    headers=headers,
+                    generation_id=generation.id,
                 )
 
                 if rows_written == 0:
@@ -374,6 +422,7 @@ class ExcelExportService:
                 sql=sql,
                 batch_size=self.PAGE_SIZE,
             ):
+                await self._raise_if_stop_requested(generation.id)
                 if not batch:
                     continue
                 if headers is None:
@@ -389,6 +438,7 @@ class ExcelExportService:
                     rows_in_sheet += 1
                     exported_rows += 1
                     if exported_rows % self.PAGE_SIZE == 0:
+                        await self._raise_if_stop_requested(generation.id)
                         await self._update_generation_progress(
                             generation=generation,
                             progress=min(95, 10 + exported_rows // 100000),
@@ -463,7 +513,8 @@ class ExcelExportService:
         sql: str,
         offset: int,
         limit: int,
-        headers: Optional[List[str]] = None
+        headers: Optional[List[str]] = None,
+        generation_id: Optional[int] = None,
     ) -> tuple[int, List[str]]:
         """
         收集数据并写入sheet，应用样式美化
@@ -476,6 +527,8 @@ class ExcelExportService:
 
         # 分批查询数据
         while rows_written < limit:
+            if generation_id:
+                await self._raise_if_stop_requested(generation_id)
             current_batch_size = min(batch_size, limit - rows_written)
 
             data = await SQLExecutionService.execute_query_page(
@@ -804,12 +857,22 @@ class ExcelExportService:
         exported_rows: int,
     ):
         try:
+            latest = await ReportGeneration.get_or_none(id=generation.id)
+            if latest and (latest.stop_requested or latest.status == "manual_stopped"):
+                raise ManualStopError("报表生成任务已手动停止")
             generation.progress = max(0, min(progress, 99))
             generation.progress_text = progress_text
             generation.exported_rows = exported_rows
             await generation.save(update_fields=["progress", "progress_text", "exported_rows"])
+        except ManualStopError:
+            raise
         except Exception as e:
             logger.warning(f"更新导出进度失败: {str(e)}")
+
+    async def _raise_if_stop_requested(self, generation_id: int):
+        generation = await ReportGeneration.get_or_none(id=generation_id)
+        if generation and generation.stop_requested:
+            raise ManualStopError("报表生成任务已手动停止")
 
     def _get_file_dir(self) -> str:
         """
@@ -840,6 +903,9 @@ class ExcelExportService:
                 short_error = (error_msg or "未知错误").strip()
                 generation.progress_text = f"导出失败: {short_error[:120]}"
                 generation.error_message = short_error
+            elif status == "manual_stopped":
+                generation.progress_text = "任务已手动停止"
+                generation.error_message = None
             else:
                 generation.error_message = None
 
@@ -849,6 +915,14 @@ class ExcelExportService:
                 execution_log["end_time"] = datetime.now().isoformat()
                 generation.execution_json = execution_log
 
+            if status in ("completed", "failed", "manual_stopped"):
+                generation.celery_task_id = None
+                generation.stop_requested = False
+
             await generation.save()
         except Exception as e:
             logger.error(f"更新生成记录状态失败: {str(e)}")
+
+    async def _mark_generation_manual_stopped(self, generation: ReportGeneration):
+        generation.stopped_at = datetime.now()
+        await self._update_generation_status(generation, "manual_stopped")

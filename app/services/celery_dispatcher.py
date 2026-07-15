@@ -37,9 +37,15 @@ def _safe_delay(task_name: str, func, *args) -> Optional[str]:
         async_result = func.apply_async(args=args, retry=False)
         task_id = getattr(async_result, "id", None)
         logger.info(f"[Celery] 已提交任务: {task_name}, task_id={task_id}, args={args}")
+        # #region debug-point A:celery-dispatch
+        import json, urllib.request, os; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'A','location':'celery_dispatcher._safe_delay','msg':'[DEBUG] celery dispatch ok','data':{'task_name':task_name,'task_id':task_id,'args_repr':repr(args)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()
+        # #endregion
         return task_id
     except Exception as exc:
         logger.error(f"[Celery] 提交任务失败: {task_name}, error={exc}", exc_info=True)
+        # #region debug-point B:celery-dispatch-fail
+        import json, urllib.request, os; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'B','location':'celery_dispatcher._safe_delay','msg':'[DEBUG] celery dispatch failed','data':{'task_name':task_name,'error':str(exc),'args_repr':repr(args)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()
+        # #endregion
         return None
 
 
@@ -105,6 +111,20 @@ def dispatch_simtrans_sync(receipt_numbers_text: str) -> Optional[str]:
     from app.tasks.celery_tasks import sync_simtrans_task
 
     return _safe_delay("dbadmin.simtrans.sync", sync_simtrans_task, receipt_numbers_text)
+
+
+def revoke_celery_task(task_id: str, terminate: bool = True) -> bool:
+    if not task_id:
+        return False
+    try:
+        from app.core.celery_app import celery_app
+
+        celery_app.control.revoke(task_id, terminate=terminate)
+        logger.info(f"[Celery] 已撤销任务: task_id={task_id}, terminate={terminate}")
+        return True
+    except Exception as exc:
+        logger.error(f"[Celery] 撤销任务失败: task_id={task_id}, error={exc}", exc_info=True)
+        return False
 
 
 def fallback_async(coro):

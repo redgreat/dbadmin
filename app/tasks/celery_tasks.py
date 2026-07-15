@@ -43,6 +43,9 @@ def process_imptask_task(self, task_id: int):
     )
 
     try:
+        # #region debug-point C:celery-task-received
+        import json, urllib.request, os, time; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'C','location':'celery_tasks.process_imptask_task','msg':'[DEBUG] celery task received','data':{'request_id':getattr(self.request,'id',None),'task_id':task_id,'retries':getattr(self.request,'retries',None)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()
+        # #endregion
         return run_async_with_tortoise(process_imptask, task_id, True)
     except RetryableImportError as exc:
         countdown = _retry_countdown(self.request.retries)
@@ -68,6 +71,9 @@ def execute_imptask_sql_task(self, task_id: int, user_id: int, username: str):
     )
 
     try:
+        # #region debug-point C:celery-task-received
+        import json, urllib.request, os, time; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'C','location':'celery_tasks.execute_imptask_sql_task','msg':'[DEBUG] celery task received','data':{'request_id':getattr(self.request,'id',None),'task_id':task_id,'user_id':user_id,'retries':getattr(self.request,'retries',None)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()
+        # #endregion
         return run_async_with_tortoise(execute_imptask_sql, task_id, user_id, username, True)
     except RetryableImportError as exc:
         countdown = _retry_countdown(self.request.retries)
@@ -75,6 +81,12 @@ def execute_imptask_sql_task(self, task_id: int, user_id: int, username: str):
             run_async_with_tortoise(mark_imptask_execute_retry_exhausted, task_id, str(exc))
             raise
         raise self.retry(exc=exc, countdown=countdown)
+
+    except Exception as exc:
+        # #region debug-point D:celery-task-exception
+        import json, urllib.request, os, time; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'D','location':'celery_tasks.execute_imptask_sql_task','msg':'[DEBUG] celery task exception','data':{'request_id':getattr(self.request,'id',None),'task_id':task_id,'error':str(exc)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()
+        # #endregion
+        raise
 
 
 @celery_app.task(

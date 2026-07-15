@@ -55,7 +55,7 @@ class ReportGeneration(BaseModel, SoftDeleteMixin):
     completed_at = fields.DatetimeField(description="完成时间", null=True)
     status = fields.CharField(
         max_length=20,
-        description="报表状态: exporting-导出中, completed-已完成, failed-失败",
+        description="报表状态: exporting-导出中, completed-已完成, failed-失败, manual_stopped-手动停止",
         default="exporting",
         index=True
     )
@@ -65,6 +65,9 @@ class ReportGeneration(BaseModel, SoftDeleteMixin):
     error_message = fields.TextField(description="失败原因", null=True)
     file_path = fields.CharField(max_length=500, description="文件路径", null=True)
     execution_json = fields.JSONField(description="执行日志(SQL语句、数据库连接等)", null=True)
+    celery_task_id = fields.CharField(max_length=100, null=True, description="Celery任务ID")
+    stop_requested = fields.BooleanField(default=False, description="是否请求停止导出任务", index=True)
+    stopped_at = fields.DatetimeField(description="手动停止时间", null=True, index=True)
 
     class Meta:
         table = "report_generation"

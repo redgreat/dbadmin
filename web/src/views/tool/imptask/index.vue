@@ -127,6 +127,7 @@ const columns = [
         processing: { text: '处理中', type: 'info' },
         completed: { text: '已完成', type: 'success' },
         failed: { text: '失败', type: 'error' },
+        manual_stopped: { text: '手动停止', type: 'warning' },
       }
       const item = map[row.status] || { text: row.status, type: 'default' }
       return h(NTag, { type: item.type }, { default: () => item.text })
@@ -142,6 +143,7 @@ const columns = [
         processing: { text: '执行中', type: 'info' },
         success: { text: '成功', type: 'success' },
         failed: { text: '失败', type: 'error' },
+        manual_stopped: { text: '手动停止', type: 'warning' },
       }
       const item = map[row.execute_status || 'pending'] || {
         text: row.execute_status || '-',
@@ -192,6 +194,20 @@ const columns = [
             )
           )
         }
+      }
+
+      if (row.status === 'pending' || row.status === 'processing' || row.execute_status === 'processing') {
+        buttons.push(
+          h(
+            NPopconfirm,
+            { onPositiveClick: () => handleStop(row) },
+            {
+              trigger: () =>
+                h(NButton, { size: 'small', type: 'warning' }, { default: () => '停止' }),
+              default: () => '确定停止当前进行中的任务吗？',
+            }
+          )
+        )
       }
 
       if (isAdmin.value) {
@@ -371,6 +387,15 @@ const handleExecuteImport = async (row) => {
     handleRefresh()
   } catch {
     // 全局请求拦截器已弹出错误，避免重复提示
+  }
+}
+
+const handleStop = async (row) => {
+  try {
+    const res = await api.stopExcelImportTask(row.id)
+    message.success(res.msg || '停止请求已提交')
+    handleRefresh()
+  } catch {
   }
 }
 

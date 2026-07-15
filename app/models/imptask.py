@@ -21,11 +21,16 @@ class ImpTask(BaseModel, TimestampMixin):
     status = fields.CharField(
         max_length=20,
         default="pending",
-        description="任务状态(pending/processing/completed/failed)",
+        description="任务状态(pending/processing/completed/failed/manual_stopped)",
         index=True
     )
     progress = fields.IntField(default=0, description="进度百分比(0-100)")
     message = fields.CharField(max_length=500, null=True, description="进度消息")
+    process_celery_task_id = fields.CharField(max_length=100, null=True, description="SQL生成Celery任务ID")
+    execute_celery_task_id = fields.CharField(max_length=100, null=True, description="导入执行Celery任务ID")
+    stop_requested = fields.BooleanField(default=False, description="是否请求停止SQL生成任务", index=True)
+    execute_stop_requested = fields.BooleanField(default=False, description="是否请求停止导入执行任务", index=True)
+    stopped_at = fields.DatetimeField(null=True, description="手动停止时间", index=True)
 
     # 结果文件
     sql_file_path = fields.CharField(max_length=500, null=True, description="生成的SQL文件路径")
@@ -36,7 +41,7 @@ class ImpTask(BaseModel, TimestampMixin):
     execute_status = fields.CharField(
         max_length=20,
         default="pending",
-        description="执行状态(pending/success/failed)",
+        description="执行状态(pending/processing/success/failed/manual_stopped)",
         index=True
     )
     execute_message = fields.CharField(max_length=500, null=True, description="执行结果消息")

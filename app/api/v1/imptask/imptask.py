@@ -12,14 +12,19 @@ from fastapi.responses import FileResponse
 from app.schemas.base import Success
 from app.schemas.imptask import ImpTaskOut
 from app.controllers.imptask import imptask_controller
-from app.services.imptask_processor import submit_imptask, submit_imptask_execute
+from app.services.imptask_processor import (
+    submit_imptask,
+    submit_imptask_execute,
+    cancel_local_imptask_process,
+    cancel_local_imptask_execute,
+)
 from app.models.admin import User
 from app.core.dependency import DependAuth
 from app.controllers.conn import conn_controller
 from app.services.excelimp_service import get_progress
 from app.services.sql_apply_service import execute_sql_on_connection, calc_sha256
 from app.services.conn_permission_service import ensure_conn_access
-from app.services.celery_dispatcher import dispatch_excelimp_execute
+from app.services.celery_dispatcher import dispatch_excelimp_execute, revoke_celery_task
 
 router = APIRouter()
 
@@ -344,3 +349,59 @@ async def delete_task(task_id: int, current_user: User = DependAuth):
     await imptask_controller.remove(task_id)
 
     return Success(msg="任务删除成功")
+
+
+@router.post("/stop/{task_id}", summary="停止Excel导入任务")
+async def stop_task(task_id: int, current_user: User = DependAuth):
+    """停止Excel导入任务或其执行导入任务。"""
+    task = await imptask_controller.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    is_admin = current_user.is_superuser or any(role.name == "admin" for role in await current_user.roles)
+    if not is_admin and task.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权限停止该任务")
+
+    if task.execute_status == "processing":
+        task.execute_stop_requested = True
+        task.execute_status = "manual_stopped"
+        task.execute_message = "任务已手动停止"
+        task.stopped_at = datetime.now()
+        await task.save(update_fields=["execute_stop_requested", "execute_status", "execute_message", "stopped_at"])
+        revoke_ok = revoke_celery_task(task.execute_celery_task_id, terminate=True) if task.execute_celery_task_id else False
+        cancel_ok = cancel_local_imptask_execute(task.id)
+        return Success(
+            msg="导入执行停止请求已提交",
+            data={"task_id": task.id, "target": "execute", "revoke_sent": revoke_ok, "local_cancelled": cancel_ok},
+        )
+
+    if task.status in ("pending", "processing"):
+        original_status = task.status
+        task.stop_requested = True
+        task.status = "manual_stopped"
+        task.message = "任务已手动停止"
+        task.stopped_at = datetime.now()
+        await task.save(update_fields=["stop_requested", "status", "message", "stopped_at"])
+        revoke_ok = revoke_celery_task(task.process_celery_task_id, terminate=True) if task.process_celery_task_id else False
+        cancel_ok = cancel_local_imptask_process(task.id)
+        if original_status == "pending":
+            task.status = "manual_stopped"
+            task.message = "任务已手动停止"
+            task.stop_requested = False
+            task.process_celery_task_id = None
+            task.stopped_at = datetime.now()
+            task.completed_at = datetime.now()
+            await task.save(update_fields=[
+                "status",
+                "message",
+                "stop_requested",
+                "process_celery_task_id",
+                "stopped_at",
+                "completed_at",
+            ])
+        return Success(
+            msg="任务停止请求已提交",
+            data={"task_id": task.id, "target": "process", "revoke_sent": revoke_ok, "local_cancelled": cancel_ok},
+        )
+
+    raise HTTPException(status_code=400, detail="当前任务没有进行中的处理或执行任务")

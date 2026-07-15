@@ -70,6 +70,8 @@ const getStatusInfo = (status) => {
       return { type: 'success', text: '已完成', icon: 'material-symbols:check-circle' }
     case 'failed':
       return { type: 'error', text: '失败', icon: 'material-symbols:cancel' }
+    case 'manual_stopped':
+      return { type: 'warning', text: '手动停止', icon: 'material-symbols:stop-circle' }
     default:
       return { type: 'default', text: '未知', icon: 'material-symbols:help' }
   }
@@ -85,6 +87,9 @@ const getStatusText = (row) => {
   }
   if (row.status === 'failed') {
     return row.progress_text || '失败'
+  }
+  if (row.status === 'manual_stopped') {
+    return row.progress_text || '任务已手动停止'
   }
   return getStatusInfo(row.status).text
 }
@@ -155,6 +160,20 @@ const columns = [
               onClick: () => handleDownload(row),
             },
             { default: () => '下载' }
+          )
+        )
+      }
+
+      if (row.status === 'exporting') {
+        buttons.push(
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'warning',
+              onClick: () => handleStop(row),
+            },
+            { default: () => '停止' }
           )
         )
       }
@@ -304,6 +323,29 @@ const handleDelete = (row) => {
       } catch (error) {
         console.error('删除报表失败', error)
         $message.error('删除失败')
+      }
+    },
+  })
+}
+
+const handleStop = (row) => {
+  $dialog.warning({
+    title: '确认停止',
+    content: `确定要停止报表"${row.report_name}"吗？`,
+    positiveText: '确定',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        const res = await api.stopReportGeneration({ generation_id: row.id })
+        if (res.code === 200) {
+          $message.success(res.msg || '停止请求已提交')
+          handleRefresh()
+        } else {
+          $message.error(res.msg || '停止失败')
+        }
+      } catch (error) {
+        console.error('停止报表失败', error)
+        $message.error('停止失败')
       }
     },
   })

@@ -105,6 +105,7 @@ export default {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   executeExcelImportTask: (data = {}) => request.post('/imptask/execute', data),
+  stopExcelImportTask: (id) => request.post(`/imptask/stop/${id}`),
   deleteExcelImportTask: (id) => request.delete(`/imptask/delete/${id}`),
 
   // report - 报表管理
@@ -117,6 +118,7 @@ export default {
   generateReport: (data = {}) => request.post('/report/generate', data),
   getReportGenerationList: (params = {}) => request.get('/report/generation/list', { params }),
   downloadReport: (params = {}) => request.get('/report/generation/download', { params, responseType: 'blob' }),
+  stopReportGeneration: (params = {}) => request.post('/report/generation/stop', null, { params }),
   deleteReportGeneration: (params = {}) => request.delete('/report/generation/delete', { params }),
   // dict - 字典管理
   getDictList: (params = {}) => request.get('/dict/list', { params }),

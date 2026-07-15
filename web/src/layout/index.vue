@@ -26,6 +26,9 @@
         <AppMain />
       </section>
     </article>
+
+    <!-- AI 运维助手悬浮按钮 -->
+    <AiChatButton />
   </n-layout>
 </template>
 
@@ -34,6 +37,7 @@ import AppHeader from './components/header/index.vue'
 import SideBar from './components/sidebar/index.vue'
 import AppMain from './components/AppMain.vue'
 import AppTags from './components/tags/index.vue'
+import AiChatButton from '@/components/AiChat/AiChatButton.vue'
 import { useAppStore } from '@/store'
 import { header, tags } from '~/settings'
 
