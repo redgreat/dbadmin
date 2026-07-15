@@ -60,7 +60,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, h } from 'vue'
 import { NButton, NForm, NFormItem, NInput, NSwitch, NTag } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
@@ -104,10 +104,10 @@ const columns = [
     width: 80,
     align: 'center',
     render(row) {
-      return (
-        <NTag type={row.enabled ? 'success' : 'error'}>
-          {row.enabled ? '启用' : '禁用'}
-        </NTag>
+      return h(
+        NTag,
+        { type: row.enabled ? 'success' : 'error' },
+        { default: () => (row.enabled ? '启用' : '禁用') }
       )
     },
   },
@@ -117,7 +117,11 @@ const columns = [
     width: 100,
     align: 'center',
     render(row) {
-      return row.allow_write ? <NTag type="warning">允许</NTag> : <NTag type="info">禁止</NTag>
+      return h(
+        NTag,
+        { type: row.allow_write ? 'warning' : 'info' },
+        { default: () => (row.allow_write ? '允许' : '禁止') }
+      )
     },
   },
   { title: '创建时间', key: 'created_at', width: 180, align: 'center' },

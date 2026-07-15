@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, h } from 'vue'
 import { NButton, NInput, NTag, NModal, NForm, NFormItem, NSpace, useMessage } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
@@ -108,7 +108,7 @@ const columns = [
       rejected: { type: 'error', label: '已拒绝' }
     }
     const s = statusMap[row.status] || { type: 'default', label: row.status }
-    return <NTag type={s.type}>{s.label}</NTag>
+    return h(NTag, { type: s.type }, { default: () => s.label })
   } },
   { title: '创建时间', key: 'created_at', width: 180, align: 'center' },
   {
@@ -119,13 +119,13 @@ const columns = [
     fixed: 'right',
     render(row) {
       if (row.status === 'pending') {
-        return (
-          <NButton size="small" type="primary" onClick={() => openApprove(row)}>
-            处理
-          </NButton>
+        return h(
+          NButton,
+          { size: 'small', type: 'primary', onClick: () => openApprove(row) },
+          { default: () => '处理' }
         )
       }
-      return <span class="text-gray-400">无</span>
+      return h('span', { class: 'text-gray-400' }, '无')
     },
   },
 ]

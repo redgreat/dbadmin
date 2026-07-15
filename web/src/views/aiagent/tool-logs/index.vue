@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, h } from 'vue'
 import { NInput, NTag, NTooltip } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
@@ -41,16 +41,16 @@ const columns = [
   { title: '工具名称', key: 'tool_name', width: 180, align: 'center' },
   { title: '会话ID', key: 'session_id', width: 150, align: 'center', ellipsis: { tooltip: true } },
   { title: '写操作', key: 'is_write_op', width: 80, align: 'center', render(row) {
-    return row.is_write_op ? <NTag type="warning" size="small">是</NTag> : <NTag type="default" size="small">否</NTag>
+    return h(NTag, { type: row.is_write_op ? 'warning' : 'default', size: 'small' }, { default: () => (row.is_write_op ? '是' : '否') })
   } },
   { title: '输入参数', key: 'tool_input', width: 250, ellipsis: { tooltip: true }, render(row) {
     return JSON.stringify(row.tool_input || {})
   } },
   { title: '状态', key: 'status', width: 100, align: 'center', render(row) {
-    return (
-      <NTag type={row.status === 'success' ? 'success' : 'error'}>
-        {row.status}
-      </NTag>
+    return h(
+      NTag,
+      { type: row.status === 'success' ? 'success' : 'error' },
+      { default: () => row.status }
     )
   } },
   { title: '耗时(ms)', key: 'duration_ms', width: 100, align: 'center' },

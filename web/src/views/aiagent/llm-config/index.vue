@@ -70,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, h } from 'vue'
 import { NButton, NForm, NFormItem, NInput, NSelect, NSwitch, NTag } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
@@ -123,10 +123,10 @@ const columns = [
     width: 80,
     align: 'center',
     render(row) {
-      return (
-        <NTag type={row.is_active ? 'success' : 'default'}>
-          {row.is_active ? '激活' : '未激活'}
-        </NTag>
+      return h(
+        NTag,
+        { type: row.is_active ? 'success' : 'default' },
+        { default: () => (row.is_active ? '激活' : '未激活') }
       )
     },
   },
@@ -138,10 +138,10 @@ const columns = [
     align: 'center',
     fixed: 'right',
     render(row) {
-      return (
-        <NButton size="small" type="primary" onClick={() => handleEdit(row)}>
-          编辑
-        </NButton>
+      return h(
+        NButton,
+        { size: 'small', type: 'primary', onClick: () => handleEdit(row) },
+        { default: () => '编辑' }
       )
     },
   },
