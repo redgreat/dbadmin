@@ -82,7 +82,8 @@ def _progress_done(stamp: str, sql: str):
 
 def get_progress(stamp: str) -> Dict[str, Any]:
     """获取进度"""
-    if stamp not in _PROGRESS and os.path.exists(_progress_path(stamp)):
+    # 每次查询都尝试从磁盘读取最新状态，因为状态可能是其他进程（如Celery Worker）更新的
+    if os.path.exists(_progress_path(stamp)):
         try:
             with open(_progress_path(stamp), "r", encoding="utf-8") as f:
                 _PROGRESS[stamp] = json.load(f)
