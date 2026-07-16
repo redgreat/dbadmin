@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from aiagent.models.ai_llm_config import AiLlmConfig
 from app.schemas.base import Success, SuccessExtra, Fail
+from fastapi.encoders import jsonable_encoder
 
 llm_config_router = APIRouter()
 
@@ -31,7 +32,8 @@ class LlmConfigUpdate(BaseModel):
 async def list_configs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1)):
     total = await AiLlmConfig.all().count()
     configs = await AiLlmConfig.all().order_by("-id").offset((page - 1) * page_size).limit(page_size).values()
-    return SuccessExtra(data=list(configs), total=total, page=page, page_size=page_size)
+    return SuccessExtra(data=jsonable_encoder(list(configs)), total=total, page=page, page_size=page_size)
+
 
 @llm_config_router.post("/")
 async def create_config(req: LlmConfigCreate):

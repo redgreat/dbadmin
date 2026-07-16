@@ -3,6 +3,7 @@ from aiagent.models.ai_approval import AiApproval
 from pydantic import BaseModel
 from datetime import datetime
 from app.schemas.base import Success, SuccessExtra, Fail
+from fastapi.encoders import jsonable_encoder
 
 approval_router = APIRouter()
 
@@ -13,7 +14,8 @@ class ApproveRequest(BaseModel):
 async def list_approvals(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1)):
     total = await AiApproval.all().count()
     approvals = await AiApproval.all().order_by("-id").offset((page - 1) * page_size).limit(page_size).values()
-    return SuccessExtra(data=list(approvals), total=total, page=page, page_size=page_size)
+    return SuccessExtra(data=jsonable_encoder(list(approvals)), total=total, page=page, page_size=page_size)
+
 
 @approval_router.post("/{approval_no}/approve")
 async def approve(approval_no: str, req: ApproveRequest):

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query
 from aiagent.models.ai_token import AiToken
 from pydantic import BaseModel
 from app.schemas.base import Success, SuccessExtra
+from fastapi.encoders import jsonable_encoder
 
 token_router = APIRouter()
 
@@ -14,7 +15,8 @@ class TokenCreate(BaseModel):
 async def list_tokens(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1)):
     total = await AiToken.all().count()
     tokens = await AiToken.all().order_by("-id").offset((page - 1) * page_size).limit(page_size).values()
-    return SuccessExtra(data=list(tokens), total=total, page=page, page_size=page_size)
+    return SuccessExtra(data=jsonable_encoder(list(tokens)), total=total, page=page, page_size=page_size)
+
 
 @token_router.post("/")
 async def create_token(req: TokenCreate):
