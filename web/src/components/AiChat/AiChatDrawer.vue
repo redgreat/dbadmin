@@ -11,21 +11,21 @@
             :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
           >
             <div
-              class="max-w-[85%] rounded-lg p-3"
+              class="max-w-[85%] rounded-[8px] p-[12px]"
               :class="
                 msg.role === 'user'
                   ? 'bg-blue-500 text-white rounded-tr-none'
                   : 'bg-gray-100 text-gray-800 rounded-tl-none dark:bg-gray-800 dark:text-gray-200'
               "
             >
-              <div v-if="msg.role === 'assistant'" class="text-sm whitespace-pre-wrap leading-relaxed font-sans" v-html="formatMessage(msg.content)"></div>
-              <div v-else class="text-sm whitespace-pre-wrap">{{ msg.content }}</div>
+              <div v-if="msg.role === 'assistant'" class="text-[14px] whitespace-pre-wrap leading-[1.6] font-sans" v-html="formatMessage(msg.content)"></div>
+              <div v-else class="text-[14px] whitespace-pre-wrap leading-[1.6]">{{ msg.content }}</div>
             </div>
           </div>
           
           <div v-if="isTyping" class="flex justify-start">
-            <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 rounded-tl-none">
-              <span class="animate-pulse">思考中...</span>
+            <div class="bg-gray-100 dark:bg-gray-800 rounded-[8px] p-[12px] rounded-tl-none">
+              <span class="animate-pulse text-[14px]">思考中...</span>
             </div>
           </div>
         </div>
