@@ -20,7 +20,7 @@
             v-model:value="queryItems.name"
             type="text"
             placeholder="请输入名称"
-            @keydown.enter="$table?.handleSearch"
+            @keydown="$event.key === 'Enter' && $table?.handleSearch()"
           />
         </QueryBarItem>
       </template>
@@ -91,6 +91,7 @@ import CrudTable from '@/components/table/CrudTable.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
 import { useCRUD } from '@/composables'
 import aiApi from '@/api/ai'
+import { formatDateTime } from '@/utils/common/common'
 
 defineOptions({ name: 'TokenManagement' })
 
@@ -190,7 +191,15 @@ const columns = [
       )
     },
   },
-  { title: '创建时间', key: 'created_at', width: 180, align: 'center' },
+  {
+    title: '创建时间',
+    key: 'created_at',
+    width: 180,
+    align: 'center',
+    render(row) {
+      return formatDateTime(row.created_at)
+    },
+  },
   {
     title: '操作',
     key: 'actions',

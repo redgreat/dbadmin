@@ -1,4 +1,5 @@
 from openai import AsyncOpenAI
+from openai import APITimeoutError, APIConnectionError
 from aiagent.models.ai_llm_config import AiLlmConfig
 
 class LLMClient:
@@ -24,6 +25,8 @@ class LLMClient:
         self.client = AsyncOpenAI(
             api_key=api_key,
             base_url=config.base_url,
+            timeout=60.0,
+            max_retries=2,
         )
         self.model_name = config.model_name
         self.max_tokens = config.max_tokens

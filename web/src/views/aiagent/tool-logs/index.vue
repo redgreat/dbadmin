@@ -14,7 +14,7 @@
             v-model:value="queryItems.tool_name"
             type="text"
             placeholder="请输入工具名称"
-            @keydown.enter="$table?.handleSearch"
+            @keydown="$event.key === 'Enter' && $table?.handleSearch()"
           />
         </QueryBarItem>
       </template>
@@ -29,6 +29,7 @@ import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
 import CrudTable from '@/components/table/CrudTable.vue'
 import aiApi from '@/api/ai'
+import { formatDateTime } from '@/utils/common/common'
 
 defineOptions({ name: 'ToolLogsManagement' })
 
@@ -59,6 +60,14 @@ const columns = [
   } },
   { title: '耗时(ms)', key: 'duration_ms', width: 100, align: 'center' },
   { title: '错误信息', key: 'error_message', width: 200, ellipsis: { tooltip: true } },
-  { title: '调用时间', key: 'timestamp', width: 180, align: 'center' },
+  {
+    title: '调用时间',
+    key: 'timestamp',
+    width: 180,
+    align: 'center',
+    render(row) {
+      return formatDateTime(row.timestamp)
+    },
+  },
 ]
 </script>

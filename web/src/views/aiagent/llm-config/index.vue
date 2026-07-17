@@ -20,7 +20,7 @@
             v-model:value="queryItems.name"
             type="text"
             placeholder="请输入名称"
-            @keydown.enter="$table?.handleSearch"
+            @keydown="$event.key === 'Enter' && $table?.handleSearch()"
           />
         </QueryBarItem>
       </template>
@@ -79,6 +79,7 @@ import CrudTable from '@/components/table/CrudTable.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
 import { useCRUD } from '@/composables'
 import aiApi from '@/api/ai'
+import { formatDateTime } from '@/utils/common/common'
 
 defineOptions({ name: 'LlmConfigManagement' })
 
@@ -134,7 +135,15 @@ const columns = [
       )
     },
   },
-  { title: '更新时间', key: 'updated_at', width: 180, align: 'center' },
+  {
+    title: '更新时间',
+    key: 'updated_at',
+    width: 180,
+    align: 'center',
+    render(row) {
+      return formatDateTime(row.updated_at)
+    },
+  },
   {
     title: '操作',
     key: 'actions',

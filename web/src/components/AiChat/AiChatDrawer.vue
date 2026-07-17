@@ -34,11 +34,12 @@
         <div class="pt-4 border-t dark:border-gray-700">
           <n-input-group>
             <n-input
+              ref="inputRef"
               v-model:value="inputValue"
               type="textarea"
               :autosize="{ minRows: 1, maxRows: 4 }"
               placeholder="请输入问题或运维指令 (Shift+Enter换行)"
-              @keydown.enter="handleEnter"
+              @keydown="handleEnter"
             />
             <n-button type="primary" :disabled="isTyping || !inputValue.trim()" @click="sendMessage">
               发送
@@ -91,6 +92,7 @@ const scrollToBottom = async () => {
 }
 
 const handleEnter = (e) => {
+  if (e.key !== 'Enter') return
   if (e.shiftKey) return
   e.preventDefault()
   sendMessage()

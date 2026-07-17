@@ -18,10 +18,10 @@ dbadmin.lunz.cn {
                 versions 1.1
             }
 
-            header_up X-Real-IP { remote_host }
-            header_up X-Forwarded-For { remote_host }
-            header_up X-Forwarded-Proto { scheme }
-            header_up X-Forwarded-Host { host }
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
         }
     }
 }
@@ -42,10 +42,10 @@ trimerge.lunz.cn {
                 versions 1.1
             }
 
-            header_up X-Real-IP { remote_host }
-            header_up X-Forwarded-For { remote_host }
-            header_up X-Forwarded-Proto { scheme }
-            header_up X-Forwarded-Host { host }
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
         }
     }
 }
@@ -73,10 +73,10 @@ dbmcp.lunz.cn {
                 write_timeout 0
             }
 
-            header_up X-Real-IP { remote_host }
-            header_up X-Forwarded-For { remote_host }
-            header_up X-Forwarded-Proto { scheme }
-            header_up X-Forwarded-Host { host }
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
 
             header_up -Accept-Encoding
         }
@@ -85,15 +85,15 @@ dbmcp.lunz.cn {
     handle {
         encode zstd gzip
 
-        reverse_proxy 192.168.11.243:3000 {
+        reverse_proxy 192.168.13.194:3000 {
             transport http {
                 versions 1.1
             }
 
-            header_up X-Real-IP { remote_host }
-            header_up X-Forwarded-For { remote_host }
-            header_up X-Forwarded-Proto { scheme }
-            header_up X-Forwarded-Host { host }
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
         }
     }
 }
