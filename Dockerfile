@@ -122,6 +122,7 @@ RUN groupadd -r -g 1000 appuser && useradd -r -u 1000 -g appuser appuser \
 
 # 暴露端口
 EXPOSE 80
+EXPOSE 8502
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
