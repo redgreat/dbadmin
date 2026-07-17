@@ -1,0 +1,99 @@
+{
+    email rubygreat@msn.com
+}
+
+dbadmin.lunz.cn {
+    tls /etc/caddy/certs/lunz.cn.pem /etc/caddy/certs/lunz.cn.key
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+    handle {
+        encode zstd gzip
+
+        reverse_proxy 192.168.13.194:8501 {
+            transport http {
+                versions 1.1
+            }
+
+            header_up X-Real-IP { remote_host }
+            header_up X-Forwarded-For { remote_host }
+            header_up X-Forwarded-Proto { scheme }
+            header_up X-Forwarded-Host { host }
+        }
+    }
+}
+
+trimerge.lunz.cn {
+    tls /etc/caddy/certs/lunz.cn.pem /etc/caddy/certs/lunz.cn.key
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+    handle {
+        encode zstd gzip
+
+        reverse_proxy 192.168.13.194:8502 {
+            transport http {
+                versions 1.1
+            }
+
+            header_up X-Real-IP { remote_host }
+            header_up X-Forwarded-For { remote_host }
+            header_up X-Forwarded-Proto { scheme }
+            header_up X-Forwarded-Host { host }
+        }
+    }
+}
+
+dbmcp.lunz.cn {
+    tls /etc/caddy/certs/lunz.cn.pem /etc/caddy/certs/lunz.cn.key
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    @mcp_sse {
+        path /mcp/sse /mcp/sse/*
+    }
+
+    handle @mcp_sse {
+        reverse_proxy 192.168.13.194:8088 {
+            flush_interval -1
+
+            transport http {
+                versions 1.1
+                read_timeout 0
+                write_timeout 0
+            }
+
+            header_up X-Real-IP { remote_host }
+            header_up X-Forwarded-For { remote_host }
+            header_up X-Forwarded-Proto { scheme }
+            header_up X-Forwarded-Host { host }
+
+            header_up -Accept-Encoding
+        }
+    }
+
+    handle {
+        encode zstd gzip
+
+        reverse_proxy 192.168.11.243:3000 {
+            transport http {
+                versions 1.1
+            }
+
+            header_up X-Real-IP { remote_host }
+            header_up X-Forwarded-For { remote_host }
+            header_up X-Forwarded-Proto { scheme }
+            header_up X-Forwarded-Host { host }
+        }
+    }
+}

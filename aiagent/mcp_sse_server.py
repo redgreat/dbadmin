@@ -190,6 +190,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "aiagent.mcp_sse_server:app",
         host="0.0.0.0",
-        port=8502,
+        port=8088,
         log_level="info",
     )

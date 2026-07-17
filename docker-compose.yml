@@ -17,7 +17,7 @@ services:
       - ./data:/opt/dbadmin/data:rw
     ports:
       - "8501:80"
-      - "8502:8502"
+      - "8088:8088"
     networks:
       - dbadmin-network
     healthcheck:
