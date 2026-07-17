@@ -156,12 +156,9 @@ async def _auth_token(x_ai_token: str) -> object:
     return token_obj
 
 
-@app.get("/sse")
+@app.api_route("/sse", methods=["GET", "POST"])
 async def handle_sse(request: Request, x_ai_token: str = Header(default="")):
-    """
-    MCP SSE 长连接入口
-    客户端连接后将收到 endpoint 事件，后续通过 /messages 发送 JSON-RPC 指令
-    """
+    """MCP SSE 长连接入口，同时兼容 GET/POST 以应对部分客户端实现"""
     token_obj = await _auth_token(x_ai_token)
     _current_token.set(token_obj)
 

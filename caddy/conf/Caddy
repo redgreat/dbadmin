@@ -63,7 +63,32 @@ dbmcp.lunz.cn {
         path /mcp/sse /mcp/sse/*
     }
 
+    @mcp_messages {
+        path /mcp/messages /mcp/messages/*
+    }
+
     handle @mcp_sse {
+        uri strip_prefix /mcp
+        reverse_proxy 192.168.13.194:8088 {
+            flush_interval -1
+
+            transport http {
+                versions 1.1
+                read_timeout 0
+                write_timeout 0
+            }
+
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
+
+            header_up -Accept-Encoding
+        }
+    }
+
+    handle @mcp_messages {
+        uri strip_prefix /mcp
         reverse_proxy 192.168.13.194:8088 {
             flush_interval -1
 
