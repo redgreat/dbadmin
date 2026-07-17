@@ -133,6 +133,12 @@ class OSSConfig(BaseModel):
     cleanup_local_after_upload: bool = False
 
 
+class GfsSyncConfig(BaseModel):
+    """GFS 费用同步配置"""
+    url: str = "http://localhost:8090/api/trigger-sync"
+    api_key: str = ""
+
+
 class Config(BaseModel):
     """统一配置模型"""
     app: AppConfig
@@ -147,6 +153,7 @@ class Config(BaseModel):
     redis: RedisConfig = Field(default_factory=RedisConfig)
     celery: CeleryConfig = Field(default_factory=CeleryConfig)
     oss: OSSConfig = Field(default_factory=OSSConfig)
+    gfs_sync: GfsSyncConfig = Field(default_factory=GfsSyncConfig)
 
 
 class ConfigLoader:
