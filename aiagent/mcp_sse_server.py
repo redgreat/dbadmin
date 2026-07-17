@@ -158,7 +158,29 @@ async def _auth_token(x_ai_token: str) -> object:
 
 
 async def _dispatch_jsonrpc(request: Request) -> Response:
-    """处理 MCP JSON-RPC 请求（兼容部分客户端将 /sse 作为统一消息入口）。"""
+    """处理 MCP JSON-RPC 请求（兼容 StreamableHTTP 客户端直连 /sse 或 /messages）。"""
+
+    def _ok(req_id, result: dict) -> Response:
+        if req_id is None:
+            return Response(status_code=202)
+        return Response(
+            content=json.dumps({"jsonrpc": "2.0", "id": req_id, "result": result}, ensure_ascii=False),
+            media_type="application/json",
+            status_code=200,
+        )
+
+    def _err(req_id, code: int, message: str) -> Response:
+        if req_id is None:
+            return Response(status_code=202)
+        return Response(
+            content=json.dumps(
+                {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}},
+                ensure_ascii=False,
+            ),
+            media_type="application/json",
+            status_code=200,
+        )
+
     try:
         payload = await request.json()
     except Exception as e:
@@ -173,40 +195,56 @@ async def _dispatch_jsonrpc(request: Request) -> Response:
     params = payload.get("params") or {}
 
     if jsonrpc != "2.0" or not method:
-        raise HTTPException(status_code=400, detail="缺少必要字段: jsonrpc/method")
+        return _err(req_id, -32600, "无效请求：缺少 jsonrpc/method")
 
     if method == "initialize":
         proto = params.get("protocolVersion", "2024-11-05")
-        result = {
-            "protocolVersion": proto,
-            "capabilities": {"tools": {}, "resources": {}},
-            "serverInfo": {"name": "dbadmin-mcp", "version": "1.0.0"},
-        }
-    elif method == "notifications/initialized" or method.startswith("notifications/"):
+        return _ok(
+            req_id,
+            {
+                "protocolVersion": proto,
+                "capabilities": {"tools": {}, "resources": {}, "prompts": {}},
+                "serverInfo": {"name": "dbadmin-mcp", "version": "1.0.0"},
+            },
+        )
+
+    if method == "notifications/initialized" or method.startswith("notifications/"):
         return Response(status_code=202)
-    elif method == "ping" or method == "notifications/ping":
-        result = {}
-    elif method == "tools/list":
-        tools = await handle_list_tools()
-        result = {"tools": [t.model_dump(exclude_none=True, mode="json") for t in tools]}
-    elif method == "tools/call":
+
+    if method == "ping" or method == "notifications/ping":
+        return _ok(req_id, {})
+
+    if method == "tools/list":
+        try:
+            tools = await handle_list_tools()
+            return _ok(req_id, {"tools": [t.model_dump(exclude_none=True, mode="json") for t in tools]})
+        except Exception as e:
+            return _err(req_id, -32603, f"tools/list 执行失败: {e}")
+
+    if method == "tools/call":
         tool_name = params.get("name")
         arguments = params.get("arguments") or {}
         if not tool_name:
-            raise HTTPException(status_code=400, detail="tools/call 缺少 params.name")
-        contents = await handle_call_tool(tool_name, arguments)
-        result = {"content": [c.model_dump(exclude_none=True, mode="json") for c in contents]}
-    else:
-        raise HTTPException(status_code=400, detail=f"未知方法: {method}")
+            return _err(req_id, -32602, "无效参数：tools/call 缺少 params.name")
+        try:
+            contents = await handle_call_tool(tool_name, arguments)
+            return _ok(req_id, {"content": [c.model_dump(exclude_none=True, mode="json") for c in contents]})
+        except Exception as e:
+            return _err(req_id, -32603, f"tools/call 执行失败: {e}")
 
-    if req_id is None:
-        return Response(status_code=202)
+    if method == "prompts/list":
+        return _ok(req_id, {"prompts": []})
 
-    return Response(
-        content=json.dumps({"jsonrpc": "2.0", "id": req_id, "result": result}, ensure_ascii=False),
-        media_type="application/json",
-        status_code=200,
-    )
+    if method == "resources/list":
+        return _ok(req_id, {"resources": []})
+
+    if method == "roots/list":
+        return _ok(req_id, {"roots": []})
+
+    if method == "logging/setLevel":
+        return _ok(req_id, {})
+
+    return _err(req_id, -32601, f"未知方法: {method}")
 
 
 async def _handle_post_message_with_capture(request: Request) -> Response:
