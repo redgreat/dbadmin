@@ -60,15 +60,14 @@ dbmcp.lunz.cn {
     }
 
     @mcp_sse {
-        path /mcp/sse /mcp/sse/*
+        path /sse /sse/*
     }
 
     @mcp_messages {
-        path /mcp/messages /mcp/messages/*
+        path /messages /messages/*
     }
 
     handle @mcp_sse {
-        uri strip_prefix /mcp
         reverse_proxy 192.168.13.194:8088 {
             flush_interval -1
 
@@ -88,7 +87,6 @@ dbmcp.lunz.cn {
     }
 
     handle @mcp_messages {
-        uri strip_prefix /mcp
         reverse_proxy 192.168.13.194:8088 {
             flush_interval -1
 

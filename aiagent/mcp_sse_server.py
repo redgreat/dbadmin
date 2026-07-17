@@ -8,7 +8,7 @@ import time
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise import Tortoise
 
@@ -158,9 +158,18 @@ async def _auth_token(x_ai_token: str) -> object:
 
 @app.api_route("/sse", methods=["GET", "POST", "HEAD"])
 async def handle_sse(request: Request, x_ai_token: str = Header(default="")):
-    """MCP SSE 长连接入口，同时兼容 GET/POST 以应对部分客户端实现"""
+    """MCP SSE 长连接入口，同时兼容部分客户端将 POST /sse 作为消息入口。"""
     token_obj = await _auth_token(x_ai_token)
     _current_token.set(token_obj)
+
+    if request.method == "HEAD":
+        return Response(status_code=200)
+
+    if request.method == "POST":
+        content_type = (request.headers.get("content-type") or "").lower()
+        if request.query_params.get("session_id") or "application/json" in content_type:
+            await sse_transport.handle_post_message(request.scope, request.receive, request._send)
+            return
 
     async with sse_transport.connect_sse(
         request.scope, request.receive, request._send
@@ -170,6 +179,7 @@ async def handle_sse(request: Request, x_ai_token: str = Header(default="")):
             write_stream,
             mcp_server.create_initialization_options(),
         )
+    return Response()
 
 
 @app.post("/messages")
