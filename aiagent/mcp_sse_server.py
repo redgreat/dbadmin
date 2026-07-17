@@ -4,6 +4,7 @@
 运行在独立端口（默认 8502），可被 Hermes Agent、Cursor 等工具直接接入
 """
 import contextvars
+import json
 import time
 from contextlib import asynccontextmanager
 
@@ -156,6 +157,98 @@ async def _auth_token(x_ai_token: str) -> object:
     return token_obj
 
 
+async def _dispatch_jsonrpc(request: Request) -> Response:
+    """处理 MCP JSON-RPC 请求（兼容部分客户端将 /sse 作为统一消息入口）。"""
+    try:
+        payload = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"请求体不是合法 JSON: {e}")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="请求体必须为 JSON 对象")
+
+    jsonrpc = payload.get("jsonrpc", "2.0")
+    method = payload.get("method")
+    req_id = payload.get("id")
+    params = payload.get("params") or {}
+
+    if jsonrpc != "2.0" or not method:
+        raise HTTPException(status_code=400, detail="缺少必要字段: jsonrpc/method")
+
+    if method == "initialize":
+        proto = params.get("protocolVersion", "2024-11-05")
+        result = {
+            "protocolVersion": proto,
+            "capabilities": {"tools": {}, "resources": {}},
+            "serverInfo": {"name": "dbadmin-mcp", "version": "1.0.0"},
+        }
+    elif method == "notifications/initialized" or method.startswith("notifications/"):
+        return Response(status_code=202)
+    elif method == "ping" or method == "notifications/ping":
+        result = {}
+    elif method == "tools/list":
+        tools = await handle_list_tools()
+        result = {"tools": [t.model_dump(exclude_none=True, mode="json") for t in tools]}
+    elif method == "tools/call":
+        tool_name = params.get("name")
+        arguments = params.get("arguments") or {}
+        if not tool_name:
+            raise HTTPException(status_code=400, detail="tools/call 缺少 params.name")
+        contents = await handle_call_tool(tool_name, arguments)
+        result = {"content": [c.model_dump(exclude_none=True, mode="json") for c in contents]}
+    else:
+        raise HTTPException(status_code=400, detail=f"未知方法: {method}")
+
+    if req_id is None:
+        return Response(status_code=202)
+
+    return Response(
+        content=json.dumps({"jsonrpc": "2.0", "id": req_id, "result": result}, ensure_ascii=False),
+        media_type="application/json",
+        status_code=200,
+    )
+
+
+async def _handle_post_message_with_capture(request: Request) -> Response:
+    """调用官方 SseServerTransport 的 POST 消息处理，并捕获其 ASGI 输出以避免双响应。"""
+    status_code: int | None = None
+    raw_headers: list[tuple[bytes, bytes]] = []
+    body_chunks: list[bytes] = []
+
+    async def _send(message):
+        nonlocal status_code, raw_headers
+        if message["type"] == "http.response.start":
+            status_code = int(message["status"])
+            raw_headers = list(message.get("headers") or [])
+            return
+        if message["type"] == "http.response.body":
+            body = message.get("body") or b""
+            if body:
+                body_chunks.append(body)
+            return
+
+    await sse_transport.handle_post_message(request.scope, request.receive, _send)
+
+    headers: dict[str, str] = {}
+    for k, v in raw_headers:
+        try:
+            ks = k.decode("latin-1")
+            vs = v.decode("latin-1")
+        except Exception:
+            continue
+        if ks in headers:
+            headers[ks] = f"{headers[ks]}, {vs}"
+        else:
+            headers[ks] = vs
+
+    return Response(
+        content=b"".join(body_chunks),
+        status_code=status_code or 204,
+        headers=headers,
+        media_type=headers.get("content-type"),
+    )
+
+
 @app.api_route("/sse", methods=["GET", "POST", "HEAD"])
 async def handle_sse(request: Request, x_ai_token: str = Header(default="")):
     """MCP SSE 长连接入口，同时兼容部分客户端将 POST /sse 作为消息入口。"""
@@ -167,9 +260,10 @@ async def handle_sse(request: Request, x_ai_token: str = Header(default="")):
 
     if request.method == "POST":
         content_type = (request.headers.get("content-type") or "").lower()
-        if request.query_params.get("session_id") or "application/json" in content_type:
-            await sse_transport.handle_post_message(request.scope, request.receive, request._send)
-            return
+        if "application/json" in content_type:
+            if request.query_params.get("session_id"):
+                return await _handle_post_message_with_capture(request)
+            return await _dispatch_jsonrpc(request)
 
     async with sse_transport.connect_sse(
         request.scope, request.receive, request._send
@@ -190,7 +284,9 @@ async def handle_messages(request: Request, x_ai_token: str = Header(default="")
     """
     token_obj = await _auth_token(x_ai_token)
     _current_token.set(token_obj)
-    await sse_transport.handle_post_message(request.scope, request.receive, request._send)
+    if request.query_params.get("session_id"):
+        return await _handle_post_message_with_capture(request)
+    return await _dispatch_jsonrpc(request)
 
 
 if __name__ == "__main__":
