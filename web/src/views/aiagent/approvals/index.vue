@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, h } from 'vue'
+import { ref, h, onMounted } from 'vue'
 import { NButton, NInput, NTag, NModal, NForm, NFormItem, NSpace, useMessage } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
@@ -57,6 +57,10 @@ const showApproveModal = ref(false)
 const currentApproval = ref(null)
 const approveForm = ref({ comment: '' })
 const submitLoading = ref(false)
+
+onMounted(() => {
+  $table.value?.handleSearch()
+})
 
 const openApprove = (row) => {
   currentApproval.value = row

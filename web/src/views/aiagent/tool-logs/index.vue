@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { ref, h } from 'vue'
+import { ref, h, onMounted } from 'vue'
 import { NInput, NTag, NTooltip } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
@@ -35,6 +35,10 @@ defineOptions({ name: 'ToolLogsManagement' })
 const $table = ref(null)
 const queryItems = ref({})
 const extraParams = ref({})
+
+onMounted(() => {
+  $table.value?.handleSearch()
+})
 
 const columns = [
   { title: 'ID', key: 'id', width: 80, align: 'center' },

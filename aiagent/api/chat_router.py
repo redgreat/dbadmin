@@ -3,6 +3,7 @@ import secrets
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from typing import Optional
 from aiagent.llm.service import llm_ask_stream
 from aiagent.models.ai_session import AiSession
 from aiagent.models.ai_message import AiMessage
@@ -10,7 +11,7 @@ from aiagent.models.ai_message import AiMessage
 chat_router = APIRouter()
 
 class ChatRequest(BaseModel):
-    session_id: str = None
+    session_id: Optional[str] = None
     message: str
 
 @chat_router.post("/")

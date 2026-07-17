@@ -70,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref, h } from 'vue'
+import { ref, h, onMounted } from 'vue'
 import { NButton, NForm, NFormItem, NInput, NSelect, NSwitch, NTag } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
@@ -109,6 +109,10 @@ const {
   doUpdate: aiApi.updateLlmConfig,
   doDelete: () => Promise.resolve(), // 暂时不支持删除
   refresh: () => $table.value?.handleSearch(),
+})
+
+onMounted(() => {
+  $table.value?.handleSearch()
 })
 
 const columns = [

@@ -66,10 +66,13 @@
       @save="handleSavePerm"
     >
       <n-checkbox-group v-model:value="selectedTools">
-        <n-space item-style="display: flex;" align="center" vertical>
+        <n-space vertical align="start" :size="16">
           <n-checkbox v-for="tool in allTools" :key="tool.name" :value="tool.name">
-            {{ tool.name }} - <span style="color: #999;">{{ tool.description }}</span>
-            <n-tag v-if="tool.is_write" type="warning" size="small" class="ml-2">写操作</n-tag>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: bold;">{{ tool.name }}</span>
+              <n-tag v-if="tool.is_write" type="warning" size="small">写操作</n-tag>
+            </div>
+            <div style="color: #999; font-size: 12px; margin-top: 4px;">{{ tool.description }}</div>
           </n-checkbox>
         </n-space>
       </n-checkbox-group>
