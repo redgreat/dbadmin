@@ -56,16 +56,36 @@
         </n-form-item>
       </n-form>
     </CrudModal>
+
+    <!-- 分配权限弹窗 -->
+    <CrudModal
+      v-model:visible="permModalVisible"
+      title="分配 MCP 工具权限"
+      :loading="permModalLoading"
+      :show-footer="true"
+      @save="handleSavePerm"
+    >
+      <n-checkbox-group v-model:value="selectedTools">
+        <n-space item-style="display: flex;" align="center" vertical>
+          <n-checkbox v-for="tool in allTools" :key="tool.name" :value="tool.name">
+            {{ tool.name }} - <span style="color: #999;">{{ tool.description }}</span>
+            <n-tag v-if="tool.is_write" type="warning" size="small" class="ml-2">写操作</n-tag>
+          </n-checkbox>
+        </n-space>
+      </n-checkbox-group>
+    </CrudModal>
+
   </CommonPage>
 </template>
 
 <script setup>
-import { ref, h } from 'vue'
-import { NButton, NForm, NFormItem, NInput, NSwitch, NTag } from 'naive-ui'
+import { ref, h, onMounted } from 'vue'
+import { NButton, NForm, NFormItem, NInput, NSwitch, NTag, NPopconfirm, NCheckboxGroup, NSpace, NCheckbox } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
 import CrudModal from '@/components/table/CrudModal.vue'
 import CrudTable from '@/components/table/CrudTable.vue'
+import ObjectHandle from '@/components/table/ObjectHandle.vue'
 import TheIcon from '@/components/icon/TheIcon.vue'
 import { useCRUD } from '@/composables'
 import aiApi from '@/api/ai'
@@ -84,14 +104,58 @@ const {
   modalForm,
   modalFormRef,
   handleAdd,
+  handleEdit,
+  handleDelete,
 } = useCRUD({
   name: 'Token',
   initForm: { allow_write: false },
   doCreate: aiApi.createToken,
-  doUpdate: () => Promise.resolve(), // 暂时不支持修改
-  doDelete: () => Promise.resolve(), // 暂时不支持删除
+  doUpdate: aiApi.updateToken,
+  doDelete: aiApi.deleteToken,
   refresh: () => $table.value?.handleSearch(),
 })
+
+onMounted(() => {
+  $table.value?.handleSearch()
+})
+
+const permModalVisible = ref(false)
+const permModalLoading = ref(false)
+const allTools = ref([])
+const selectedTools = ref([])
+const currentTokenId = ref(null)
+
+async function fetchTools() {
+  const res = await aiApi.listMcpTools()
+  allTools.value = res.data || []
+}
+
+async function handleOpenPerm(row) {
+  if (allTools.value.length === 0) {
+    await fetchTools()
+  }
+  currentTokenId.value = row.id
+  selectedTools.value = row.allow_tools || []
+  permModalVisible.value = true
+}
+
+async function handleSavePerm() {
+  permModalLoading.value = true
+  try {
+    await aiApi.updateToken({ id: currentTokenId.value, allow_tools: selectedTools.value })
+    permModalVisible.value = false
+    window.$message?.success('权限分配成功')
+    $table.value?.handleSearch()
+  } finally {
+    permModalLoading.value = false
+  }
+}
+
+async function handleToggleStatus(row) {
+  await aiApi.updateToken({ id: row.id, enabled: !row.enabled })
+  window.$message?.success('状态更新成功')
+  $table.value?.handleSearch()
+}
 
 const columns = [
   { title: 'ID', key: 'id', width: 60, align: 'center' },
@@ -125,6 +189,48 @@ const columns = [
     },
   },
   { title: '创建时间', key: 'created_at', width: 180, align: 'center' },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 250,
+    align: 'center',
+    fixed: 'right',
+    render(row) {
+      return h(
+        NSpace,
+        { justify: 'center' },
+        {
+          default: () => [
+            h(
+              NButton,
+              { size: 'small', type: 'primary', secondary: true, onClick: () => handleEdit(row) },
+              { default: () => '编辑' }
+            ),
+            h(
+              NButton,
+              { size: 'small', type: row.enabled ? 'warning' : 'success', secondary: true, onClick: () => handleToggleStatus(row) },
+              { default: () => (row.enabled ? '停用' : '启用') }
+            ),
+            h(
+              NButton,
+              { size: 'small', type: 'info', secondary: true, onClick: () => handleOpenPerm(row) },
+              { default: () => '分配权限' }
+            ),
+            h(
+              NPopconfirm,
+              {
+                onPositiveClick: () => handleDelete({ id: row.id }),
+              },
+              {
+                trigger: () => h(NButton, { size: 'small', type: 'error', secondary: true }, { default: () => '删除' }),
+                default: () => '确定要删除此 Token 吗？',
+              }
+            ),
+          ],
+        }
+      )
+    },
+  },
 ]
 
 const rules = {

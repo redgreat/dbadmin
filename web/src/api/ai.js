@@ -4,6 +4,11 @@ export default {
   // Token 管理
   listTokens: (params = {}) => request.get('/ai/token/', { params }),
   createToken: (data = {}) => request.post('/ai/token/', data),
+  updateToken: (data = {}) => request.post('/ai/token/update', data),
+  deleteToken: (data = {}) => request.post('/ai/token/delete', data),
+  
+  // MCP Tools
+  listMcpTools: (params = {}) => request.get('/ai/token/mcp_tools', { params }),
 
   // LLM 配置
   listLlmConfigs: (params = {}) => request.get('/ai/llm-config/', { params }),
