@@ -28,3 +28,19 @@ class RestoreLogicalIn(BaseModel):
     order_no: str = Field(..., description="订单编码或订单Id")
     operator_id: str = Field(..., description="删除人Id（GUID格式）")
     remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
+
+
+class GfsQueryIn(BaseModel):
+    """GFS订单状态查询入参"""
+    order_nos: List[str] = Field(default_factory=list, description="订单编码列表")
+    order_ids: List[str] = Field(default_factory=list, description="订单Id列表")
+
+
+class GfsDeleteIn(BaseModel):
+    """GFS订单删除入参"""
+    order_id: str = Field(..., description="订单Id")
+
+
+class CheckRecordDeleteIn(BaseModel):
+    """校验记录删除入参"""
+    order_id: str = Field(..., description="订单Id")

@@ -67,6 +67,9 @@ export default {
   // oms 订单删除相关API
   validateOrdersForDelete: (data) => request.post('/oms/validate-orders-for-delete', data),
   batchDeleteOrders: (data) => request.post('/oms/batch-delete-orders', data),
+  queryGfsStatus: (data) => request.post('/oms/orders/query_gfs_status', data),
+  deleteGfsOrder: (data) => request.post('/oms/orders/delete_gfs_order', data),
+  deleteCheckRecord: (data) => request.post('/oms/orders/delete_check_record', data),
   // simiccid
   simiccidUpload: (formData) =>
     request.post('/sim/simiccid/upload', formData, {
@@ -160,6 +163,7 @@ export default {
   // wms - 价格查询与修改
   queryPrice: (data = {}) => request.post('/wms/wms_curd/price_query', data),
   modifyPrice: (data = {}) => request.post('/wms/wms_curd/price_modify', data),
+  validateOwing: (data = {}) => request.post('/wms/wms_curd/validate_owing', data),
   // wms - FCC关联功能
   fccParse: (data = {}) => request.post('/wms/fcc/parse', data),
   fccValidate: (data = {}) => request.post('/wms/fcc/validate', data),

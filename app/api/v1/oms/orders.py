@@ -8,7 +8,7 @@ from app.core.dependency import AuthControl
 from app.models.admin import User
 from app.utils.audit_log import create_operation_audit_log
 from app.schemas.base import Fail, Success
-from app.schemas.oms import UpdateAuditTimeBatchIn, DeleteBatchIn, RestoreLogicalIn, OrderQueryIn
+from app.schemas.oms import UpdateAuditTimeBatchIn, DeleteBatchIn, RestoreLogicalIn, OrderQueryIn, GfsQueryIn, GfsDeleteIn, CheckRecordDeleteIn
 from app.services.order_service import order_service
 
 logger = logging.getLogger(__name__)
@@ -317,3 +317,93 @@ async def query_order_status(body: OrderQueryIn):
     except Exception as e:
         logger.error(f"查询订单状态失败: {e}")
         return Fail(code=500, msg=f"查询失败: {str(e)}")
+
+
+@router.post("/query_gfs_status", summary="查询GFS订单状态（验证对账、开票、回款、推广费状态）")
+async def query_gfs_status(body: GfsQueryIn):
+    """查询GFS订单状态，验证是否允许删除"""
+    try:
+        result = await order_service.query_gfs_order_status(
+            order_nos=body.order_nos,
+            order_ids=body.order_ids,
+        )
+        return Success(data=result, msg=result["message"])
+    except Exception as e:
+        logger.error(f"查询GFS订单状态失败: {e}")
+        return Fail(code=500, msg=f"查询失败: {str(e)}")
+
+
+@router.post("/delete_gfs_order", summary="调用GFS存储过程删除订单")
+async def delete_gfs_order(req: Request, body: GfsDeleteIn):
+    """调用GFS存储过程删除订单"""
+    try:
+        await order_service.delete_gfs_order(body.order_id)
+
+        try:
+            token = req.headers.get("token")
+            user_obj: User = None
+            if token:
+                user_obj = await AuthControl.is_authed(token)
+            user_id = user_obj.id if user_obj else 0
+            username = user_obj.username if user_obj else ""
+        except Exception:
+            user_id = 0
+            username = ""
+
+        try:
+            await create_operation_audit_log(
+                user_id=user_id,
+                username=username,
+                module="OMS",
+                summary=f"GFS订单删除: order_id={body.order_id}",
+                method="POST",
+                path="/api/v1/oms/orders/delete_gfs_order",
+                status=200,
+                request_body=body.model_dump(mode="json"),
+                response_body={"order_id": body.order_id, "deleted": True},
+            )
+        except Exception as e:
+            logger.warning(f"审计日志记录失败: {e}")
+
+        return Success(msg="GFS订单删除成功", data={"order_id": body.order_id, "deleted": True})
+    except Exception as e:
+        logger.error(f"GFS订单删除失败: {e}")
+        return Fail(code=500, msg=f"删除失败: {str(e)}")
+
+
+@router.post("/delete_check_record", summary="删除校验记录")
+async def delete_check_record(req: Request, body: CheckRecordDeleteIn):
+    """删除校验记录（mallcenter.sys_reoperatecheck）"""
+    try:
+        await order_service.delete_check_record(body.order_id)
+
+        try:
+            token = req.headers.get("token")
+            user_obj: User = None
+            if token:
+                user_obj = await AuthControl.is_authed(token)
+            user_id = user_obj.id if user_obj else 0
+            username = user_obj.username if user_obj else ""
+        except Exception:
+            user_id = 0
+            username = ""
+
+        try:
+            await create_operation_audit_log(
+                user_id=user_id,
+                username=username,
+                module="OMS",
+                summary=f"删除校验记录: order_id={body.order_id}",
+                method="POST",
+                path="/api/v1/oms/orders/delete_check_record",
+                status=200,
+                request_body=body.model_dump(mode="json"),
+                response_body={"order_id": body.order_id, "deleted": True},
+            )
+        except Exception as e:
+            logger.warning(f"审计日志记录失败: {e}")
+
+        return Success(msg="校验记录删除成功", data={"order_id": body.order_id, "deleted": True})
+    except Exception as e:
+        logger.error(f"删除校验记录失败: {e}")
+        return Fail(code=500, msg=f"删除失败: {str(e)}")

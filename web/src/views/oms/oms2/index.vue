@@ -42,6 +42,95 @@
       </div>
     </n-card>
 
+    <!-- 校验记录删除模块 -->
+    <n-card title="校验记录删除" class="mb-4">
+      <n-form label-placement="left" label-align="left" :label-width="120">
+        <n-form-item label="订单Id">
+          <n-input v-model:value="checkRecordForm.orderId" placeholder="请输入订单Id" />
+        </n-form-item>
+      </n-form>
+      <div class="mt-4">
+        <n-space>
+          <n-button type="primary" @click="handleQueryCheckRecord" :loading="checkRecordQuerying">
+            <TheIcon icon="material-symbols:search" :size="16" class="mr-2" />
+            查询校验记录
+          </n-button>
+          <n-button type="error" @click="handleDeleteCheckRecord" :loading="checkRecordDeleting" :disabled="!checkRecordForm.orderId">
+            <TheIcon icon="material-symbols:delete" :size="16" class="mr-2" />
+            删除校验记录
+          </n-button>
+        </n-space>
+      </div>
+      <div v-if="checkRecordResult" class="mt-3">
+        <n-alert :type="checkRecordResult.found ? 'info' : 'warning'">
+          {{ checkRecordResult.message }}
+        </n-alert>
+      </div>
+    </n-card>
+
+    <!-- GFS同步验证模块 -->
+    <n-card title="GFS同步验证" class="mb-4">
+      <n-form label-placement="left" label-align="left" :label-width="120">
+        <n-form-item label="订单编码/Id">
+          <n-input
+            v-model:value="gfsForm.orderNos"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入订单编码或Id，多个用逗号分隔"
+          />
+        </n-form-item>
+      </n-form>
+      <div class="mt-4">
+        <n-space>
+          <n-button type="primary" @click="handleQueryGfsStatus" :loading="gfsQuerying">
+            <TheIcon icon="material-symbols:search" :size="16" class="mr-2" />
+            查询GFS状态
+          </n-button>
+          <n-button type="error" @click="handleDeleteGfsOrder" :loading="gfsDeleting" :disabled="!gfsForm.orderId">
+            <TheIcon icon="material-symbols:delete" :size="16" class="mr-2" />
+            GFS删除
+          </n-button>
+        </n-space>
+      </div>
+      <div v-if="gfsResult" class="mt-3">
+        <n-alert :type="gfsResult.success ? 'success' : 'error'">
+          {{ gfsResult.message }}
+        </n-alert>
+        <div v-if="gfsResult.found_docs && gfsResult.found_docs.length > 0" class="mt-2">
+          <n-text strong>GFS订单状态：</n-text>
+          <n-table :bordered="false" :single-line="false" size="small" class="mt-2">
+            <thead>
+              <tr>
+                <th>订单编号</th>
+                <th>对账状态</th>
+                <th>开票状态</th>
+                <th>回款状态</th>
+                <th>推广费状态</th>
+                <th>是否可删除</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="doc in gfsResult.found_docs" :key="doc.order_no || doc.order_id">
+                <td>{{ doc.order_no || doc.order_id }}</td>
+                <td>{{ doc.reconc_state }}</td>
+                <td>{{ doc.invoice_state }}</td>
+                <td>{{ doc.receipt_state }}</td>
+                <td>{{ doc.promotion_state }}</td>
+                <td>
+                  <n-tag :type="doc.invalid_reasons ? 'error' : 'success'">
+                    {{ doc.invalid_reasons ? '不可删除' : '可删除' }}
+                  </n-tag>
+                  <n-text v-if="doc.invalid_reasons" type="error" class="ml-2">
+                    {{ doc.invalid_reasons.join(', ') }}
+                  </n-text>
+                </td>
+              </tr>
+            </tbody>
+          </n-table>
+        </div>
+      </div>
+    </n-card>
+
     <!-- 验证结果展示 -->
     <n-card v-if="validationResult" title="数据校验结果" class="mb-4">
       <n-alert v-if="validationResult.success" type="warning" class="mb-3">
@@ -141,6 +230,18 @@ const validationResult = ref(null)
 const deleteResult = ref(null)
 const loading = ref(false)
 
+// 校验记录删除
+const checkRecordForm = ref({ orderId: '' })
+const checkRecordResult = ref(null)
+const checkRecordQuerying = ref(false)
+const checkRecordDeleting = ref(false)
+
+// GFS同步验证
+const gfsForm = ref({ orderNos: '', orderId: '' })
+const gfsResult = ref(null)
+const gfsQuerying = ref(false)
+const gfsDeleting = ref(false)
+
 // 批量删除表单
 const batchForm = ref({
   orderNos: '',
@@ -223,6 +324,122 @@ const handleValidate = async () => {
     }
   } finally {
     loading.value = false
+  }
+}
+
+// 查询校验记录
+const handleQueryCheckRecord = async () => {
+  if (!checkRecordForm.value.orderId) {
+    message.warning('请先填写订单Id')
+    return
+  }
+  checkRecordQuerying.value = true
+  try {
+    const response = await api.queryOrderStatus({ order_nos: checkRecordForm.value.orderId })
+    if (response.code === 200 && response.data.success) {
+      checkRecordResult.value = { found: true, message: `找到订单 ${checkRecordForm.value.orderId}，可删除校验记录` }
+    } else {
+      checkRecordResult.value = { found: false, message: response.msg || '未找到订单' }
+    }
+  } catch (error) {
+    checkRecordResult.value = { found: false, message: '查询失败' }
+  } finally {
+    checkRecordQuerying.value = false
+  }
+}
+
+// 删除校验记录
+const handleDeleteCheckRecord = async () => {
+  if (!checkRecordForm.value.orderId) {
+    message.warning('请先填写订单Id')
+    return
+  }
+  const confirmed = await new Promise((resolve) => {
+    const dialog = window.$dialog.warning({
+      title: '确认删除',
+      content: `确定要删除订单 ${checkRecordForm.value.orderId} 的校验记录吗？`,
+      positiveText: '确认删除',
+      negativeText: '取消',
+      onPositiveClick: () => resolve(true),
+      onNegativeClick: () => resolve(false)
+    })
+  })
+  if (!confirmed) return
+  checkRecordDeleting.value = true
+  try {
+    const response = await api.deleteCheckRecord({ order_id: checkRecordForm.value.orderId })
+    if (response.code === 200) {
+      message.success('校验记录删除成功')
+      checkRecordResult.value = null
+    } else {
+      message.error(response.msg || '删除失败')
+    }
+  } catch (error) {
+    message.error('删除失败')
+  } finally {
+    checkRecordDeleting.value = false
+  }
+}
+
+// 查询GFS状态
+const handleQueryGfsStatus = async () => {
+  if (!gfsForm.value.orderNos) {
+    message.warning('请先填写订单编码或Id')
+    return
+  }
+  gfsQuerying.value = true
+  try {
+    const items = gfsForm.value.orderNos.split(',').map(s => s.trim()).filter(s => s)
+    const orderNos = items.filter(s => !s.match(/^\d+$/))
+    const orderIds = items.filter(s => s.match(/^\d+$/))
+    const response = await api.queryGfsStatus({ order_nos: orderNos, order_ids: orderIds })
+    if (response.code === 200) {
+      gfsResult.value = response.data
+      if (response.data.success) {
+        message.success('GFS状态验证通过，可删除')
+      } else {
+        message.error('GFS状态验证不通过，不可删除')
+      }
+    } else {
+      message.error(response.msg || '查询失败')
+    }
+  } catch (error) {
+    message.error('查询失败')
+  } finally {
+    gfsQuerying.value = false
+  }
+}
+
+// GFS删除
+const handleDeleteGfsOrder = async () => {
+  if (!gfsForm.value.orderId) {
+    message.warning('请先填写要删除的订单Id')
+    return
+  }
+  const confirmed = await new Promise((resolve) => {
+    const dialog = window.$dialog.warning({
+      title: '确认删除',
+      content: `确定要删除GFS订单 ${gfsForm.value.orderId} 吗？`,
+      positiveText: '确认删除',
+      negativeText: '取消',
+      onPositiveClick: () => resolve(true),
+      onNegativeClick: () => resolve(false)
+    })
+  })
+  if (!confirmed) return
+  gfsDeleting.value = true
+  try {
+    const response = await api.deleteGfsOrder({ order_id: gfsForm.value.orderId })
+    if (response.code === 200) {
+      message.success('GFS订单删除成功')
+      gfsResult.value = null
+    } else {
+      message.error(response.msg || '删除失败')
+    }
+  } catch (error) {
+    message.error('删除失败')
+  } finally {
+    gfsDeleting.value = false
   }
 }
 

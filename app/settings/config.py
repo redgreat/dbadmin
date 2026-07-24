@@ -214,6 +214,10 @@ class Settings:
     async def USER_CONN_ID(self) -> int:
         """OA数据库连接ID（用于查询人员信息，从数据库读取）"""
         return await self._get_conn_id_by_alias('OA_CONN')
+
+    async def GFS_CONN_ID(self) -> int:
+        """GFS数据库连接ID（从数据库读取）"""
+        return await self._get_conn_id_by_alias('GFS_CONN')
     
     async def _get_conn_id_by_alias(self, alias: str) -> int:
         """

@@ -9,12 +9,26 @@ logger = logging.getLogger(__name__)
 
 # 订单固定连接的Id（延迟获取，避免模块加载时Tortoise未初始化）
 _order_conn_id = None
+_gfs_conn_id = None
+_mallcenter_conn_id = None
 
 async def _get_conn_id():
     global _order_conn_id
     if _order_conn_id is None:
         _order_conn_id = await settings.ORDER_CONN_ID()
     return _order_conn_id
+
+async def _get_gfs_conn_id():
+    global _gfs_conn_id
+    if _gfs_conn_id is None:
+        _gfs_conn_id = await settings.GFS_CONN_ID()
+    return _gfs_conn_id
+
+async def _get_mallcenter_conn_id():
+    global _mallcenter_conn_id
+    if _mallcenter_conn_id is None:
+        _mallcenter_conn_id = await settings.ORDER_CONN_ID()
+    return _mallcenter_conn_id
 
 class OrderService:
     """订单业务服务"""
@@ -371,6 +385,110 @@ class OrderService:
             "not_found_docs": not_found_docs,
             "message": self._build_fetch_message(len(found_docs), len(not_found_docs)),
         }
+
+    async def query_gfs_order_status(self, order_nos: List[str] = None, order_ids: List[str] = None) -> Dict:
+        """查询GFS订单状态，验证对账、开票、回款、推广费状态"""
+        await db_pool.ensure_pool(await _get_gfs_conn_id())
+        pool = db_pool.get_pool(await _get_gfs_conn_id())
+        if pool is None:
+            raise ValueError("GFS连接池不存在")
+
+        found_docs = []
+        not_found_docs = []
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    # 按订单编码查询
+                    if order_nos:
+                        placeholders = ",".join(["%s"] * len(order_nos))
+                        sql = f"SELECT OrderNo, ReconcState, InvoiceState, ReceiptState, PromotionState FROM finance_basic.basic_orderinfo WHERE OrderNo IN ({placeholders})"
+                        await cur.execute(sql, tuple(order_nos))
+                        rows = await cur.fetchall()
+                        for row in rows:
+                            found_docs.append({
+                                "order_no": row[0],
+                                "reconc_state": row[1],
+                                "invoice_state": row[2],
+                                "receipt_state": row[3],
+                                "promotion_state": row[4],
+                            })
+                        found_nos = [doc["order_no"] for doc in found_docs]
+                        not_found_docs = [no for no in order_nos if no not in found_nos]
+
+                    # 按订单Id查询
+                    if order_ids:
+                        placeholders = ",".join(["%s"] * len(order_ids))
+                        sql = f"SELECT OrderId, ReconcState, InvoiceState, ReceiptState, PromotionState FROM finance_basic.basic_orderinfo WHERE OrderId IN ({placeholders})"
+                        await cur.execute(sql, tuple(order_ids))
+                        rows = await cur.fetchall()
+                        for row in rows:
+                            found_docs.append({
+                                "order_id": row[0],
+                                "reconc_state": row[1],
+                                "invoice_state": row[2],
+                                "receipt_state": row[3],
+                                "promotion_state": row[4],
+                            })
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        # 验证状态是否允许删除
+        invalid_docs = []
+        for doc in found_docs:
+            invalid_reasons = []
+            if doc.get("reconc_state") is not None and doc["reconc_state"] != 0:
+                invalid_reasons.append(f"对账状态为{doc['reconc_state']}（需为0未提交）")
+            if doc.get("invoice_state") is not None and doc["invoice_state"] != 0:
+                invalid_reasons.append(f"开票状态为{doc['invoice_state']}（需为0待申请）")
+            if doc.get("receipt_state") is not None and doc["receipt_state"] != 0:
+                invalid_reasons.append(f"回款状态为{doc['receipt_state']}（需为0未回款）")
+            if doc.get("promotion_state") is not None and doc["promotion_state"] != 0:
+                invalid_reasons.append(f"推广费状态为{doc['promotion_state']}（需为0待申请）")
+            if invalid_reasons:
+                doc["invalid_reasons"] = invalid_reasons
+                invalid_docs.append(doc)
+
+        return {
+            "success": len(invalid_docs) == 0,
+            "found_count": len(found_docs),
+            "not_found_count": len(not_found_docs),
+            "invalid_count": len(invalid_docs),
+            "found_docs": found_docs,
+            "not_found_docs": not_found_docs,
+            "invalid_docs": invalid_docs,
+            "message": f"查询到 {len(found_docs)} 条，{len(not_found_docs)} 条未同步，{len(invalid_docs)} 条状态不符合" if (not_found_docs or invalid_docs) else "所有订单状态均符合删除条件",
+        }
+
+    async def delete_gfs_order(self, order_id: str) -> bool:
+        """调用GFS存储过程删除订单"""
+        await db_pool.ensure_pool(await _get_gfs_conn_id())
+        pool = db_pool.get_pool(await _get_gfs_conn_id())
+        if pool is None:
+            raise ValueError("GFS连接池不存在")
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("CALL finance_basic.proc_DeleteOrderById(%s)", (order_id,))
+                    return True
+        else:
+            raise ValueError("不支持的连接池类型")
+
+    async def delete_check_record(self, order_id: str) -> bool:
+        """删除校验记录"""
+        await db_pool.ensure_pool(await _get_mallcenter_conn_id())
+        pool = db_pool.get_pool(await _get_mallcenter_conn_id())
+        if pool is None:
+            raise ValueError("连接池不存在")
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("DELETE FROM mallcenter.sys_reoperatecheck WHERE Id=%s", (order_id,))
+                    return True
+        else:
+            raise ValueError("不支持的连接池类型")
 
 
 order_service = OrderService()

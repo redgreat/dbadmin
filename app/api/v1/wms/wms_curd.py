@@ -14,6 +14,7 @@ from app.schemas.wms import (
     WmsQueryIn,
     PriceQueryIn,
     PriceModifyIn,
+    OwingValidateIn,
 )
 from app.services.wms_service import wms_service
 
@@ -283,3 +284,14 @@ async def price_modify(req: Request, body: PriceModifyIn):
     except Exception as e:
         logger.error(f"接口异常: {e}")
         return Fail(code=500, msg="服务异常")
+
+
+@router.post("/wms_curd/validate_owing", summary="验证应付单是否对账")
+async def validate_owing(body: OwingValidateIn):
+    """验证应付单是否对账，有记录时ReconcStatus必须为0"""
+    try:
+        result = await wms_service.validate_owing_status(body.stock_id)
+        return Success(data=result, msg=result["message"])
+    except Exception as e:
+        logger.error(f"应付单验证失败: {e}")
+        return Fail(code=500, msg=f"验证失败: {str(e)}")

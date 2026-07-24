@@ -65,6 +65,11 @@ class PriceModifyIn(BaseModel):
         return v
 
 
+class OwingValidateIn(BaseModel):
+    """应付单验证入参"""
+    stock_id: str = Field(..., description="出入库单Id")
+
+
 class PriceQueryResult(BaseModel):
     """价格查询结果"""
     detail_id: str = Field(..., description="明细Id")
