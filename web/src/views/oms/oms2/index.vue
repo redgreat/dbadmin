@@ -112,10 +112,26 @@
             <tbody>
               <tr v-for="doc in gfsResult.found_docs" :key="doc.order_no || doc.order_id">
                 <td>{{ doc.order_no || doc.order_id }}</td>
-                <td>{{ doc.reconc_state }}</td>
-                <td>{{ doc.invoice_state }}</td>
-                <td>{{ doc.receipt_state }}</td>
-                <td>{{ doc.promotion_state }}</td>
+                <td>
+                  <n-tag :type="doc.reconc_state === 0 ? 'success' : 'warning'" size="small">
+                    {{ formatGfsStatus('reconc', doc.reconc_state) }}
+                  </n-tag>
+                </td>
+                <td>
+                  <n-tag :type="doc.invoice_state === 0 ? 'success' : 'warning'" size="small">
+                    {{ formatGfsStatus('invoice', doc.invoice_state) }}
+                  </n-tag>
+                </td>
+                <td>
+                  <n-tag :type="doc.receipt_state === 0 ? 'success' : 'warning'" size="small">
+                    {{ formatGfsStatus('receipt', doc.receipt_state) }}
+                  </n-tag>
+                </td>
+                <td>
+                  <n-tag :type="doc.promotion_state === 0 ? 'success' : 'warning'" size="small">
+                    {{ formatGfsStatus('promotion', doc.promotion_state) }}
+                  </n-tag>
+                </td>
                 <td>
                   <n-tag :type="doc.invalid_reasons ? 'error' : 'success'">
                     {{ doc.invalid_reasons ? '不可删除' : '可删除' }}
@@ -149,6 +165,10 @@
               <th>订单编号</th>
               <th>订单状态</th>
               <th>创建时间</th>
+              <th>对账状态</th>
+              <th>开票状态</th>
+              <th>回款状态</th>
+              <th>推广费状态</th>
             </tr>
           </thead>
           <tbody>
@@ -157,6 +177,30 @@
               <td>{{ order.orderNo }}</td>
               <td>{{ order.status || '未知' }}</td>
               <td>{{ order.createTime || '未知' }}</td>
+              <td>
+                <n-tag v-if="order.gfs_status" :type="order.gfs_status.reconc_state === 0 ? 'success' : 'warning'">
+                  {{ formatGfsStatus('reconc', order.gfs_status.reconc_state) }}
+                </n-tag>
+                <span v-else>-</span>
+              </td>
+              <td>
+                <n-tag v-if="order.gfs_status" :type="order.gfs_status.invoice_state === 0 ? 'success' : 'warning'">
+                  {{ formatGfsStatus('invoice', order.gfs_status.invoice_state) }}
+                </n-tag>
+                <span v-else>-</span>
+              </td>
+              <td>
+                <n-tag v-if="order.gfs_status" :type="order.gfs_status.receipt_state === 0 ? 'success' : 'warning'">
+                  {{ formatGfsStatus('receipt', order.gfs_status.receipt_state) }}
+                </n-tag>
+                <span v-else>-</span>
+              </td>
+              <td>
+                <n-tag v-if="order.gfs_status" :type="order.gfs_status.promotion_state === 0 ? 'success' : 'warning'">
+                  {{ formatGfsStatus('promotion', order.gfs_status.promotion_state) }}
+                </n-tag>
+                <span v-else>-</span>
+              </td>
             </tr>
           </tbody>
         </n-table>
@@ -235,6 +279,19 @@ const checkRecordForm = ref({ orderId: '' })
 const checkRecordResult = ref(null)
 const checkRecordQuerying = ref(false)
 const checkRecordDeleting = ref(false)
+
+// GFS状态格式化
+const formatGfsStatus = (type, value) => {
+  if (value === null || value === undefined) return '未同步'
+  const maps = {
+    'reconc': { 0: '未对账', 1: '已对账', 2: '对账中', 3: '对账异常' },
+    'invoice': { 0: '待开票', 1: '已开票', 2: '开票中' },
+    'receipt': { 0: '未回款', 1: '已回款', 2: '部分回款' },
+    'promotion': { 0: '待申请', 1: '已申请', 2: '已确认' },
+  }
+  const map = maps[type]
+  return map && map[value] !== undefined ? map[value] : `未知(${value})`
+}
 
 // GFS同步验证
 const gfsForm = ref({ orderNos: '', orderId: '' })

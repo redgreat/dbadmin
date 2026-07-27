@@ -9,6 +9,7 @@ from app.services.conn_manager import db_manager
 from app.settings.database import refresh_dynamic_connections
 from app.log import logger
 from app.controllers.oplog import OpLogController
+from app.settings.config import settings
 
 
 class OrderValidationRequest(BaseModel):
@@ -175,6 +176,33 @@ class OMSController:
                 else:
                     not_found_orders.append(order_no)
                     logger.warning(f"订单未找到: {order_no}")
+            
+            # 查询GFS状态并合并到结果中
+            gfs_status_map = {}
+            try:
+                gfs_conn_id = await settings.GFS_CONN_ID()
+                if gfs_conn_id:
+                    order_no_list = [o["orderNo"] for o in found_orders if o.get("orderNo")]
+                    if order_no_list:
+                        placeholders = ",".join(["%s"] * len(order_no_list))
+                        gfs_sql = f"SELECT OrderNo, ReconcState, InvoiceState, ReceiptState, PromotionState FROM finance_basic.basic_orderinfo WHERE OrderNo IN ({placeholders})"
+                        gfs_result = await db_manager.execute_query(gfs_conn_id, gfs_sql, order_no_list)
+                        if gfs_result and len(gfs_result) > 1 and gfs_result[1]:
+                            for row in gfs_result[1]:
+                                gfs_status_map[row.get('OrderNo')] = {
+                                    "reconc_state": row.get('ReconcState'),
+                                    "invoice_state": row.get('InvoiceState'),
+                                    "receipt_state": row.get('ReceiptState'),
+                                    "promotion_state": row.get('PromotionState'),
+                                }
+            except Exception as e:
+                logger.warning(f"查询GFS状态失败: {e}")
+            
+            # 将GFS状态合并到订单信息中
+            for order in found_orders:
+                order_no = order.get("orderNo")
+                if order_no and order_no in gfs_status_map:
+                    order["gfs_status"] = gfs_status_map[order_no]
             
             return {
                 "success": len(not_found_orders) == 0,
