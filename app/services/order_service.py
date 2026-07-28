@@ -1,6 +1,6 @@
-from typing import Dict, List, Optional, Tuple
-import aiomysql
 import logging
+
+import aiomysql
 
 from app.services.db_pool import db_pool
 from app.settings.config import settings
@@ -37,7 +37,7 @@ class OrderService:
         """确保连接池已注册"""
         await db_pool.ensure_pool(await _get_conn_id())
 
-    async def fetch_audit_time_map(self, order_nos: List[str]) -> Dict:
+    async def fetch_audit_time_map(self, order_nos: list[str]) -> dict:
         """根据订单编码或数字Id获取审核时间，返回详细的验证结果"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
@@ -102,7 +102,7 @@ class OrderService:
             "audit_time_map": {doc["order_no"]: doc["audit_time"] for doc in found_docs}
         }
 
-    async def fetch_order_ids_by_nos(self, order_nos: List[str]) -> Dict:
+    async def fetch_order_ids_by_nos(self, order_nos: list[str]) -> dict:
         """根据订单编码或数字Id获取对应的Id，优先按输入类型匹配，返回详细的验证结果"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
@@ -176,7 +176,7 @@ class OrderService:
 
         return "，".join(parts) if parts else "所有订单均找到"
 
-    async def fetch_deleted_order_by_no(self, order_no: str, deleted_by_id: str = None) -> Optional[Dict]:
+    async def fetch_deleted_order_by_no(self, order_no: str, deleted_by_id: str = None) -> dict | None:
         """根据订单编码或数字Id查询已删除的订单（Deleted=1），验证唯一性"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
@@ -225,41 +225,39 @@ class OrderService:
                     return None
         raise ValueError("不支持的连接池类型")
 
-    async def update_audit_time_batch(self, order_ids: List[int], new_time) -> int:
+    async def update_audit_time_batch(self, order_ids: list[int], new_time) -> int:
         """批量更新订单审核时间（使用指定连接池）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    placeholder = ",".join(["%s"] * len(order_ids))
-                    sql = f"UPDATE tb_orderinfo SET AuditTime = %s WHERE Id IN ({placeholder})"
-                    await cur.execute(sql, tuple([new_time, *order_ids]))
-                    return cur.rowcount or 0
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                placeholder = ",".join(["%s"] * len(order_ids))
+                sql = f"UPDATE tb_orderinfo SET AuditTime = %s WHERE Id IN ({placeholder})"
+                await cur.execute(sql, tuple([new_time, *order_ids]))
+                return cur.rowcount or 0
         raise ValueError("不支持的连接池类型")
 
-    async def delete_logical_batch(self, order_ids: List[int], deleted_by_id: str = None) -> Tuple[int, List[int]]:
+    async def delete_logical_batch(self, order_ids: list[int], deleted_by_id: str = None) -> tuple[int, list[int]]:
         """批量逻辑删除订单（逐行调用存储过程）"""
         import uuid
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
-        
+
         # 如果没有传入deleted_by_id，生成一个随机GUID
         if deleted_by_id is None:
             deleted_by_id = str(uuid.uuid4())
-        
+
         success = 0
-        failed: List[int] = []
+        failed: list[int] = []
         for order_id in order_ids:
             try:
                 if isinstance(pool, aiomysql.Pool):
-                    async with pool.acquire() as conn:
-                        async with conn.cursor() as cur:
-                            await cur.execute("CALL proc_DeleteOrderInfoById(%s, %s)", (order_id, deleted_by_id))
+                    async with pool.acquire() as conn, conn.cursor() as cur:
+                        await cur.execute("CALL proc_DeleteOrderInfoById(%s, %s)", (order_id, deleted_by_id))
                 else:
                     raise ValueError("不支持的连接池类型")
                 success += 1
@@ -267,21 +265,20 @@ class OrderService:
                 failed.append(order_id)
         return success, failed
 
-    async def delete_physical_batch(self, order_ids: List[int]) -> Tuple[int, List[int]]:
+    async def delete_physical_batch(self, order_ids: list[int]) -> tuple[int, list[int]]:
         """批量物理删除订单（逐行调用存储过程）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
-        
+
         success = 0
-        failed: List[int] = []
+        failed: list[int] = []
         for order_id in order_ids:
             try:
                 if isinstance(pool, aiomysql.Pool):
-                    async with pool.acquire() as conn:
-                        async with conn.cursor() as cur:
-                            await cur.execute("CALL proc_TruncateOrderInfoById(%s)", (order_id,))
+                    async with pool.acquire() as conn, conn.cursor() as cur:
+                        await cur.execute("CALL proc_TruncateOrderInfoById(%s)", (order_id,))
                 else:
                     raise ValueError("不支持的连接池类型")
                 success += 1
@@ -296,13 +293,12 @@ class OrderService:
         if pool is None:
             raise ValueError("连接池不存在")
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    await cur.execute("CALL proc_UnDeleteOrderInfoById(%s, %s)", (order_id, operator_id))
-                    return True
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                await cur.execute("CALL proc_UnDeleteOrderInfoById(%s, %s)", (order_id, operator_id))
+                return True
         raise ValueError("不支持的连接池类型")
 
-    async def query_order_status(self, order_nos: List[str]) -> Dict:
+    async def query_order_status(self, order_nos: list[str]) -> dict:
         """查询订单状态信息，返回Id、OrderNo、AuditTime、Deleted、DeletedById、DeletedAt，并关联OA获取删除人姓名"""
         from app.services.user_service import user_service
 
@@ -386,7 +382,7 @@ class OrderService:
             "message": self._build_fetch_message(len(found_docs), len(not_found_docs)),
         }
 
-    async def query_gfs_order_status(self, order_nos: List[str] = None, order_ids: List[str] = None) -> Dict:
+    async def query_gfs_order_status(self, order_nos: list[str] = None, order_ids: list[str] = None) -> dict:
         """查询GFS订单状态，验证对账、开票、回款、推广费状态"""
         await db_pool.ensure_pool(await _get_gfs_conn_id())
         pool = db_pool.get_pool(await _get_gfs_conn_id())
@@ -468,10 +464,9 @@ class OrderService:
             raise ValueError("GFS连接池不存在")
 
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    await cur.execute("CALL finance_basic.proc_DeleteOrderById(%s)", (order_id,))
-                    return True
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                await cur.execute("CALL finance_basic.proc_DeleteOrderById(%s)", (order_id,))
+                return True
         else:
             raise ValueError("不支持的连接池类型")
 
@@ -483,10 +478,9 @@ class OrderService:
             raise ValueError("连接池不存在")
 
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    await cur.execute("DELETE FROM mallcenter.sys_reoperatecheck WHERE Id=%s", (order_id,))
-                    return True
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                await cur.execute("DELETE FROM mallcenter.sys_reoperatecheck WHERE Id=%s", (order_id,))
+                return True
         else:
             raise ValueError("不支持的连接池类型")
 

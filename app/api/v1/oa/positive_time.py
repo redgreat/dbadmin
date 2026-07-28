@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 from fastapi import APIRouter, Request
 
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _clean_codes(codes: List[str]) -> List[str]:
+def _clean_codes(codes: list[str]) -> list[str]:
     result = []
     seen = set()
     for code in codes:
@@ -50,7 +49,7 @@ async def validate_positive_time(req: Request, body: PositiveTimeRequest):
         return Success(msg="验证完成", data=result)
     except Exception as e:
         logger.error(f"验证转正时间失败: {e}", exc_info=True)
-        return Fail(code=500, msg=f"验证失败: {str(e)}")
+        return Fail(code=500, msg=f"验证失败: {e!s}")
 
 
 @router.post("/execute", summary="修改转正时间")
@@ -89,4 +88,4 @@ async def execute_positive_time(req: Request, body: PositiveTimeRequest):
         return Success(msg="执行完成", data=result)
     except Exception as e:
         logger.error(f"修改转正时间失败: {e}", exc_info=True)
-        return Fail(code=500, msg=f"执行失败: {str(e)}")
+        return Fail(code=500, msg=f"执行失败: {e!s}")

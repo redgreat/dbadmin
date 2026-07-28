@@ -1,22 +1,21 @@
 import logging
-from typing import List
 
 from fastapi import APIRouter, Request
 
 from app.core.dependency import AuthControl
 from app.models.admin import User
-from app.utils.audit_log import create_operation_audit_log
 from app.schemas.base import Fail, Success
 from app.schemas.wms import (
+    OwingValidateIn,
+    PriceModifyIn,
+    PriceQueryIn,
     WmsDeleteBatchIn,
+    WmsQueryIn,
     WmsRestoreLogicalIn,
     WmsValidateRequest,
-    WmsQueryIn,
-    PriceQueryIn,
-    PriceModifyIn,
-    OwingValidateIn,
 )
 from app.services.wms_service import wms_service
+from app.utils.audit_log import create_operation_audit_log
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,7 @@ router = APIRouter()
 async def validate_stock(body: WmsValidateRequest):
     """验证单据状态，支持传入单据编码或单据Id"""
     try:
-        nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
+        nos: list[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
         if not nos:
             return Fail(code=400, msg="单据编码或单据Id不能为空")
 
@@ -35,7 +34,7 @@ async def validate_stock(body: WmsValidateRequest):
         return Success(data=result, msg=result["message"])
     except Exception as e:
         logger.error(f"验证单据失败: {e}")
-        return Fail(code=500, msg=f"验证失败: {str(e)}")
+        return Fail(code=500, msg=f"验证失败: {e!s}")
 
 
 @router.post("/wms_curd/query_status", summary="查询单据状态（Id、单号、AuditTime、Deleted、DeletedById、DeletedAt、删除人姓名）")
@@ -46,7 +45,7 @@ async def query_stock_status(body: WmsQueryIn):
     删除人通过 OA membership_userbaseinfo.UserCenterUserId 关联获取
     """
     try:
-        nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
+        nos: list[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
         if not nos:
             return Fail(code=400, msg="单据编码或单据Id不能为空")
 
@@ -54,14 +53,14 @@ async def query_stock_status(body: WmsQueryIn):
         return Success(data=result, msg=result["message"])
     except Exception as e:
         logger.error(f"查询单据状态失败: {e}")
-        return Fail(code=500, msg=f"查询失败: {str(e)}")
+        return Fail(code=500, msg=f"查询失败: {e!s}")
 
 
 @router.post("/wms_curd/delete_logical_batch", summary="批量逻辑删除（支持单据编码或单据Id）")
 async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
     """批量逻辑删除单据，支持传入单据编码或单据Id"""
     try:
-        nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
+        nos: list[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
         if not nos:
             return Fail(code=400, msg="单据编码或单据Id不能为空")
 
@@ -80,7 +79,7 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
             success_count, failed_ids = await wms_service.delete_logical_batch(nos, body.operator_id)
         except Exception as e:
             logger.error(f"逻辑删除失败: {e}")
-            return Fail(code=500, msg=f"执行失败: {str(e)}")
+            return Fail(code=500, msg=f"执行失败: {e!s}")
 
         try:
             token = req.headers.get("token")
@@ -122,7 +121,7 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
 async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
     """批量物理删除单据，支持传入单据编码或单据Id"""
     try:
-        nos: List[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
+        nos: list[str] = [s.strip() for s in body.stock_nos if s and s.strip()]
         if not nos:
             return Fail(code=400, msg="单据编码或单据Id不能为空")
 
@@ -141,7 +140,7 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
             success_count, failed_ids = await wms_service.delete_physical_batch(nos, body.operator_id)
         except Exception as e:
             logger.error(f"物理删除失败: {e}")
-            return Fail(code=500, msg=f"执行失败: {str(e)}")
+            return Fail(code=500, msg=f"执行失败: {e!s}")
 
         try:
             token = req.headers.get("token")
@@ -192,7 +191,7 @@ async def restore_logical(req: Request, body: WmsRestoreLogicalIn):
             await wms_service.restore_logical(stock_no=body.stock_no, operator_id=body.operator_id)
         except Exception as e:
             logger.error(f"恢复失败: {e}")
-            return Fail(code=500, msg=f"执行失败: {str(e)}")
+            return Fail(code=500, msg=f"执行失败: {e!s}")
 
         try:
             token = req.headers.get("token")
@@ -238,7 +237,7 @@ async def price_query(body: PriceQueryIn):
         return Success(data=results, msg=f"查询到 {len(results)} 条记录")
     except Exception as e:
         logger.error(f"价格查询失败: {e}")
-        return Fail(code=500, msg=f"查询失败: {str(e)}")
+        return Fail(code=500, msg=f"查询失败: {e!s}")
 
 
 @router.post("/wms_curd/price_modify", summary="价格修改")
@@ -252,7 +251,7 @@ async def price_modify(req: Request, body: PriceModifyIn):
             )
         except Exception as e:
             logger.error(f"价格修改失败: {e}")
-            return Fail(code=500, msg=f"执行失败: {str(e)}")
+            return Fail(code=500, msg=f"执行失败: {e!s}")
 
         try:
             token = req.headers.get("token")
@@ -294,4 +293,4 @@ async def validate_owing(body: OwingValidateIn):
         return Success(data=result, msg=result["message"])
     except Exception as e:
         logger.error(f"应付单验证失败: {e}")
-        return Fail(code=500, msg=f"验证失败: {str(e)}")
+        return Fail(code=500, msg=f"验证失败: {e!s}")

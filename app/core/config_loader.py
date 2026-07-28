@@ -2,9 +2,8 @@
 统一配置加载器
 从 config/config.yml 读取所有配置
 """
-import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -105,8 +104,8 @@ class RedisConfig(BaseModel):
 class CeleryConfig(BaseModel):
     """Celery 配置"""
     enabled: bool = True
-    broker_url: Optional[str] = None
-    result_backend: Optional[str] = None
+    broker_url: str | None = None
+    result_backend: str | None = None
     timezone: str = "Asia/Shanghai"
     task_default_queue: str = "dbadmin.default"
     result_expires: int = 86400
@@ -158,20 +157,20 @@ class Config(BaseModel):
 
 class ConfigLoader:
     """配置加载器"""
-    
+
     _instance: Optional['ConfigLoader'] = None
-    _config: Optional[Config] = None
-    
+    _config: Config | None = None
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         if self._config is None:
             self.load_config()
-    
-    def load_config(self, config_path: Optional[str] = None) -> Config:
+
+    def load_config(self, config_path: str | None = None) -> Config:
         """
         加载配置文件
         
@@ -185,34 +184,34 @@ class ConfigLoader:
             # 默认配置文件路径
             base_dir = Path(__file__).resolve().parent.parent.parent
             config_path = base_dir / "config" / "config.yml"
-        
+
         config_path = Path(config_path)
-        
+
         if not config_path.exists():
             raise FileNotFoundError(
                 f"配置文件不存在: {config_path}\n"
                 f"请复制 config/config.yml.example 并重命名为 config.yml"
             )
-        
+
         # 读取 YAML 配置文件
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(config_path, encoding='utf-8') as f:
             config_data = yaml.safe_load(f)
-        
+
         if not config_data:
             raise ValueError("配置文件为空或格式错误")
-        
+
         # 解析为配置对象
         self._config = Config(**config_data)
         return self._config
-    
+
     @property
     def config(self) -> Config:
         """获取配置对象"""
         if self._config is None:
             self.load_config()
         return self._config
-    
-    def reload(self, config_path: Optional[str] = None):
+
+    def reload(self, config_path: str | None = None):
         """重新加载配置"""
         self._config = None
         return self.load_config(config_path)
@@ -227,7 +226,7 @@ def get_config() -> Config:
     return _loader.config
 
 
-def reload_config(config_path: Optional[str] = None) -> Config:
+def reload_config(config_path: str | None = None) -> Config:
     """重新加载配置"""
     return _loader.reload(config_path)
 

@@ -1,15 +1,15 @@
-from typing import List, Optional, Dict, Any
+from datetime import datetime
+from typing import Any
+
+import pytz
 from fastapi import HTTPException
 from pydantic import BaseModel
-from datetime import datetime, timezone
-import pytz
-from math import ceil
 
-from app.services.conn_manager import db_manager
-from app.settings.database import refresh_dynamic_connections
-from app.log import logger
 from app.controllers.oplog import OpLogController
+from app.log import logger
+from app.services.conn_manager import db_manager
 from app.settings.config import settings
+from app.settings.database import refresh_dynamic_connections
 
 
 class OrderValidationRequest(BaseModel):
@@ -43,9 +43,9 @@ class OMSController:
     """
     订单管理系统控制器
     """
-    
+
     @staticmethod
-    async def validate_orders(request: OrderValidationRequest) -> Dict[str, Any]:
+    async def validate_orders(request: OrderValidationRequest) -> dict[str, Any]:
         """
         验证订单编码是否存在
         """
@@ -53,20 +53,20 @@ class OMSController:
             order_nos = [oid.strip() for oid in request.order_nos.split(',') if oid.strip()]
             if not order_nos:
                 raise HTTPException(status_code=400, detail="订单编码不能为空")
-            
+
             conn_info = db_manager.get_connection_info(request.conn_id)
             if not conn_info:
                 raise HTTPException(status_code=400, detail=f"连接ID {request.conn_id} 不存在")
-            
+
             found_orders = []
             not_found_orders = []
-            
+
             if conn_info['db_type'].lower() not in ['mysql']:
                 raise HTTPException(status_code=400, detail=f"不支持的数据库类型: {conn_info['db_type']}，当前只支持MySQL")
-            
+
             for order_no in order_nos:
                 is_numeric = order_no.isdigit()
-                
+
                 # 根据输入类型决定主查和备查
                 queries = []
                 if is_numeric:
@@ -80,7 +80,7 @@ class OMSController:
                         ("SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
                         ("SELECT Id, OrderNo, AuditTime FROM tb_orderinfo WHERE Id=%s AND Deleted=0 LIMIT 1", (order_no,)),
                     ]
-                
+
                 # 按优先级逐条查询，找到第一个命中的就停
                 result = None
                 for sql, params in queries:
@@ -97,11 +97,11 @@ class OMSController:
                             logger.info(f"找到订单: {order_no} -> Id={order_data.get('Id')}, OrderNo={order_data.get('OrderNo')}")
                             break
                     result = None
-                
+
                 if not result or not found_orders or (found_orders and found_orders[-1]["orderNo"] != order_no and not any(o["orderNo"] == order_no or str(o["id"]) == order_no for o in found_orders)):
                     not_found_orders.append(order_no)
                     logger.warning(f"订单未找到: {order_no}")
-            
+
             return {
                 "success": len(not_found_orders) == 0,
                 "total_count": len(order_nos),
@@ -112,13 +112,13 @@ class OMSController:
                 "message": f"找到 {len(found_orders)} 条订单，{len(not_found_orders)} 条未找到" if not_found_orders else "所有订单都已找到",
                 "connection_name": conn_info['name']
             }
-            
+
         except Exception as e:
-            logger.error(f"验证订单时发生错误: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"验证订单失败: {str(e)}")
-    
+            logger.error(f"验证订单时发生错误: {e!s}")
+            raise HTTPException(status_code=500, detail=f"验证订单失败: {e!s}")
+
     @staticmethod
-    async def validate_orders_for_delete(request: OrderDeleteValidationRequest) -> Dict[str, Any]:
+    async def validate_orders_for_delete(request: OrderDeleteValidationRequest) -> dict[str, Any]:
         """
         验证订单是否存在且可删除（支持订单编码或订单Id）
         """
@@ -126,20 +126,20 @@ class OMSController:
             order_nos = [oid.strip() for oid in request.order_nos.split(',') if oid.strip()]
             if not order_nos:
                 raise HTTPException(status_code=400, detail="订单编码不能为空")
-            
+
             conn_info = db_manager.get_connection_info(request.conn_id)
             if not conn_info:
                 raise HTTPException(status_code=400, detail=f"连接ID {request.conn_id} 不存在")
-            
+
             found_orders = []
             not_found_orders = []
-            
+
             if conn_info['db_type'].lower() not in ['mysql']:
                 raise HTTPException(status_code=400, detail=f"不支持的数据库类型: {conn_info['db_type']}，当前只支持MySQL")
-            
+
             for order_no in order_nos:
                 is_numeric = order_no.isdigit()
-                
+
                 # 根据输入类型决定主查和备查
                 queries = []
                 if is_numeric:
@@ -153,7 +153,7 @@ class OMSController:
                         ("SELECT Id, OrderNo, OrderStatus, CreatedAt FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=1 LIMIT 1", (order_no,)),
                         ("SELECT Id, OrderNo, OrderStatus, CreatedAt FROM tb_orderinfo WHERE Id=%s AND Deleted=1 LIMIT 1", (order_no,)),
                     ]
-                
+
                 # 按优先级逐条查询，找到第一个命中的就停
                 result = None
                 for sql, params in queries:
@@ -164,7 +164,7 @@ class OMSController:
                             result = data_list[0]
                             break
                     result = None
-                
+
                 if result:
                     found_orders.append({
                         "id": result.get('Id'),
@@ -176,7 +176,7 @@ class OMSController:
                 else:
                     not_found_orders.append(order_no)
                     logger.warning(f"订单未找到: {order_no}")
-            
+
             # 查询GFS状态并合并到结果中
             gfs_status_map = {}
             try:
@@ -197,13 +197,13 @@ class OMSController:
                                 }
             except Exception as e:
                 logger.warning(f"查询GFS状态失败: {e}")
-            
+
             # 将GFS状态合并到订单信息中
             for order in found_orders:
                 order_no = order.get("orderNo")
                 if order_no and order_no in gfs_status_map:
                     order["gfs_status"] = gfs_status_map[order_no]
-            
+
             return {
                 "success": len(not_found_orders) == 0,
                 "total_count": len(order_nos),
@@ -214,46 +214,46 @@ class OMSController:
                 "message": f"找到 {len(found_orders)} 条订单，{len(not_found_orders)} 条未找到" if not_found_orders else "所有订单都已找到",
                 "connection_name": conn_info['name']
             }
-            
+
         except Exception as e:
-            logger.error(f"验证订单删除时发生错误: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"验证订单删除失败: {str(e)}")
-    
+            logger.error(f"验证订单删除时发生错误: {e!s}")
+            raise HTTPException(status_code=500, detail=f"验证订单删除失败: {e!s}")
+
     @staticmethod
-    async def batch_update_audit_time(request: OrderUpdateRequest) -> Dict[str, Any]:
+    async def batch_update_audit_time(request: OrderUpdateRequest) -> dict[str, Any]:
         """
         批量更新订单审核时间（支持订单编码）
         """
         try:
             order_nos = [oid.strip() for oid in request.order_nos.split(',') if oid.strip()]
-            
+
             if not order_nos:
                 raise HTTPException(status_code=400, detail="订单编码不能为空")
 
             conn_info = db_manager.get_connection_info(request.conn_id)
             if not conn_info:
                 raise HTTPException(status_code=400, detail=f"连接ID {request.conn_id} 不存在")
-            
+
             updated_orders = []
             failed_orders = []
-            
+
             if conn_info['db_type'].lower() not in ['mysql']:
                 raise HTTPException(status_code=400, detail=f"不支持的数据库类型: {conn_info['db_type']}，当前只支持MySQL")
-            
+
             beijing_tz = pytz.timezone('Asia/Shanghai')
             if request.new_audit_time.tzinfo is None:
                 utc_time = request.new_audit_time.replace(tzinfo=pytz.UTC)
             else:
                 utc_time = request.new_audit_time.astimezone(pytz.UTC)
-            
+
             beijing_time = utc_time.astimezone(beijing_tz)
             formatted_time = beijing_time.strftime('%Y-%m-%d %H:%M:%S')
-            
+
             # 先查询订单编码或订单Id对应的Id
             order_no_id_map = {}
             for order_no in order_nos:
                 is_numeric = order_no.isdigit()
-                
+
                 # 根据输入类型决定主查和备查
                 queries = []
                 if is_numeric:
@@ -267,7 +267,7 @@ class OMSController:
                         ("SELECT Id FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (order_no,)),
                         ("SELECT Id FROM tb_orderinfo WHERE Id=%s AND Deleted=0 LIMIT 1", (order_no,)),
                     ]
-                
+
                 # 按优先级逐条查询，找到第一个命中的就停
                 result = None
                 for sql, params in queries:
@@ -279,32 +279,32 @@ class OMSController:
                             logger.info(f"找到订单: {order_no} -> Id={order_no_id_map[order_no]}")
                             break
                     result = None
-                
+
                 if order_no not in order_no_id_map:
                     logger.warning(f"订单未找到: {order_no}")
-            
+
             for order_no in order_nos:
                 order_id = order_no_id_map.get(order_no)
                 if not order_id:
                     failed_orders.append({"order_no": order_no, "reason": "订单不存在"})
                     continue
-                    
+
                 try:
                     sql = "UPDATE tb_orderinfo SET AuditTime = %s WHERE Id = %s"
                     affected_rows = await db_manager.execute_update(
-                        request.conn_id, 
-                        sql, 
+                        request.conn_id,
+                        sql,
                         [formatted_time, order_id]
                     )
-                    
+
                     if affected_rows > 0:
                         updated_orders.append(order_no)
                     else:
                         failed_orders.append({"order_no": order_no, "reason": "更新失败"})
-                        
+
                 except Exception as e:
                     failed_orders.append({"order_no": order_no, "reason": str(e)})
-            
+
             if updated_orders:
                 try:
                     oplog_data = {
@@ -314,7 +314,7 @@ class OMSController:
                         "connection_name": conn_info['name'],
                         "total_count": len(updated_orders)
                     }
-                    
+
                     await OpLogController.create_operation_log(
                         logger_type="订单审核时间修改",
                         operation_content=oplog_data,
@@ -322,8 +322,8 @@ class OMSController:
                         modify_time=datetime.now(beijing_tz)
                     )
                 except Exception as e:
-                    logger.error(f"记录操作日志失败: {str(e)}")
-            
+                    logger.error(f"记录操作日志失败: {e!s}")
+
             return {
                 "success": len(failed_orders) == 0,
                 "total_count": len(order_nos),
@@ -333,44 +333,44 @@ class OMSController:
                 "failed_orders": failed_orders,
                 "connection_name": conn_info['name']
             }
-            
+
         except Exception as e:
-            logger.error(f"批量更新订单审核时间时发生错误: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"批量更新失败: {str(e)}")
-    
+            logger.error(f"批量更新订单审核时间时发生错误: {e!s}")
+            raise HTTPException(status_code=500, detail=f"批量更新失败: {e!s}")
+
     @staticmethod
-    async def batch_delete_orders(request: OrderDeleteRequest) -> Dict[str, Any]:
+    async def batch_delete_orders(request: OrderDeleteRequest) -> dict[str, Any]:
         """
         批量删除订单，调用MySQL存储过程（支持订单编码）
         """
         try:
             import uuid
-            
+
             order_nos = [oid.strip() for oid in request.order_nos.split(',') if oid.strip()]
-            
+
             if not order_nos:
                 raise HTTPException(status_code=400, detail="订单编码不能为空")
 
             conn_info = db_manager.get_connection_info(request.conn_id)
             if not conn_info:
                 raise HTTPException(status_code=400, detail=f"连接ID {request.conn_id} 不存在")
-            
+
             deleted_orders = []
             failed_orders = []
-            
+
             if conn_info['db_type'].lower() not in ['mysql']:
                 raise HTTPException(status_code=400, detail=f"不支持的数据库类型: {conn_info['db_type']}，当前只支持MySQL")
-            
+
             # 生成随机UUID作为删除操作者ID
             deleted_by_id = str(uuid.uuid4())
             beijing_tz = pytz.timezone('Asia/Shanghai')
             current_time = datetime.now(beijing_tz)
-            
+
             # 先查询订单编码或订单Id对应的Id
             order_no_id_map = {}
             for order_no in order_nos:
                 is_numeric = order_no.isdigit()
-                
+
                 # 根据输入类型决定主查和备查
                 queries = []
                 if is_numeric:
@@ -384,7 +384,7 @@ class OMSController:
                         ("SELECT Id FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=1 LIMIT 1", (order_no,)),
                         ("SELECT Id FROM tb_orderinfo WHERE Id=%s AND Deleted=1 LIMIT 1", (order_no,)),
                     ]
-                
+
                 # 按优先级逐条查询，找到第一个命中的就停
                 result = None
                 for sql, params in queries:
@@ -396,10 +396,10 @@ class OMSController:
                             logger.info(f"找到订单: {order_no} -> Id={order_no_id_map[order_no]}")
                             break
                     result = None
-                
+
                 if order_no not in order_no_id_map:
                     logger.warning(f"订单未找到: {order_no}")
-            
+
             # 使用Id执行删除操作
             for order_no in order_nos:
                 order_id = order_no_id_map.get(order_no)
@@ -412,15 +412,15 @@ class OMSController:
                         "message": "订单不存在"
                     })
                     continue
-                    
+
                 try:
                     sql = "CALL proc_DeleteOrderInfoById(%s, %s);"
                     result = await db_manager.execute_query(
-                        request.conn_id, 
-                        sql, 
+                        request.conn_id,
+                        sql,
                         [order_id, deleted_by_id]
                     )
-                    
+
                     if result and len(result) > 1 and result[1]:
                         deleted_orders.append({
                             "orderId": order_id,
@@ -437,7 +437,7 @@ class OMSController:
                             "success": True,
                             "message": "删除成功"
                         })
-                        
+
                 except Exception as e:
                     failed_orders.append({
                         "orderId": order_id,
@@ -446,7 +446,7 @@ class OMSController:
                         "success": False,
                         "message": str(e)
                     })
-            
+
             if deleted_orders:
                 try:
                     oplog_data = {
@@ -456,7 +456,7 @@ class OMSController:
                         "deleted_by_id": deleted_by_id,
                         "total_count": len(deleted_orders)
                     }
-                    
+
                     await OpLogController.create_operation_log(
                         logger_type="订单批量删除",
                         operation_content=oplog_data,
@@ -464,8 +464,8 @@ class OMSController:
                         modify_time=current_time
                     )
                 except Exception as e:
-                    logger.error(f"记录操作日志失败: {str(e)}")
-            
+                    logger.error(f"记录操作日志失败: {e!s}")
+
             return {
                 "success": len(failed_orders) == 0,
                 "total_count": len(order_nos),
@@ -474,13 +474,13 @@ class OMSController:
                 "details": deleted_orders + failed_orders,
                 "connection_name": conn_info['name']
             }
-            
+
         except Exception as e:
-            logger.error(f"批量删除订单时发生错误: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"批量删除失败: {str(e)}")
-    
+            logger.error(f"批量删除订单时发生错误: {e!s}")
+            raise HTTPException(status_code=500, detail=f"批量删除失败: {e!s}")
+
     @staticmethod
-    async def get_connections() -> List[Dict[str, Any]]:
+    async def get_connections() -> list[dict[str, Any]]:
         """
         获取所有可用的数据库连接
         """
@@ -494,9 +494,9 @@ class OMSController:
             }
             for conn_name, conn_info in connections.items()
         ]
-    
+
     @staticmethod
-    async def refresh_connections() -> Dict[str, str]:
+    async def refresh_connections() -> dict[str, str]:
         """
         刷新数据库连接池
         """
@@ -504,8 +504,8 @@ class OMSController:
             await refresh_dynamic_connections()
             return {"message": "连接池刷新成功"}
         except Exception as e:
-            logger.error(f"刷新连接池时发生错误: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"刷新连接池失败: {str(e)}")
-    
+            logger.error(f"刷新连接池时发生错误: {e!s}")
+            raise HTTPException(status_code=500, detail=f"刷新连接池失败: {e!s}")
+
 
 oms_controller = OMSController()

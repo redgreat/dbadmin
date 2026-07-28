@@ -11,26 +11,25 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from tortoise import Tortoise
-
-import mcp.types as types
+from mcp import types
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
+from tortoise import Tortoise
+
+import aiagent.tools.approval_tools
 
 # 工具注册（触发装饰器执行）
-import aiagent.tools.conn_tools  # noqa: F401
-import aiagent.tools.sql_tools  # noqa: F401
-import aiagent.tools.order_tools  # noqa: F401
+import aiagent.tools.conn_tools
+import aiagent.tools.imptask_tools
+import aiagent.tools.oa_tools
+import aiagent.tools.order_tools
+import aiagent.tools.report_tools
+import aiagent.tools.sql_tools
 import aiagent.tools.wms_tools  # noqa: F401
-import aiagent.tools.oa_tools  # noqa: F401
-import aiagent.tools.report_tools  # noqa: F401
-import aiagent.tools.imptask_tools  # noqa: F401
-import aiagent.tools.approval_tools  # noqa: F401
-
-from aiagent.tools.base import TOOL_REGISTRY
-from aiagent.security.token_auth import verify_token
-from aiagent.security.permission_checker import check_tool_permission
 from aiagent.models.ai_tool_call_log import AiToolCallLog
+from aiagent.security.permission_checker import check_tool_permission
+from aiagent.security.token_auth import verify_token
+from aiagent.tools.base import TOOL_REGISTRY
 
 # 每个请求的 Token 上下文变量（用于在工具调用时获取当前 token）
 _current_token: contextvars.ContextVar = contextvars.ContextVar("current_token", default=None)

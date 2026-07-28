@@ -2,9 +2,7 @@
 数据库配置模块
 从统一配置文件 config.yml 读取数据库配置
 """
-from typing import Any, Dict, Optional
-
-from pydantic import BaseModel, Field
+from typing import Any
 
 from app.core.config_loader import get_config
 
@@ -25,12 +23,12 @@ def _get_admin_db_config():
         'credentials': admin_db.model_dump()
     }
 
-def get_tortoise_config() -> Dict[str, Any]:
+def get_tortoise_config() -> dict[str, Any]:
     """
     生成完整的Tortoise ORM配置（从 config.yml 读取）
     """
     admin_db = _get_admin_db_config()
-    
+
     connections = {
         "default": {
             "engine": DB_ENGINES[admin_db['engine']],
@@ -62,7 +60,7 @@ def get_tortoise_config() -> Dict[str, Any]:
 TORTOISE_ORM = get_tortoise_config()
 
 # 动态连接占位
-DYNAMIC_CONNECTIONS: Dict[str, Dict[str, Any]] = {}
+DYNAMIC_CONNECTIONS: dict[str, dict[str, Any]] = {}
 
 async def load_dynamic_connections():
     """
@@ -70,7 +68,7 @@ async def load_dynamic_connections():
     """
     return
 
-def get_tortoise_config_with_dynamic() -> Dict[str, Any]:
+def get_tortoise_config_with_dynamic() -> dict[str, Any]:
     """
     获取包含动态连接的Tortoise配置（占位实现，返回静态配置）
     """

@@ -4,7 +4,9 @@ import httpx
 from pydantic import BaseModel, Field
 
 from app.core.config_loader import get_config
-from .base import mcp_tool, _err, _ok
+
+from .base import _err, _ok, mcp_tool
+
 
 class QueryImptaskStatusInput(BaseModel):
     task_id: str = Field(..., description="导入任务ID")

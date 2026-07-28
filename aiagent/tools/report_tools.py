@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
-from .base import mcp_tool, _ok, _err
+
+from .base import _ok, mcp_tool
+
 
 class ListReportsInput(BaseModel):
     pass

@@ -8,7 +8,6 @@ from app.core.dependency import DependAuth
 from app.models.admin import User
 from app.schemas.base import Fail, Success, SuccessExtra
 from app.schemas.conn import DBConnectionCreate, DBConnectionTest, DBConnectionUpdate
-from app.services.db_pool import db_pool
 from app.services.conn_permission_service import apply_conn_permission_filter
 
 logger = logging.getLogger(__name__)
@@ -27,7 +26,7 @@ async def list_connections(
     if name:
         q &= Q(name__contains=name)
     q = await apply_conn_permission_filter(q, current_user)
-    
+
     total, conn_objs = await conn_controller.list(
         page=page, page_size=page_size, search=q, order=["-updated_at"]
     )
@@ -54,7 +53,7 @@ async def create_connection(
     existing = await conn_controller.get_by_name(conn_in.name)
     if existing:
         return Fail(code=400, msg="连接名称已存在")
-    
+
     # 创建连接
     await conn_controller.create(obj_in=conn_in)
     return Success(msg="创建成功")
@@ -70,13 +69,13 @@ async def update_connection(
         await conn_controller.get(id=conn_in.id)
     except Exception:
         return Fail(code=404, msg="连接不存在")
-    
+
     # 如果更新了名称，检查名称是否已存在
     if conn_in.name:
         existing = await conn_controller.get_by_name(conn_in.name)
         if existing and existing.id != conn_in.id:
             return Fail(code=400, msg="连接名称已存在")
-    
+
     # 更新连接
     await conn_controller.update(id=conn_in.id, obj_in=conn_in)
     return Success(msg="更新成功")
@@ -91,7 +90,7 @@ async def delete_connection(
         await conn_controller.remove(id=conn_id)
         return Success(msg="删除成功")
     except Exception as e:
-        return Fail(code=400, msg=f"删除失败: {str(e)}")
+        return Fail(code=400, msg=f"删除失败: {e!s}")
 
 
 @router.post("/test", summary="测试数据库连接")
@@ -109,7 +108,7 @@ async def test_connection(
         database=conn_test.database,
         params=conn_test.params,
     )
-    
+
     if success:
         return Success(msg=message)
     else:

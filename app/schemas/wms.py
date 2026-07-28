@@ -1,4 +1,3 @@
-from typing import List
 from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
@@ -6,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class WmsDeleteBatchIn(BaseModel):
     """批量删除入参"""
-    stock_nos: List[str] = Field(default_factory=list, description="单据编码或单据Id列表")
+    stock_nos: list[str] = Field(default_factory=list, description="单据编码或单据Id列表")
     operator_id: str = Field(default="", description="操作人Id（GUID格式）")
     remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
 
@@ -20,12 +19,12 @@ class WmsRestoreLogicalIn(BaseModel):
 
 class WmsQueryIn(BaseModel):
     """查询单据状态入参"""
-    stock_nos: List[str] = Field(default_factory=list, description="单据编码或单据Id列表")
+    stock_nos: list[str] = Field(default_factory=list, description="单据编码或单据Id列表")
 
 
 class WmsValidateRequest(BaseModel):
     """单据验证请求"""
-    stock_nos: List[str] = Field(default_factory=list, description="单据编码或单据Id列表")
+    stock_nos: list[str] = Field(default_factory=list, description="单据编码或单据Id列表")
     validate_type: str = Field(..., description="验证类型: logical_delete, physical_delete, restore")
     operator_id: str = Field(default="", description="删除人Id（恢复时需要）")
     remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
@@ -82,7 +81,7 @@ class PriceQueryResult(BaseModel):
 class RelationItem(BaseModel):
     """FCC报销单与仓储对账单对应关系"""
     fcc_no: str = Field(..., description="FCC报销单号")
-    wms_nos: List[str] = Field(..., description="仓储对账单号列表")
+    wms_nos: list[str] = Field(..., description="仓储对账单号列表")
 
 
 class FccParseIn(BaseModel):
@@ -92,17 +91,17 @@ class FccParseIn(BaseModel):
 
 class FccValidateIn(BaseModel):
     """验证请求模型"""
-    relations: List[RelationItem] = Field(..., description="对应关系列表")
+    relations: list[RelationItem] = Field(..., description="对应关系列表")
 
 
 class FccSubmitIn(BaseModel):
     """提交请求模型"""
-    relations: List[RelationItem] = Field(..., description="对应关系列表")
+    relations: list[RelationItem] = Field(..., description="对应关系列表")
 
 
 class ParseResult(BaseModel):
     """解析结果模型"""
-    relations: List[RelationItem] = Field(..., description="对应关系列表")
+    relations: list[RelationItem] = Field(..., description="对应关系列表")
     total_fcc: int = Field(..., description="FCC报销单总数")
     total_wms: int = Field(..., description="仓储对账单总数")
 
@@ -110,8 +109,8 @@ class ParseResult(BaseModel):
 class ValidateResult(BaseModel):
     """验证结果模型"""
     valid: bool = Field(..., description="是否验证通过")
-    not_found_fcc: List[str] = Field(default_factory=list, description="不存在的FCC报销单列表")
-    not_found_wms: List[str] = Field(default_factory=list, description="不存在的仓储对账单列表")
+    not_found_fcc: list[str] = Field(default_factory=list, description="不存在的FCC报销单列表")
+    not_found_wms: list[str] = Field(default_factory=list, description="不存在的仓储对账单列表")
     message: str = Field(..., description="验证消息")
 
 
@@ -133,7 +132,7 @@ class FailedItem(BaseModel):
 class TaskResult(BaseModel):
     """任务结果模型"""
     success_count: int = Field(..., description="成功数量")
-    failed_items: List[FailedItem] = Field(default_factory=list, description="失败项列表")
+    failed_items: list[FailedItem] = Field(default_factory=list, description="失败项列表")
 
 
 class TaskStatus(BaseModel):

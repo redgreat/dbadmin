@@ -1,21 +1,22 @@
 """
 Excel导入服务 - 从Excel文件生成SQL语句
 """
-from io import BytesIO
-from datetime import datetime, date
-from typing import List, Tuple, Any, Literal, Dict, Optional
 import hashlib
 import json
 import os
+import uuid
+from datetime import date, datetime
+from io import BytesIO
+from typing import Any, Literal
+
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
-from pypinyin import lazy_pinyin, Style
-import uuid
+from pypinyin import Style, lazy_pinyin
 
 from app.services.sql_apply_service import execute_sql_on_connection
 
 # 进度存储
-_PROGRESS: Dict[str, Dict[str, Any]] = {}
+_PROGRESS: dict[str, dict[str, Any]] = {}
 EXCELIMP_TASK_DIR = "data/excelimp_tasks"
 os.makedirs(EXCELIMP_TASK_DIR, exist_ok=True)
 
@@ -80,12 +81,12 @@ def _progress_done(stamp: str, sql: str):
     )
 
 
-def get_progress(stamp: str) -> Dict[str, Any]:
+def get_progress(stamp: str) -> dict[str, Any]:
     """获取进度"""
     # 每次查询都尝试从磁盘读取最新状态，因为状态可能是其他进程（如Celery Worker）更新的
     if os.path.exists(_progress_path(stamp)):
         try:
-            with open(_progress_path(stamp), "r", encoding="utf-8") as f:
+            with open(_progress_path(stamp), encoding="utf-8") as f:
                 _PROGRESS[stamp] = json.load(f)
         except Exception:
             pass
@@ -93,13 +94,13 @@ def get_progress(stamp: str) -> Dict[str, Any]:
     data = dict(_PROGRESS.get(stamp, {"stage": "", "message": ""}))
     sql_file = data.get("sql_file_path") or _sql_path(stamp)
     if data.get("stage") == "done" and os.path.exists(sql_file):
-        with open(sql_file, "r", encoding="utf-8") as f:
+        with open(sql_file, encoding="utf-8") as f:
             data["sql"] = f.read()
     return data
 
 
 async def submit_and_generate(
-    file_bytes: bytes, filename: str, db_type: str, stamp: Optional[str] = None
+    file_bytes: bytes, filename: str, db_type: str, stamp: str | None = None
 ) -> str:
     """异步生成SQL"""
     if stamp is None:
@@ -135,7 +136,7 @@ def generate_sql_file_task(
     filename: str,
     db_type: Literal["mysql", "postgresql"],
     stamp: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """后台生成Excel临时表SQL，状态和结果均落盘，便于跨进程查询。"""
     _progress_start(stamp, filename)
     try:
@@ -159,7 +160,7 @@ def generate_sql_file_task(
         raise
 
 
-async def execute_sql_file_task(stamp: str, target_conn_id: int) -> Dict[str, Any]:
+async def execute_sql_file_task(stamp: str, target_conn_id: int) -> dict[str, Any]:
     """后台执行Excel临时表SQL，并把执行状态写入同一个进度文件。"""
     data = get_progress(stamp)
     sql_file = data.get("sql_file_path") or _sql_path(stamp)
@@ -171,7 +172,7 @@ async def execute_sql_file_task(stamp: str, target_conn_id: int) -> Dict[str, An
         execute_status="processing",
         execute_message="导入执行已进入后台",
     )
-    with open(sql_file, "r", encoding="utf-8") as f:
+    with open(sql_file, encoding="utf-8") as f:
         sql_text = f.read()
 
     async def progress_cb(done: int, total: int, _stmt: str):
@@ -262,7 +263,7 @@ def generate_sql_file_from_excel(
     db_type: Literal["mysql", "postgresql"],
     sql_file_path: str,
     batch_size: int = 500,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """从Excel文件流式生成SQL文件，避免大文件导入时占用过多内存。"""
 
     columns, field_names, primary_key_name, field_types, row_count = _analyze_excel_file(
@@ -285,7 +286,7 @@ def generate_sql_file_from_excel(
         sha.update(text.encode("utf-8"))
 
     with open(sql_file_path, "w", encoding="utf-8") as sql_file:
-        write_sql(sql_file, f"-- GENERATED_BY:EXCELIMP\n")
+        write_sql(sql_file, "-- GENERATED_BY:EXCELIMP\n")
         write_sql(sql_file, f"-- SOURCE_FILE:{filename}\n")
         write_sql(sql_file, f"-- DB_TYPE:{db_type}\n")
         write_sql(sql_file, f"{create_table_sql}\n\n")
@@ -325,7 +326,7 @@ def generate_sql_file_from_excel(
 def _analyze_excel_file(
     excel_path: str,
     db_type: Literal["mysql", "postgresql"],
-) -> Tuple[List[str], List[str], str, List[str], int]:
+) -> tuple[list[str], list[str], str, list[str], int]:
     workbook = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
     try:
         sheet = workbook.active
@@ -354,17 +355,17 @@ def _analyze_excel_file(
         workbook.close()
 
 
-def _normalize_data_row(row: Tuple[Any, ...], width: int) -> List[Any]:
+def _normalize_data_row(row: tuple[Any, ...], width: int) -> list[Any]:
     values = list(row or [])
     values = values + [None] * (width - len(values))
     return values[:width]
 
 
-def _is_empty_row(row: List[Any]) -> bool:
+def _is_empty_row(row: list[Any]) -> bool:
     return all(cell is None or str(cell).strip() == "" for cell in row)
 
 
-def _new_type_stats() -> Dict[str, Any]:
+def _new_type_stats() -> dict[str, Any]:
     return {
         "has_int": False,
         "has_float": False,
@@ -377,7 +378,7 @@ def _new_type_stats() -> Dict[str, Any]:
     }
 
 
-def _update_type_stats(stat: Dict[str, Any], val: Any):
+def _update_type_stats(stat: dict[str, Any], val: Any):
     if val is None:
         return
     if isinstance(val, bool):
@@ -406,7 +407,7 @@ def _update_type_stats(stat: Dict[str, Any], val: Any):
         stat["max_str_length"] = max(stat["max_str_length"], len(str(val)))
 
 
-def _stats_to_field_type(stat: Dict[str, Any], db_type: Literal["mysql", "postgresql"]) -> str:
+def _stats_to_field_type(stat: dict[str, Any], db_type: Literal["mysql", "postgresql"]) -> str:
     if stat["has_datetime"]:
         return "DATETIME" if db_type == "mysql" else "TIMESTAMP"
     if stat["has_date"] and not stat["has_string"]:
@@ -431,7 +432,7 @@ def _stats_to_field_type(stat: Dict[str, Any], db_type: Literal["mysql", "postgr
     return "VARCHAR(255)"
 
 
-def _parse_sheet(sheet: Worksheet) -> Tuple[List[str], List[List[Any]]]:
+def _parse_sheet(sheet: Worksheet) -> tuple[list[str], list[list[Any]]]:
     """
     解析Excel工作表，提取列名和数据行
     
@@ -439,13 +440,13 @@ def _parse_sheet(sheet: Worksheet) -> Tuple[List[str], List[List[Any]]]:
         元组 (列名列表, 数据行列表)
     """
     rows = list(sheet.iter_rows(values_only=True))
-    
+
     if not rows:
         return [], []
-    
+
     # 第一行是列名
     columns = [str(cell) if cell is not None else f"column_{i+1}" for i, cell in enumerate(rows[0])]
-    
+
     # 其余行是数据
     data_rows = []
     for row in rows[1:]:
@@ -453,11 +454,11 @@ def _parse_sheet(sheet: Worksheet) -> Tuple[List[str], List[List[Any]]]:
         if all(cell is None or str(cell).strip() == "" for cell in row):
             continue
         data_rows.append(list(row))
-    
+
     return columns, data_rows
 
 
-def _generate_field_names(columns: List[str]) -> Tuple[List[str], str]:
+def _generate_field_names(columns: list[str]) -> tuple[list[str], str]:
     """
     从列名生成有效的SQL字段名
     将中文字符转换为拼音，确保符合SQL标识符规范
@@ -515,20 +516,18 @@ def _convert_to_sql_identifier(text: str) -> str:
     """
     # 先去除空白字符
     text = text.strip()
-    
+
     if not text:
         return ""
-    
+
     result = []
-    
+
     for char in text:
         if char.isascii():
             # ASCII字符 - 直接处理
             if char.isalnum():
                 result.append(char)
-            elif char in (' ', '-'):
-                result.append('_')
-            elif char == '_':
+            elif char in (' ', '-') or char == '_':
                 result.append('_')
             # 跳过其他特殊字符
         else:
@@ -536,38 +535,38 @@ def _convert_to_sql_identifier(text: str) -> str:
             pinyin_list = lazy_pinyin(char, style=Style.NORMAL)
             if pinyin_list:
                 result.append(pinyin_list[0])
-    
+
     field_name = ''.join(result)
-    
+
     # 确保以字母或下划线开头
     if field_name and not (field_name[0].isalpha() or field_name[0] == '_'):
         field_name = f"col_{field_name}"
-    
+
     return field_name
 
 
-def _infer_field_types(data_rows: List[List[Any]], db_type: Literal["mysql", "postgresql"]) -> List[str]:
+def _infer_field_types(data_rows: list[list[Any]], db_type: Literal["mysql", "postgresql"]) -> list[str]:
     """
     根据数据推断每列的SQL数据类型
     """
     if not data_rows:
         return []
-    
+
     num_columns = len(data_rows[0])
     field_types = []
-    
+
     for col_idx in range(num_columns):
         # 收集该列的所有值
         values = [row[col_idx] if col_idx < len(row) else None for row in data_rows]
-        
+
         # 推断类型
         field_type = _infer_column_type(values, db_type)
         field_types.append(field_type)
-    
+
     return field_types
 
 
-def _infer_column_type(values: List[Any], db_type: Literal["mysql", "postgresql"]) -> str:
+def _infer_column_type(values: list[Any], db_type: Literal["mysql", "postgresql"]) -> str:
     """
     根据列的值推断SQL类型
     支持: INT, BIGINT, DECIMAL, VARCHAR, TEXT, DATE, DATETIME
@@ -575,10 +574,10 @@ def _infer_column_type(values: List[Any], db_type: Literal["mysql", "postgresql"
     """
     # 过滤掉None值
     non_null_values = [v for v in values if v is not None]
-    
+
     if not non_null_values:
         return "VARCHAR(255)"
-    
+
     # 跟踪类型类别
     has_int = False
     has_float = False
@@ -586,10 +585,10 @@ def _infer_column_type(values: List[Any], db_type: Literal["mysql", "postgresql"
     has_datetime = False
     has_string = False
     has_bool = False
-    
+
     max_int_value = 0
     max_str_length = 0
-    
+
     for val in non_null_values:
         if isinstance(val, bool):
             has_bool = True
@@ -618,46 +617,46 @@ def _infer_column_type(values: List[Any], db_type: Literal["mysql", "postgresql"
             # 未知类型，作为字符串处理
             has_string = True
             max_str_length = max(max_str_length, len(str(val)))
-    
+
     # 根据发现的类型确定最终类型
     # 优先级: datetime > date > decimal > bigint > int > varchar/text
-    
+
     if has_datetime:
         # 如果有任何datetime，使用DATETIME（对日期/时间数据最宽松）
         return "DATETIME" if db_type == "mysql" else "TIMESTAMP"
-    
+
     if has_date and not has_string:
         # 纯日期列（没有非日期字符串）
         return "DATE"
-    
+
     if has_string or has_bool:
         # 如果有字符串或布尔值与数字混合，使用字符串类型
         if has_int or has_float or has_date or has_datetime:
             # 混合类型 - 使用字符串
             max_str_length = max(max_str_length, 50)  # 确保合理的最小值
-        
+
         if max_str_length == 0:
             max_str_length = 255
         elif max_str_length < 255:
             max_str_length = min(max_str_length * 2, 255)  # 添加缓冲
-        
+
         if max_str_length > 1000:
             return "TEXT"
         else:
             return f"VARCHAR({max_str_length})"
-    
+
     # 仅数字类型
     if has_float:
         # 如果有任何浮点数，使用DECIMAL（对数字数据最宽松）
         return "DECIMAL(18,2)"
-    
+
     if has_int:
         # 纯整数列
         if max_int_value < 2147483647:  # 2^31 - 1
             return "INT"
         else:
             return "BIGINT"
-    
+
     # 默认回退
     return "VARCHAR(255)"
 
@@ -669,9 +668,9 @@ def _try_parse_date(value: str) -> Any:
     """
     if not value or not isinstance(value, str):
         return None
-    
+
     value = value.strip()
-    
+
     # 常见的日期/时间格式
     formats = [
         # 日期时间格式
@@ -691,7 +690,7 @@ def _try_parse_date(value: str) -> Any:
         "%m/%d/%Y",
         "%m-%d-%Y",
     ]
-    
+
     for fmt in formats:
         try:
             parsed = datetime.strptime(value, fmt)
@@ -706,7 +705,7 @@ def _try_parse_date(value: str) -> Any:
                 return parsed  # datetime
         except ValueError:
             continue
-    
+
     return None
 
 
@@ -721,7 +720,7 @@ def _generate_table_name() -> str:
 
 def _generate_index_statements(
     table_name: str,
-    field_names: List[str],
+    field_names: list[str],
     db_type: Literal["mysql", "postgresql"],
     primary_key_name: str
 ) -> str:
@@ -753,8 +752,8 @@ def _generate_index_statements(
 
 def _generate_create_table(
     table_name: str,
-    field_names: List[str],
-    field_types: List[str],
+    field_names: list[str],
+    field_types: list[str],
     db_type: Literal["mysql", "postgresql"],
     primary_key_name: str
 ) -> str:
@@ -784,8 +783,8 @@ def _generate_create_table(
 
 def _generate_insert_statements(
     table_name: str,
-    field_names: List[str],
-    data_rows: List[List[Any]],
+    field_names: list[str],
+    data_rows: list[list[Any]],
     db_type: Literal["mysql", "postgresql"],
     batch_size: int = 500
 ) -> str:
@@ -794,30 +793,30 @@ def _generate_insert_statements(
     """
     if not data_rows:
         return ""
-    
+
     insert_statements = []
     fields_str = ", ".join(field_names)
-    
+
     for i in range(0, len(data_rows), batch_size):
         batch = data_rows[i:i + batch_size]
         values_list = []
-        
+
         for row in batch:
             # 确保行的长度与字段名相同
             row_values = row + [None] * (len(field_names) - len(row))
             row_values = row_values[:len(field_names)]
-            
+
             # 格式化值
             formatted_values = []
             for val in row_values:
                 formatted_values.append(_format_value(val))
-            
+
             values_list.append(f"({', '.join(formatted_values)})")
-        
+
         values_str = ",\n  ".join(values_list)
         insert_sql = f"INSERT INTO {table_name} ({fields_str})\nVALUES\n  {values_str};"
         insert_statements.append(insert_sql)
-    
+
     return "\n\n".join(insert_statements)
 
 

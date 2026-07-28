@@ -1,8 +1,8 @@
 import os
-import warnings
 import time
+import warnings
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any
 from urllib.parse import urlsplit
 
 # 过滤oss2库的SyntaxWarning
@@ -12,16 +12,17 @@ warnings.filterwarnings(
     category=SyntaxWarning,
 )
 
+from urllib.parse import quote
+
 import oss2
 import requests
-from urllib.parse import quote
 
 from app.log import logger
 from app.settings import settings
 
 
 class OSSService:
-    _identity_token_cache: Optional[str] = None
+    _identity_token_cache: str | None = None
     _identity_token_expire_at: float = 0
 
     @staticmethod
@@ -41,7 +42,7 @@ class OSSService:
         return f"{prefix}/{now.year}/{now.month:02d}/{now.day:02d}/{safe_name}"
 
     @staticmethod
-    def _extract_download_url(payload: Dict[str, Any]) -> Optional[str]:
+    def _extract_download_url(payload: dict[str, Any]) -> str | None:
         candidates = [
             payload.get("url"),
             payload.get("download_url"),
@@ -65,7 +66,7 @@ class OSSService:
         return None
 
     @staticmethod
-    def _extract_object_key(payload: Dict[str, Any]) -> Optional[str]:
+    def _extract_object_key(payload: dict[str, Any]) -> str | None:
         candidates = [
             payload.get("object_key"),
             payload.get("objectKey"),
@@ -105,7 +106,7 @@ class OSSService:
         return ""
 
     @classmethod
-    def _get_identity_access_token(cls) -> Optional[str]:
+    def _get_identity_access_token(cls) -> str | None:
         """
         从认证中心获取 access_token（带简单缓存）。
         """
@@ -150,7 +151,7 @@ class OSSService:
             return None
 
     @classmethod
-    def _get_sts_token(cls) -> Optional[Dict[str, Any]]:
+    def _get_sts_token(cls) -> dict[str, Any] | None:
         """获取STS token"""
         try:
             access_token = cls._get_identity_access_token()
@@ -177,21 +178,21 @@ class OSSService:
             if not resp.ok:
                 logger.error(f"[OSS] 获取STS token失败: status={resp.status_code}, body={resp.text[:500]}")
                 return None
-            
+
             sts_data = resp.json()
             sts_info = sts_data.get("sts")
             if not sts_info:
                 logger.error("[OSS] STS信息为空")
                 return None
-            
+
             return sts_info
-            
+
         except Exception as e:
             logger.error(f"[OSS] 获取STS token异常: {e}", exc_info=True)
             return None
 
     @classmethod
-    def _get_sts_download_url(cls, object_key: str) -> Optional[str]:
+    def _get_sts_download_url(cls, object_key: str) -> str | None:
         """
         按文档流程获取下载链接：
         1) 认证中心 token
@@ -245,7 +246,7 @@ class OSSService:
             return None
 
     @classmethod
-    def upload_file(cls, local_file_path: str, object_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def upload_file(cls, local_file_path: str, object_name: str | None = None) -> dict[str, Any] | None:
         if not cls.is_enabled():
             return None
         if not local_file_path or not os.path.exists(local_file_path):
@@ -253,32 +254,32 @@ class OSSService:
 
         try:
             object_key = object_name or cls._build_object_key(os.path.basename(local_file_path))
-            
+
             # 获取STS token
             sts_info = cls._get_sts_token()
             if not sts_info:
                 logger.error("[OSS] 无法获取STS token")
                 return None
-            
+
             # 使用STS凭证创建OSS客户端
             auth = oss2.StsAuth(
                 sts_info["sts_AccessId"],
-                sts_info["sts_AccessKeySecret"], 
+                sts_info["sts_AccessKeySecret"],
                 sts_info["securityToken"]
             )
             bucket = oss2.Bucket(auth, sts_info["endpoint"], settings.OSS_BUCKET)
-            
+
             # 上传文件
             with open(local_file_path, "rb") as file_obj:
                 result = bucket.put_object(object_key, file_obj)
-            
+
             if result.status != 200:
                 logger.error(f"[OSS] 上传失败: status={result.status}")
                 return None
-            
+
             # 生成下载URL
             remote_url = cls.sign_download_url(object_key)
-            
+
             logger.info(f"[OSS] 上传成功: bucket={settings.OSS_BUCKET}, key={object_key}")
             return {
                 "provider": "aliyun_oss_sts",
@@ -288,13 +289,13 @@ class OSSService:
                 "size": os.path.getsize(local_file_path),
                 "uploaded_at": datetime.now().isoformat(),
             }
-            
+
         except Exception as e:
             logger.error(f"[OSS] 上传异常: {e}")
             return None
 
     @classmethod
-    def sign_download_url(cls, object_key: str, expire_seconds: Optional[int] = None) -> Optional[str]:
+    def sign_download_url(cls, object_key: str, expire_seconds: int | None = None) -> str | None:
         if not object_key:
             return None
         if str(object_key).startswith("http://") or str(object_key).startswith("https://"):
@@ -306,7 +307,7 @@ class OSSService:
         return f"{base_url}/{object_key_safe}"
 
     @staticmethod
-    def extract_oss_meta(execution_json: Optional[dict]) -> Optional[Dict[str, Any]]:
+    def extract_oss_meta(execution_json: dict | None) -> dict[str, Any] | None:
         if not execution_json:
             return None
         storage = execution_json.get("storage")
@@ -318,7 +319,7 @@ class OSSService:
         return storage
 
     @classmethod
-    def resolve_download_url(cls, storage_meta: Optional[Dict[str, Any]]) -> Optional[str]:
+    def resolve_download_url(cls, storage_meta: dict[str, Any] | None) -> str | None:
         if not storage_meta:
             return None
         object_key = storage_meta.get("object_key") or storage_meta.get("key")

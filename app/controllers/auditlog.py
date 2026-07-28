@@ -1,6 +1,4 @@
-from typing import List
 
-from fastapi import Query
 from tortoise.expressions import Q
 
 from app.core.crud import CRUDBase
@@ -12,7 +10,7 @@ class AuditLogController(CRUDBase):
     def get_schema_model(self):
         return AuditLogSchema
 
-    async def get_logs(self, query: AuditLogQuerySchema) -> tuple[List[AuditLogSchema], int]:
+    async def get_logs(self, query: AuditLogQuerySchema) -> tuple[list[AuditLogSchema], int]:
         filters = Q()
         if query.username:
             filters &= Q(username__icontains=query.username)

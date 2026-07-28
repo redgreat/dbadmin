@@ -1,26 +1,27 @@
-from typing import List, Dict, Any, Optional
 from datetime import datetime
+from math import ceil
+from typing import Any
+
 from fastapi import HTTPException
 from tortoise.expressions import Q
-from math import ceil
 
 from app.core.crud import CRUDBase
+from app.log import logger
 from app.models.oplog import OpLog
 from app.schemas.oplog import (
     OpLogCreateRequest,
-    OpLogUpdateRequest,
+    OpLogListResponse,
     OpLogQueryRequest,
     OpLogResponse,
-    OpLogListResponse
+    OpLogUpdateRequest,
 )
-from app.log import logger
 
 
 class OpLogCRUD(CRUDBase[OpLog, OpLogCreateRequest, OpLogUpdateRequest]):
     """
     运维日志CRUD操作类
     """
-    
+
     def get_schema_model(self):
         return OpLogResponse
 
@@ -29,10 +30,10 @@ class OpLogController:
     """
     运维日志控制器
     """
-    
+
     def __init__(self):
         self.crud = OpLogCRUD(OpLog)
-    
+
     async def create_oplog(self, request: OpLogCreateRequest) -> OpLogResponse:
         """
         创建运维日志记录
@@ -41,9 +42,9 @@ class OpLogController:
             oplog = await self.crud.create(request)
             return await self.crud._to_schema(oplog)
         except Exception as e:
-            logger.error(f"创建运维日志失败: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"创建运维日志失败: {str(e)}")
-    
+            logger.error(f"创建运维日志失败: {e!s}")
+            raise HTTPException(status_code=500, detail=f"创建运维日志失败: {e!s}")
+
     async def get_oplog(self, oplog_id: int) -> OpLogResponse:
         """
         根据ID获取运维日志
@@ -52,9 +53,9 @@ class OpLogController:
             oplog = await self.crud.get(oplog_id)
             return await self.crud._to_schema(oplog)
         except Exception as e:
-            logger.error(f"获取运维日志失败: {str(e)}")
+            logger.error(f"获取运维日志失败: {e!s}")
             raise HTTPException(status_code=404, detail="运维日志不存在")
-    
+
     async def query_oplogs(self, request: OpLogQueryRequest) -> OpLogListResponse:
         """
         查询运维日志列表
@@ -62,19 +63,19 @@ class OpLogController:
         try:
             # 构建查询条件
             search_conditions = Q()
-            
+
             if request.logger:
                 search_conditions &= Q(logger__icontains=request.logger)
-            
+
             if request.operater:
                 search_conditions &= Q(operater__icontains=request.operater)
-            
+
             if request.start_date:
                 search_conditions &= Q(final_modify_time__gte=request.start_date)
-            
+
             if request.end_date:
                 search_conditions &= Q(final_modify_time__lte=request.end_date)
-            
+
             # 执行查询
             total, oplogs = await self.crud.list(
                 page=request.page,
@@ -82,13 +83,13 @@ class OpLogController:
                 search=search_conditions,
                 order=["-final_modify_time", "-created_at"]
             )
-            
+
             # 转换为响应模型
             records = []
             for oplog in oplogs:
                 record = await self.crud._to_schema(oplog)
                 records.append(record)
-            
+
             # 计算分页信息
             total_pages = ceil(total / request.page_size)
             pagination = {
@@ -99,16 +100,16 @@ class OpLogController:
                 "has_next": request.page < total_pages,
                 "has_prev": request.page > 1
             }
-            
+
             return OpLogListResponse(
                 records=records,
                 pagination=pagination
             )
-            
+
         except Exception as e:
-            logger.error(f"查询运维日志失败: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"查询运维日志失败: {str(e)}")
-    
+            logger.error(f"查询运维日志失败: {e!s}")
+            raise HTTPException(status_code=500, detail=f"查询运维日志失败: {e!s}")
+
     async def update_oplog(self, oplog_id: int, request: OpLogUpdateRequest) -> OpLogResponse:
         """
         更新运维日志
@@ -117,10 +118,10 @@ class OpLogController:
             oplog = await self.crud.update(oplog_id, request)
             return await self.crud._to_schema(oplog)
         except Exception as e:
-            logger.error(f"更新运维日志失败: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"更新运维日志失败: {str(e)}")
-    
-    async def delete_oplog(self, oplog_id: int) -> Dict[str, str]:
+            logger.error(f"更新运维日志失败: {e!s}")
+            raise HTTPException(status_code=500, detail=f"更新运维日志失败: {e!s}")
+
+    async def delete_oplog(self, oplog_id: int) -> dict[str, str]:
         """
         删除运维日志
         """
@@ -128,15 +129,15 @@ class OpLogController:
             await self.crud.remove(oplog_id)
             return {"message": "运维日志删除成功"}
         except Exception as e:
-            logger.error(f"删除运维日志失败: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"删除运维日志失败: {str(e)}")
-    
+            logger.error(f"删除运维日志失败: {e!s}")
+            raise HTTPException(status_code=500, detail=f"删除运维日志失败: {e!s}")
+
     @staticmethod
     async def create_operation_log(
         logger_type: str,
-        operation_content: Dict[str, Any],
+        operation_content: dict[str, Any],
         operator: str,
-        modify_time: Optional[datetime] = None
+        modify_time: datetime | None = None
     ) -> OpLog:
         """
         创建运维操作日志的公共方法
@@ -153,19 +154,19 @@ class OpLogController:
         try:
             if modify_time is None:
                 modify_time = datetime.now()
-            
+
             oplog = await OpLog.create(
                 logger=logger_type,
                 chgmsg=operation_content,
                 operater=operator,
                 final_modify_time=modify_time
             )
-            
+
             logger.info(f"运维日志记录成功: {logger_type} - {operator}")
             return oplog
-            
+
         except Exception as e:
-            logger.error(f"记录运维日志失败: {str(e)}")
+            logger.error(f"记录运维日志失败: {e!s}")
             # 这里不抛出异常，避免影响主业务流程
             return None
 

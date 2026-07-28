@@ -1,17 +1,18 @@
+
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
-from typing import Optional
-from aiagent.models.ai_llm_config import AiLlmConfig
-from app.schemas.base import Success, SuccessExtra, Fail
 from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
+
+from aiagent.models.ai_llm_config import AiLlmConfig
+from app.schemas.base import Fail, Success, SuccessExtra
 
 llm_config_router = APIRouter()
 
 class LlmConfigCreate(BaseModel):
     provider: str
     name: str
-    base_url: Optional[str] = None
-    api_key_enc: Optional[str] = None
+    base_url: str | None = None
+    api_key_enc: str | None = None
     model_name: str
     max_tokens: int = 4096
     temperature: float = 0.2
@@ -19,14 +20,14 @@ class LlmConfigCreate(BaseModel):
 
 class LlmConfigUpdate(BaseModel):
     id: int
-    provider: Optional[str] = None
-    name: Optional[str] = None
-    base_url: Optional[str] = None
-    api_key_enc: Optional[str] = None
-    model_name: Optional[str] = None
-    max_tokens: Optional[int] = None
-    temperature: Optional[float] = None
-    is_active: Optional[bool] = None
+    provider: str | None = None
+    name: str | None = None
+    base_url: str | None = None
+    api_key_enc: str | None = None
+    model_name: str | None = None
+    max_tokens: int | None = None
+    temperature: float | None = None
+    is_active: bool | None = None
 
 @llm_config_router.get("/")
 async def list_configs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1)):
@@ -49,7 +50,7 @@ async def update_config(req: LlmConfigUpdate):
         return Fail(msg="配置不存在")
     if req.is_active:
         await AiLlmConfig.filter(is_active=True).update(is_active=False)
-    
+
     update_data = req.model_dump(exclude_unset=True)
     update_data.pop('id', None)
     for k, v in update_data.items():

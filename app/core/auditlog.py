@@ -1,5 +1,4 @@
 import time
-from typing import Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -44,6 +43,6 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
             )
         except Exception as e:
             # Log the error but don't interrupt the response
-            print(f"Error creating audit log: {str(e)}")
+            print(f"Error creating audit log: {e!s}")
 
         return response

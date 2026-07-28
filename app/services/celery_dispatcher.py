@@ -1,6 +1,5 @@
 import asyncio
 import time
-from typing import Optional
 
 from app.log import logger
 from app.settings.config import settings
@@ -32,7 +31,7 @@ def _has_active_worker() -> bool:
     return alive
 
 
-def _safe_delay(task_name: str, func, *args) -> Optional[str]:
+def _safe_delay(task_name: str, func, *args) -> str | None:
     try:
         async_result = func.apply_async(args=args, retry=False)
         task_id = getattr(async_result, "id", None)
@@ -43,7 +42,7 @@ def _safe_delay(task_name: str, func, *args) -> Optional[str]:
         return None
 
 
-def dispatch_report_export(generation_id: int) -> Optional[str]:
+def dispatch_report_export(generation_id: int) -> str | None:
     if not settings.CELERY_ENABLED or not _has_active_worker():
         return None
     from app.tasks.celery_tasks import export_report_task
@@ -51,7 +50,7 @@ def dispatch_report_export(generation_id: int) -> Optional[str]:
     return _safe_delay("dbadmin.report.export", export_report_task, generation_id)
 
 
-def dispatch_imptask(task_id: int) -> Optional[str]:
+def dispatch_imptask(task_id: int) -> str | None:
     if not settings.CELERY_ENABLED or not _has_active_worker():
         return None
     from app.tasks.celery_tasks import process_imptask_task
@@ -59,7 +58,7 @@ def dispatch_imptask(task_id: int) -> Optional[str]:
     return _safe_delay("dbadmin.imptask.process", process_imptask_task, task_id)
 
 
-def dispatch_imptask_execute(task_id: int, user_id: int, username: str) -> Optional[str]:
+def dispatch_imptask_execute(task_id: int, user_id: int, username: str) -> str | None:
     if not settings.CELERY_ENABLED or not _has_active_worker():
         return None
     from app.tasks.celery_tasks import execute_imptask_sql_task
@@ -67,7 +66,7 @@ def dispatch_imptask_execute(task_id: int, user_id: int, username: str) -> Optio
     return _safe_delay("dbadmin.imptask.execute", execute_imptask_sql_task, task_id, user_id, username)
 
 
-def dispatch_excelimp_generate(file_path: str, filename: str, db_type: str, stamp: str) -> Optional[str]:
+def dispatch_excelimp_generate(file_path: str, filename: str, db_type: str, stamp: str) -> str | None:
     if not settings.CELERY_ENABLED or not _has_active_worker():
         return None
     from app.tasks.celery_tasks import generate_excelimp_sql_task
@@ -75,7 +74,7 @@ def dispatch_excelimp_generate(file_path: str, filename: str, db_type: str, stam
     return _safe_delay("dbadmin.excelimp.generate", generate_excelimp_sql_task, file_path, filename, db_type, stamp)
 
 
-def dispatch_excelimp_execute(stamp: str, target_conn_id: int) -> Optional[str]:
+def dispatch_excelimp_execute(stamp: str, target_conn_id: int) -> str | None:
     if not settings.CELERY_ENABLED or not _has_active_worker():
         return None
     from app.tasks.celery_tasks import execute_excelimp_sql_task
@@ -83,7 +82,7 @@ def dispatch_excelimp_execute(stamp: str, target_conn_id: int) -> Optional[str]:
     return _safe_delay("dbadmin.excelimp.execute", execute_excelimp_sql_task, stamp, target_conn_id)
 
 
-def dispatch_notify_report_send(task_id: int) -> Optional[str]:
+def dispatch_notify_report_send(task_id: int) -> str | None:
     if not settings.CELERY_ENABLED or not _has_active_worker():
         return None
     from app.tasks.celery_tasks import execute_report_send_task
@@ -91,7 +90,7 @@ def dispatch_notify_report_send(task_id: int) -> Optional[str]:
     return _safe_delay("dbadmin.notify.report_send", execute_report_send_task, task_id)
 
 
-def dispatch_notify_sql_alert(task_id: int) -> Optional[str]:
+def dispatch_notify_sql_alert(task_id: int) -> str | None:
     if not settings.CELERY_ENABLED or not _has_active_worker():
         return None
     from app.tasks.celery_tasks import execute_sql_alert_task
@@ -99,7 +98,7 @@ def dispatch_notify_sql_alert(task_id: int) -> Optional[str]:
     return _safe_delay("dbadmin.notify.sql_alert", execute_sql_alert_task, task_id)
 
 
-def dispatch_simtrans_sync(receipt_numbers_text: str) -> Optional[str]:
+def dispatch_simtrans_sync(receipt_numbers_text: str) -> str | None:
     if not settings.CELERY_ENABLED or not _has_active_worker():
         return None
     from app.tasks.celery_tasks import sync_simtrans_task

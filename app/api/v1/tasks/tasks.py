@@ -1,11 +1,9 @@
-from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Path, Query
 
 from app.controllers.task import task_controller
 from app.controllers.task_notify import task_notify_controller
 from app.core.ctx import CTX_USER_ID
-from app.core.dependency import DependPermisson
 from app.schemas.base import Success, SuccessExtra
 from app.schemas.task import (
     TaskCreate,
@@ -29,9 +27,9 @@ router = APIRouter(tags=["定时任务"])
 async def get_tasks(
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(10, ge=1, le=100, description="每页数量"),
-    name: Optional[str] = Query(None, description="任务名称，支持模糊搜索"),
-    type: Optional[str] = Query(None, description="任务类型：shell, python, http"),
-    status: Optional[bool] = Query(None, description="任务状态：true启用，false禁用"),
+    name: str | None = Query(None, description="任务名称，支持模糊搜索"),
+    type: str | None = Query(None, description="任务类型：shell, python, http"),
+    status: bool | None = Query(None, description="任务状态：true启用，false禁用"),
 ):
     """
     获取定时任务列表，支持分页和筛选
@@ -82,10 +80,10 @@ async def execute_task(task_id: int = Path(..., ge=1, description="任务ID")):
 
 @router.get("/logs", response_model=TaskLogList, summary="获取任务日志列表")
 async def get_task_logs(
-    task_id: Optional[int] = Query(None, ge=1, description="任务ID，不提供则查询所有任务的日志"),
+    task_id: int | None = Query(None, ge=1, description="任务ID，不提供则查询所有任务的日志"),
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(10, ge=1, le=100, description="每页数量"),
-    status: Optional[str] = Query(None, description="执行状态：success, failed, timeout, running"),
+    status: str | None = Query(None, description="执行状态：success, failed, timeout, running"),
 ):
     """
     获取任务执行日志列表，支持分页和筛选
@@ -105,8 +103,8 @@ async def get_task_log(log_id: int = Path(..., ge=1, description="日志ID")):
 async def list_report_send_tasks(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
-    task_name: Optional[str] = Query(None, description="任务名称"),
-    status: Optional[bool] = Query(None, description="任务状态"),
+    task_name: str | None = Query(None, description="任务名称"),
+    status: bool | None = Query(None, description="任务状态"),
 ):
     total, data = await task_notify_controller.list_report_send_tasks(page, page_size, task_name, status)
     return SuccessExtra(data=data, total=total, page=page, page_size=page_size)
@@ -140,8 +138,8 @@ async def execute_report_send_task(task_id: int = Query(..., description="任务
 async def list_sql_alert_tasks(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
-    task_name: Optional[str] = Query(None, description="任务名称"),
-    status: Optional[bool] = Query(None, description="任务状态"),
+    task_name: str | None = Query(None, description="任务名称"),
+    status: bool | None = Query(None, description="任务状态"),
 ):
     total, data = await task_notify_controller.list_sql_alert_tasks(page, page_size, task_name, status)
     return SuccessExtra(data=data, total=total, page=page, page_size=page_size)
@@ -175,9 +173,9 @@ async def execute_sql_alert_task(task_id: int = Query(..., description="任务ID
 async def list_notify_task_logs(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
-    task_type: Optional[str] = Query(None, description="任务类型"),
-    task_ref_id: Optional[int] = Query(None, description="任务ID"),
-    status: Optional[str] = Query(None, description="执行状态"),
+    task_type: str | None = Query(None, description="任务类型"),
+    task_ref_id: int | None = Query(None, description="任务ID"),
+    status: str | None = Query(None, description="执行状态"),
 ):
     total, data = await task_notify_controller.list_notify_task_logs(
         page=page,

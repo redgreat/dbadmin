@@ -1,8 +1,8 @@
-from typing import Tuple, Optional, List
-from app.models.report import ReportConfig, ReportGeneration
+
+from app.log import logger
 from app.models.conn import DBConnection
 from app.models.dict import Dict
-from app.log import logger
+from app.models.report import ReportConfig, ReportGeneration
 
 
 class ReportService:
@@ -95,9 +95,9 @@ class ReportService:
     async def get_config_list(
         page: int = 1,
         page_size: int = 10,
-        system_name: Optional[str] = None,
-        report_name: Optional[str] = None
-    ) -> Tuple[List[ReportConfig], int]:
+        system_name: str | None = None,
+        report_name: str | None = None
+    ) -> tuple[list[ReportConfig], int]:
         """
         获取报表配置列表
         """
@@ -121,10 +121,10 @@ class ReportService:
     async def get_generation_list(
         page: int = 1,
         page_size: int = 10,
-        system_name: Optional[str] = None,
-        report_name: Optional[str] = None,
-        status: Optional[str] = None
-    ) -> Tuple[List[ReportGeneration], int]:
+        system_name: str | None = None,
+        report_name: str | None = None,
+        status: str | None = None
+    ) -> tuple[list[ReportGeneration], int]:
         """
         获取报表生成记录列表
         """
@@ -179,7 +179,7 @@ class ReportService:
         return config.maintainer == user
 
     @staticmethod
-    def validate_sql(sql_statement: str) -> Tuple[bool, str]:
+    def validate_sql(sql_statement: str) -> tuple[bool, str]:
         """
         验证SQL安全性
         :param sql_statement: SQL语句
@@ -207,7 +207,7 @@ class ReportService:
         return True, ""
 
     @staticmethod
-    async def get_system_name_options() -> List[str]:
+    async def get_system_name_options() -> list[str]:
         """
         获取系统名称选项列表（从字典表获取）
         """
@@ -216,5 +216,5 @@ class ReportService:
             parent_code='yyxt_1',
             deleted=False
         ).order_by('created_at')
-        
+
         return [dict_item.name for dict_item in dicts]

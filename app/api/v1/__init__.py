@@ -2,27 +2,27 @@ from fastapi import APIRouter
 
 from app.core.dependency import DependPermisson
 
+from .alert import alert_router
 from .apis import apis_router
 from .auditlog import auditlog_router
 from .base import base_router
 from .conns import conns_router
 from .dicts import dicts_router
-from .menus import menus_router
-from .roles import roles_router
-from .tasks import tasks_router
-from .users import users_router
-from .oplog import oplog_router
-from .oms import oms_router
-from .oa import oa_router
-from .sim import sim_router
-from .tool import tool_router
 from .imptask import router as imptask_router
-from .report import report_router
-from .wms import wms_router
-from .alert import alert_router
 from .imptask.imptask import download_sql_file
+from .menus import menus_router
+from .oa import oa_router
+from .oms import oms_router
+from .oplog import oplog_router
+from .report import report_router
 from .report.report import download_report_direct, download_report_public
+from .roles import roles_router
+from .sim import sim_router
+from .tasks import tasks_router
+from .tool import tool_router
 from .usercenter import usercenter_router
+from .users import users_router
+from .wms import wms_router
 
 v1_router = APIRouter()
 

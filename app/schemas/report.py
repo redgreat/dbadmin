@@ -1,8 +1,6 @@
 from datetime import datetime
-from typing import List, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-
+from pydantic import BaseModel, ConfigDict, Field
 
 # ==================== 报表配置相关 Schema ====================
 
@@ -16,16 +14,15 @@ class ReportConfigBase(BaseModel):
 
 class ReportConfigCreate(ReportConfigBase):
     """创建报表配置请求模式"""
-    pass
 
 
 class ReportConfigUpdate(BaseModel):
     """更新报表配置请求模式"""
     id: int
-    system_name: Optional[str] = Field(None, description="系统名称")
-    report_name: Optional[str] = Field(None, description="报表名称")
-    sql_statement: Optional[str] = Field(None, description="SQL语句")
-    db_connection_id: Optional[int] = Field(None, description="数据库连接ID")
+    system_name: str | None = Field(None, description="系统名称")
+    report_name: str | None = Field(None, description="报表名称")
+    sql_statement: str | None = Field(None, description="SQL语句")
+    db_connection_id: int | None = Field(None, description="数据库连接ID")
 
 
 class ReportConfigInDB(BaseModel):
@@ -44,7 +41,7 @@ class ReportConfigInDB(BaseModel):
 
 class ReportConfigList(BaseModel):
     """报表配置列表响应模式"""
-    items: List[ReportConfigInDB]
+    items: list[ReportConfigInDB]
     total: int
 
 
@@ -62,21 +59,21 @@ class ReportGenerationInDB(BaseModel):
     report_config_id: int
     generator: str
     generated_at: datetime
-    completed_at: Optional[datetime]
+    completed_at: datetime | None
     status: str
     progress: int
-    progress_text: Optional[str]
+    progress_text: str | None
     exported_rows: int
-    error_message: Optional[str]
-    file_path: Optional[str]
-    execution_json: Optional[dict]
+    error_message: str | None
+    file_path: str | None
+    execution_json: dict | None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ReportGenerationList(BaseModel):
     """报表生成记录列表响应模式"""
-    items: List[ReportGenerationInDB]
+    items: list[ReportGenerationInDB]
     total: int
 
 
@@ -90,4 +87,4 @@ class SystemNameOption(BaseModel):
 
 class SystemNameOptions(BaseModel):
     """系统名称选项列表"""
-    options: List[SystemNameOption]
+    options: list[SystemNameOption]

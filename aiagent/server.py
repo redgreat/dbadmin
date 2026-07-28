@@ -1,20 +1,13 @@
 import time
-from fastapi import APIRouter, Header, Request, HTTPException
+
+from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
-from typing import Optional
-from aiagent.security.token_auth import verify_token
-from aiagent.security.permission_checker import check_tool_permission
-from aiagent.tools.base import TOOL_REGISTRY
-from aiagent.models.ai_tool_call_log import AiToolCallLog
+
 # 引入工具确保装饰器执行，注册工具
-import aiagent.tools.conn_tools
-import aiagent.tools.sql_tools
-import aiagent.tools.order_tools
-import aiagent.tools.wms_tools
-import aiagent.tools.oa_tools
-import aiagent.tools.report_tools
-import aiagent.tools.imptask_tools
-import aiagent.tools.approval_tools
+from aiagent.models.ai_tool_call_log import AiToolCallLog
+from aiagent.security.permission_checker import check_tool_permission
+from aiagent.security.token_auth import verify_token
+from aiagent.tools.base import TOOL_REGISTRY
 
 mcp_router = APIRouter()
 
@@ -53,12 +46,12 @@ async def call_tool(
         status = "success"
         error = None
     except Exception as e:
-        result = [{"type": "text", "text": f"工具执行失败: {str(e)}"}]
+        result = [{"type": "text", "text": f"工具执行失败: {e!s}"}]
         status = "error"
         error = str(e)
 
     duration = int((time.time() - start) * 1000)
-    
+
     # 记录调用日志
     await AiToolCallLog.create(
         ai_token_id=token_obj.id,

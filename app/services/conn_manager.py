@@ -1,8 +1,10 @@
-from typing import Dict, Optional, List, Any, Tuple
-from tortoise import connections
-import asyncpg
+from typing import Any
+
 import aiomysql
 import aioodbc
+import asyncpg
+from tortoise import connections
+
 from app.log import logger
 
 
@@ -11,7 +13,7 @@ class DBConnectionManager:
     数据库连接管理器
     提供动态数据库连接的获取和查询执行功能
     """
-    
+
     @staticmethod
     async def get_connection_by_id(conn_id: int):
         """
@@ -22,30 +24,30 @@ class DBConnectionManager:
         except KeyError:
             logger.error(f"连接 conn_{conn_id} 不存在")
             return None
-    
+
     @staticmethod
-    def get_connection_info(conn_id: int) -> Optional[Dict[str, Any]]:
+    def get_connection_info(conn_id: int) -> dict[str, Any] | None:
         """
         获取连接信息
         """
         return None
-    
+
     @staticmethod
-    def list_all_connections() -> Dict[str, Dict[str, Any]]:
+    def list_all_connections() -> dict[str, dict[str, Any]]:
         """
         列出所有动态连接
         """
         return {}
-    
+
     @staticmethod
-    async def execute_query(conn_id: int, sql: str, params: Optional[List] = None) -> List[Dict]:
+    async def execute_query(conn_id: int, sql: str, params: list | None = None) -> list[dict]:
         """
         在指定连接上执行查询
         """
         connection = await DBConnectionManager.get_connection_by_id(conn_id)
         if not connection:
             raise ValueError(f"连接ID {conn_id} 对应的数据库连接不存在")
-        
+
         try:
             if params:
                 result = await connection.execute_query(sql, params)
@@ -53,18 +55,18 @@ class DBConnectionManager:
                 result = await connection.execute_query(sql)
             return result
         except Exception as e:
-            logger.error(f"执行查询失败 (连接ID: {conn_id}): {str(e)}")
+            logger.error(f"执行查询失败 (连接ID: {conn_id}): {e!s}")
             raise
-    
+
     @staticmethod
-    async def execute_update(conn_id: int, sql: str, params: Optional[List] = None) -> int:
+    async def execute_update(conn_id: int, sql: str, params: list | None = None) -> int:
         """
         在指定连接上执行更新操作
         """
         connection = await DBConnectionManager.get_connection_by_id(conn_id)
         if not connection:
             raise ValueError(f"连接ID {conn_id} 对应的数据库连接不存在")
-        
+
         try:
             if params:
                 result = await connection.execute_query(sql, params)
@@ -72,7 +74,7 @@ class DBConnectionManager:
                 result = await connection.execute_query(sql)
             return result[0] if isinstance(result, tuple) else result
         except Exception as e:
-            logger.error(f"执行更新失败 (连接ID: {conn_id}): {str(e)}")
+            logger.error(f"执行更新失败 (连接ID: {conn_id}): {e!s}")
             raise
 
 
@@ -83,8 +85,8 @@ class DBConnector:
 
     @staticmethod
     async def test_postgresql_connection(
-        host: str, port: int, username: str, password: str, database: str, params: Optional[str] = None
-    ) -> Tuple[bool, str]:
+        host: str, port: int, username: str, password: str, database: str, params: str | None = None
+    ) -> tuple[bool, str]:
         """
         测试PostgreSQL连接
         """
@@ -101,12 +103,12 @@ class DBConnector:
             await conn.close()
             return True, "连接成功"
         except Exception as e:
-            return False, f"连接失败: {str(e)}"
+            return False, f"连接失败: {e!s}"
 
     @staticmethod
     async def test_mysql_connection(
-        host: str, port: int, username: str, password: str, database: str, params: Optional[str] = None
-    ) -> Tuple[bool, str]:
+        host: str, port: int, username: str, password: str, database: str, params: str | None = None
+    ) -> tuple[bool, str]:
         """
         测试MySQL连接
         """
@@ -124,12 +126,12 @@ class DBConnector:
             conn.close()
             return True, "连接成功"
         except Exception as e:
-            return False, f"连接失败: {str(e)}"
+            return False, f"连接失败: {e!s}"
 
     @staticmethod
     async def test_sqlserver_connection(
-        host: str, port: int, username: str, password: str, database: str, params: Optional[str] = None
-    ) -> Tuple[bool, str]:
+        host: str, port: int, username: str, password: str, database: str, params: str | None = None
+    ) -> tuple[bool, str]:
         """
         测试SQL Server连接
         """
@@ -147,19 +149,19 @@ class DBConnector:
             )
             if params:
                 conn_str += f";{params}"
-            
+
             conn = await aioodbc.connect(dsn=conn_str, timeout=5)
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1")
             await conn.close()
             return True, "连接成功"
         except Exception as e:
-            return False, f"连接失败: {str(e)}"
+            return False, f"连接失败: {e!s}"
 
     @staticmethod
     async def test_connection(
-        db_type: str, host: str, port: int, username: str, password: str, database: str, params: Optional[str] = None
-    ) -> Tuple[bool, str]:
+        db_type: str, host: str, port: int, username: str, password: str, database: str, params: str | None = None
+    ) -> tuple[bool, str]:
         """
         测试数据库连接
         """

@@ -1,12 +1,11 @@
 import asyncio
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import HTTPException
-from tortoise.expressions import Q
 from tortoise.transactions import in_transaction
 
-from app.models.task import Task, TaskLog, TaskStatus, TaskType
+from app.models.task import Task, TaskLog, TaskStatus
 from app.schemas.task import (
     TaskCreate,
     TaskInDB,
@@ -27,9 +26,9 @@ class TaskController:
         self,
         page: int = 1,
         limit: int = 10,
-        name: Optional[str] = None,
-        type: Optional[str] = None,
-        status: Optional[bool] = None,
+        name: str | None = None,
+        type: str | None = None,
+        status: bool | None = None,
     ) -> TaskList:
         """获取任务列表"""
         # 构建查询条件
@@ -118,7 +117,7 @@ class TaskController:
 
         return True
 
-    async def execute_task(self, task_id: int) -> Dict[str, Any]:
+    async def execute_task(self, task_id: int) -> dict[str, Any]:
         """立即执行任务"""
         task = await self.model.get_or_none(id=task_id)
         if not task:
@@ -135,7 +134,7 @@ class TaskController:
         return {"success": True, "message": f"任务 {task_id} 已开始执行", "task_log_id": task_log.id}
 
     async def get_task_logs(
-        self, task_id: Optional[int] = None, page: int = 1, limit: int = 10, status: Optional[str] = None
+        self, task_id: int | None = None, page: int = 1, limit: int = 10, status: str | None = None
     ) -> TaskLogList:
         """获取任务执行日志"""
         # 构建查询条件

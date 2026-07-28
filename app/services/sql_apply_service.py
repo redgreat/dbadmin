@@ -1,12 +1,11 @@
 import hashlib
-from typing import Awaitable, Callable, List, Optional
+from collections.abc import Awaitable, Callable
 
 import aiomysql
 import asyncpg
 import sqlparse
 
 from app.controllers.conn import conn_controller
-
 
 ALLOWED_SQL_PREFIXES = (
     "CREATE TABLE",
@@ -39,7 +38,7 @@ def _strip_leading_comments(stmt: str) -> str:
     return s
 
 
-def validate_excel_generated_sql(sql_text: str) -> List[str]:
+def validate_excel_generated_sql(sql_text: str) -> list[str]:
     if not sql_text:
         raise ValueError("SQL内容为空")
     if "-- GENERATED_BY:EXCELIMP" not in sql_text:
@@ -65,7 +64,7 @@ ProgressCallback = Callable[[int, int, str], Awaitable[None]]
 async def execute_sql_on_connection(
     conn_id: int,
     sql_text: str,
-    progress_cb: Optional[ProgressCallback] = None,
+    progress_cb: ProgressCallback | None = None,
 ) -> dict:
     conn_info = await conn_controller.get_decrypted_connection(conn_id)
     if not conn_info:

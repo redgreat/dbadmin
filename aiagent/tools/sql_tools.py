@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
-from aiagent.tools.base import mcp_tool, _ok, _err
+
+from aiagent.tools.base import _err, _ok, mcp_tool
+
 
 class ExecuteSqlQueryInput(BaseModel):
     conn_name: str = Field(..., description="连接名称")

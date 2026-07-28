@@ -1,5 +1,3 @@
-from datetime import datetime
-from typing import Optional
 
 from fastapi import HTTPException
 from tortoise.expressions import Q
@@ -14,19 +12,19 @@ from app.schemas.task_notify import (
     SqlAlertTaskCreate,
     SqlAlertTaskUpdate,
 )
-from app.services.notify_task_executor import NotifyTaskExecutor
-from app.services.report_service import ReportService
 from app.services.celery_dispatcher import (
     dispatch_notify_report_send,
     dispatch_notify_sql_alert,
     fallback_async,
 )
+from app.services.notify_task_executor import NotifyTaskExecutor
+from app.services.report_service import ReportService
 from app.services.task_scheduler import scheduler
 
 
 class TaskNotifyController:
     @staticmethod
-    async def list_report_send_tasks(page: int, page_size: int, task_name: Optional[str], status: Optional[bool]):
+    async def list_report_send_tasks(page: int, page_size: int, task_name: str | None, status: bool | None):
         query = ReportSendTask.all().prefetch_related("report_config", "sender")
         if task_name:
             query = query.filter(task_name__icontains=task_name)
@@ -105,7 +103,7 @@ class TaskNotifyController:
         return {"success": True, "message": "任务已开始执行"}
 
     @staticmethod
-    async def list_sql_alert_tasks(page: int, page_size: int, task_name: Optional[str], status: Optional[bool]):
+    async def list_sql_alert_tasks(page: int, page_size: int, task_name: str | None, status: bool | None):
         query = SqlAlertTask.all().prefetch_related("db_connection", "sender")
         if task_name:
             query = query.filter(task_name__icontains=task_name)
@@ -195,9 +193,9 @@ class TaskNotifyController:
     async def list_notify_task_logs(
         page: int,
         page_size: int,
-        task_type: Optional[str] = None,
-        task_ref_id: Optional[int] = None,
-        status: Optional[str] = None,
+        task_type: str | None = None,
+        task_ref_id: int | None = None,
+        status: str | None = None,
     ):
         query = NotifyTaskRunLog.all()
         search = Q()

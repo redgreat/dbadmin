@@ -1,8 +1,7 @@
 import functools
 import json
-import secrets
 from datetime import datetime, timedelta
-from typing import Type, Any, List, Tuple
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -22,7 +21,7 @@ class ToolDefinition:
 def mcp_tool(
     name: str,
     description: str,
-    input_model: Type[BaseModel],
+    input_model: type[BaseModel],
     is_write: bool = False,
 ):
     """MCP 工具注册装饰器"""
@@ -37,7 +36,7 @@ def mcp_tool(
         }
 
         @functools.wraps(func)
-        async def wrapper(arguments: dict) -> List[dict]:
+        async def wrapper(arguments: dict) -> list[dict]:
             try:
                 validated = input_model(**arguments)
                 result = await func(validated)
@@ -62,14 +61,14 @@ def _suggest_fix(error: str) -> str:
     return "请联系系统管理员"
 
 
-def _ok(data: Any, message: str = "") -> List[dict]:
+def _ok(data: Any, message: str = "") -> list[dict]:
     """标准成功返回"""
     return [{"type": "text", "text": json.dumps({
         "success": True, "data": data, "message": message
     }, ensure_ascii=False, default=str)}]
 
 
-def _err(message: str, suggestion: str = "") -> List[dict]:
+def _err(message: str, suggestion: str = "") -> list[dict]:
     """标准失败返回"""
     return [{"type": "text", "text": json.dumps({
         "success": False, "error": message, "suggestion": suggestion
@@ -113,10 +112,9 @@ async def _create_approval(
 
 async def _notify_dba_wecom(approval) -> None:
     """[预留] 发送企业微信审批通知给 DBA。"""
-    pass
 
 
-async def _lookup_dba_reviewer(op_type: str) -> Tuple[str, str, str]:
+async def _lookup_dba_reviewer(op_type: str) -> tuple[str, str, str]:
     """[预留] 从公司用户中心查询有权限的 DBA 审批人。"""
     return "dba_admin", "DBA管理员", "请联系系统管理员获取审批人信息"
 

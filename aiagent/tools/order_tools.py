@@ -1,9 +1,11 @@
+
 from pydantic import BaseModel, Field
-from typing import List
-from .base import mcp_tool, _ok, _err, _create_approval, _notify_dba_wecom
+
+from .base import _create_approval, _notify_dba_wecom, _ok, mcp_tool
+
 
 class QueryOrderStatusInput(BaseModel):
-    order_nos: List[str] = Field(..., description="订单编码或ID列表（支持混合）")
+    order_nos: list[str] = Field(..., description="订单编码或ID列表（支持混合）")
 
 @mcp_tool(
     name="query_order_status",
@@ -23,7 +25,7 @@ async def query_order_status(args: QueryOrderStatusInput):
 
 
 class SubmitDeleteOrdersInput(BaseModel):
-    order_nos: List[str] = Field(..., description="要删除的订单编码或ID列表")
+    order_nos: list[str] = Field(..., description="要删除的订单编码或ID列表")
     operator_id: str = Field(..., description="申请人工号")
     remark: str = Field(default="", description="删除原因和备注")
 

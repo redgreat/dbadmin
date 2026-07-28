@@ -4,14 +4,13 @@ import hmac
 import os
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import openpyxl
 
 from app.core.config_loader import config
-from app.models.alert import AlertSendLog, AlertSender
-from app.models.conn import DBConnection
-from app.models.report import ReportConfig, ReportGeneration
+from app.models.alert import AlertSender, AlertSendLog
+from app.models.report import ReportGeneration
 from app.models.task_notify import NotifyTaskRunLog, ReportSendTask, SqlAlertTask, TaskRunStatus
 from app.services.excel_export_service import ExcelExportService
 from app.services.oss_service import oss_service
@@ -52,9 +51,9 @@ class NotifyTaskExecutor:
     async def _finish_run_log(
         run_log: NotifyTaskRunLog,
         status: str,
-        output: Optional[str] = None,
-        error: Optional[str] = None,
-        result_json: Optional[dict] = None,
+        output: str | None = None,
+        error: str | None = None,
+        result_json: dict | None = None,
     ):
         run_log.status = status
         run_log.output = output
@@ -79,7 +78,7 @@ class NotifyTaskExecutor:
         sender: AlertSender,
         alert_text: str,
         send_status: int,
-        response_text: Optional[str] = None,
+        response_text: str | None = None,
     ):
         await AlertSendLog.create(
             sender_id=sender.id,
@@ -135,14 +134,14 @@ class NotifyTaskExecutor:
     def _build_report_public_download_link(generation_id: int, expires_seconds: int = 86400) -> str:
         """生成报表公开下载链接（签名校验，默认24小时过期）。"""
         exp = int(datetime.now().timestamp()) + int(expires_seconds)
-        raw = f"{generation_id}:{exp}".encode("utf-8")
+        raw = f"{generation_id}:{exp}".encode()
         key = settings.SECRET_KEY.encode("utf-8")
         sig = hmac.new(key, raw, hashlib.sha256).hexdigest()
         base_url = NotifyTaskExecutor._guess_public_base_url()
         return f"{base_url}/api/v1/report/generation/public-download/{generation_id}?exp={exp}&sig={sig}"
 
     @staticmethod
-    async def execute_report_send_task(task_id: int) -> Dict[str, Any]:
+    async def execute_report_send_task(task_id: int) -> dict[str, Any]:
         if not await NotifyTaskExecutor._acquire_report_send_lock(task_id):
             return {"success": True, "message": "任务正在执行，跳过重复触发"}
 
@@ -259,7 +258,7 @@ class NotifyTaskExecutor:
         return str(value)
 
     @staticmethod
-    def _build_rows_text(rows: List[dict], max_rows: int = 20) -> str:
+    def _build_rows_text(rows: list[dict], max_rows: int = 20) -> str:
         if not rows:
             return ""
         # 列名直接来自SQL查询结果（支持SQL别名，如中文列名）
@@ -274,7 +273,7 @@ class NotifyTaskExecutor:
         return "\n".join(lines)
 
     @staticmethod
-    def _fill_message(template: str, rows: List[dict], total: int):
+    def _fill_message(template: str, rows: list[dict], total: int):
         msg = template or ""
         msg = msg.replace("{{total}}", str(total))
         msg = msg.replace("{total}", str(total))
@@ -289,7 +288,7 @@ class NotifyTaskExecutor:
         return msg
 
     @staticmethod
-    def _build_detail_excel(task_name: str, rows: List[dict]) -> Optional[str]:
+    def _build_detail_excel(task_name: str, rows: list[dict]) -> str | None:
         if not rows:
             return None
         file_dir = ExcelExportService()._get_file_dir()
@@ -311,7 +310,7 @@ class NotifyTaskExecutor:
         return file_path
 
     @staticmethod
-    async def execute_sql_alert_task(task_id: int) -> Dict[str, Any]:
+    async def execute_sql_alert_task(task_id: int) -> dict[str, Any]:
         run_log = await NotifyTaskExecutor._create_run_log("sql_alert", task_id)
         task = await SqlAlertTask.get_or_none(id=task_id).prefetch_related("db_connection", "sender")
         if not task:

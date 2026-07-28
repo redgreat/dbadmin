@@ -1,6 +1,7 @@
 from tortoise import fields
 from tortoise.models import Model
 
+
 class AiTokenPermission(Model):
     """Token 权限配置表"""
     id = fields.IntField(pk=True)

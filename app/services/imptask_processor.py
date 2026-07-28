@@ -1,15 +1,15 @@
 """
 Excel导入任务后台处理器
 """
-import os
 import asyncio
+import os
 from datetime import datetime
+
+from app.log import logger
 from app.models.imptask import ImpTask
+from app.services.celery_dispatcher import dispatch_imptask, dispatch_imptask_execute
 from app.services.excelimp_service import generate_sql_file_from_excel
 from app.services.sql_apply_service import calc_sha256, execute_sql_on_connection
-from app.services.celery_dispatcher import dispatch_imptask, dispatch_imptask_execute
-from app.log import logger
-
 
 RETRYABLE_ERRORS = (MemoryError, OSError, TimeoutError, ConnectionError)
 _LOCAL_PROCESS_TASKS: dict[int, asyncio.Task] = {}
@@ -183,7 +183,7 @@ async def process_imptask(task_id: int, raise_retryable: bool = False):
         await _mark_task_manual_stopped(task_id, target="process")
         return
     except Exception as e:
-        logger.error(f"Excel导入任务失败: {task_id}, 错误: {str(e)}", exc_info=True)
+        logger.error(f"Excel导入任务失败: {task_id}, 错误: {e!s}", exc_info=True)
         if raise_retryable and isinstance(e, RETRYABLE_ERRORS):
             await _update_task_status(
                 task_id,
@@ -304,7 +304,7 @@ async def execute_imptask_sql(
             "executor_username",
         ])
 
-        with open(task.sql_file_path, "r", encoding="utf-8") as file_obj:
+        with open(task.sql_file_path, encoding="utf-8") as file_obj:
             sql_text = file_obj.read()
 
         current_sha = calc_sha256(sql_text)

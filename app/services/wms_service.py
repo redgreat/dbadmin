@@ -1,6 +1,6 @@
-from typing import Dict, List, Tuple
-import aiomysql
 import logging
+
+import aiomysql
 
 from app.services.db_pool import db_pool
 from app.settings.config import settings
@@ -24,7 +24,7 @@ class WmsService:
         """确保连接池已注册"""
         await db_pool.ensure_pool(await _get_conn_id())
 
-    async def validate_stock(self, stock_nos: List[str], validate_type: str, operator_id: str = None) -> Dict:
+    async def validate_stock(self, stock_nos: list[str], validate_type: str, operator_id: str = None) -> dict:
         """
         验证单据状态，支持传入单据编码或数字Id
 
@@ -46,83 +46,82 @@ class WmsService:
         invalid_docs = []  # 状态不符合的单据
 
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    for stock_no in stock_nos:
-                        is_numeric = stock_no.isdigit()
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                for stock_no in stock_nos:
+                    is_numeric = stock_no.isdigit()
 
-                        # 根据输入类型决定主查和备查
-                        queries = []
-                        if is_numeric:
-                            doc_id = int(stock_no)
-                            queries = [
-                                ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
+                    # 根据输入类型决定主查和备查
+                    queries = []
+                    if is_numeric:
+                        doc_id = int(stock_no)
+                        queries = [
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
                                     FROM tb_instockinfohis WHERE Id=%s""", (doc_id,)),
-                                ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
                                     FROM tb_outstockinfohis WHERE Id=%s""", (doc_id,)),
-                                ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
                                     FROM tb_instockinfohis WHERE InStockNo=%s""", (stock_no,)),
-                                ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
                                     FROM tb_outstockinfohis WHERE OutStockNo=%s""", (stock_no,)),
-                            ]
-                        else:
-                            queries = [
-                                ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
+                        ]
+                    else:
+                        queries = [
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
                                     FROM tb_instockinfohis WHERE InStockNo=%s""", (stock_no,)),
-                                ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
                                     FROM tb_outstockinfohis WHERE OutStockNo=%s""", (stock_no,)),
-                                ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
                                     FROM tb_instockinfohis WHERE Id=%s""", (stock_no,)),
-                                ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
                                     FROM tb_outstockinfohis WHERE Id=%s""", (stock_no,)),
-                            ]
+                        ]
 
-                        # 按优先级逐条查询，找到第一个命中的就停
-                        result = None
-                        for sql, params in queries:
-                            await cur.execute(sql, params)
-                            row = await cur.fetchone()
-                            if row:
-                                result = row
-                                break
+                    # 按优先级逐条查询，找到第一个命中的就停
+                    result = None
+                    for sql, params in queries:
+                        await cur.execute(sql, params)
+                        row = await cur.fetchone()
+                        if row:
+                            result = row
+                            break
 
-                        if not result:
-                            not_found_docs.append(stock_no)
-                        else:
-                            stock_id, deleted, deleted_by_id, doc_type = result
-                            doc_info = {
-                                "stock_id": stock_id,
-                                "stock_no": stock_no,
-                                "deleted": deleted,
-                                "deleted_by_id": deleted_by_id,
-                                "doc_type": doc_type
-                            }
+                    if not result:
+                        not_found_docs.append(stock_no)
+                    else:
+                        stock_id, deleted, deleted_by_id, doc_type = result
+                        doc_info = {
+                            "stock_id": stock_id,
+                            "stock_no": stock_no,
+                            "deleted": deleted,
+                            "deleted_by_id": deleted_by_id,
+                            "doc_type": doc_type
+                        }
 
-                            if validate_type == "logical_delete":
-                                if deleted == 1:
-                                    invalid_docs.append({
-                                        **doc_info,
-                                        "reason": "单据已被逻辑删除，不能再次删除"
-                                    })
-                                else:
-                                    found_docs.append(doc_info)
-
-                            elif validate_type == "physical_delete":
+                        if validate_type == "logical_delete":
+                            if deleted == 1:
+                                invalid_docs.append({
+                                    **doc_info,
+                                    "reason": "单据已被逻辑删除，不能再次删除"
+                                })
+                            else:
                                 found_docs.append(doc_info)
 
-                            elif validate_type == "restore":
-                                if deleted == 0:
-                                    invalid_docs.append({
-                                        **doc_info,
-                                        "reason": "单据未被逻辑删除，无需恢复"
-                                    })
-                                elif operator_id and deleted_by_id != operator_id:
-                                    invalid_docs.append({
-                                        **doc_info,
-                                        "reason": f"删除人不匹配，期望 {operator_id}，实际 {deleted_by_id}"
-                                    })
-                                else:
-                                    found_docs.append(doc_info)
+                        elif validate_type == "physical_delete":
+                            found_docs.append(doc_info)
+
+                        elif validate_type == "restore":
+                            if deleted == 0:
+                                invalid_docs.append({
+                                    **doc_info,
+                                    "reason": "单据未被逻辑删除，无需恢复"
+                                })
+                            elif operator_id and deleted_by_id != operator_id:
+                                invalid_docs.append({
+                                    **doc_info,
+                                    "reason": f"删除人不匹配，期望 {operator_id}，实际 {deleted_by_id}"
+                                })
+                            else:
+                                found_docs.append(doc_info)
         else:
             raise ValueError("不支持的连接池类型")
 
@@ -161,14 +160,14 @@ class WmsService:
 
         return "，".join(parts) if parts else f"所有单据均可{type_name}"
 
-    async def fetch_stock_ids_by_nos(self, stock_nos: List[str]) -> Dict[str, int]:
+    async def fetch_stock_ids_by_nos(self, stock_nos: list[str]) -> dict[str, int]:
         """根据单据编码或数字Id获取对应的stock_id，优先按输入类型匹配"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
 
-        result: Dict[str, int] = {}
+        result: dict[str, int] = {}
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
@@ -203,30 +202,29 @@ class WmsService:
 
         return result
 
-    async def delete_logical_batch(self, stock_nos: List[str], operator_id: str) -> Tuple[int, List[str]]:
+    async def delete_logical_batch(self, stock_nos: list[str], operator_id: str) -> tuple[int, list[str]]:
         """批量逻辑删除单据（逐行调用存储过程）"""
         # 先根据单据编码获取Id
         stock_no_id_map = await self.fetch_stock_ids_by_nos(stock_nos)
-        
+
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         success = 0
-        failed: List[str] = []
-        
+        failed: list[str] = []
+
         for stock_no in stock_nos:
             stock_id = stock_no_id_map.get(stock_no)
             if not stock_id:
                 failed.append(stock_no)
                 continue
-            
+
             try:
                 if isinstance(pool, aiomysql.Pool):
-                    async with pool.acquire() as conn:
-                        async with conn.cursor() as cur:
-                            # 调用存储过程：逻辑删除单据，参数：stock_id, operator_id
-                            await cur.execute("CALL proc_DeleteStockInfoById(%s, %s)", (stock_id, operator_id))
+                    async with pool.acquire() as conn, conn.cursor() as cur:
+                        # 调用存储过程：逻辑删除单据，参数：stock_id, operator_id
+                        await cur.execute("CALL proc_DeleteStockInfoById(%s, %s)", (stock_id, operator_id))
                 else:
                     raise ValueError("不支持的连接池类型")
                 success += 1
@@ -234,30 +232,29 @@ class WmsService:
                 failed.append(stock_no)
         return success, failed
 
-    async def delete_physical_batch(self, stock_nos: List[str], operator_id: str) -> Tuple[int, List[str]]:
+    async def delete_physical_batch(self, stock_nos: list[str], operator_id: str) -> tuple[int, list[str]]:
         """批量物理删除单据（逐行调用存储过程）"""
         # 先根据单据编码获取Id
         stock_no_id_map = await self.fetch_stock_ids_by_nos(stock_nos)
-        
+
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
         success = 0
-        failed: List[str] = []
-        
+        failed: list[str] = []
+
         for stock_no in stock_nos:
             stock_id = stock_no_id_map.get(stock_no)
             if not stock_id:
                 failed.append(stock_no)
                 continue
-            
+
             try:
                 if isinstance(pool, aiomysql.Pool):
-                    async with pool.acquire() as conn:
-                        async with conn.cursor() as cur:
-                            # 调用存储过程：物理删除单据，参数：stock_id
-                            await cur.execute("CALL proc_TruncateStockInfoById(%s)", (stock_id,))
+                    async with pool.acquire() as conn, conn.cursor() as cur:
+                        # 调用存储过程：物理删除单据，参数：stock_id
+                        await cur.execute("CALL proc_TruncateStockInfoById(%s)", (stock_id,))
                 else:
                     raise ValueError("不支持的连接池类型")
                 success += 1
@@ -321,7 +318,7 @@ class WmsService:
         else:
             raise ValueError("不支持的连接池类型")
 
-    async def query_price(self, stock_code: str, material_name: str, new_price: str) -> List[Dict]:
+    async def query_price(self, stock_code: str, material_name: str, new_price: str) -> list[dict]:
         """
         查询价格信息，支持入库单和出库单
 
@@ -340,10 +337,9 @@ class WmsService:
 
         results = []
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    # 先尝试查询入库单
-                    sql_instock = """
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                # 先尝试查询入库单
+                sql_instock = """
                         SELECT b.Id AS detail_id,b.MaterialName AS material_name,
                         b.InStockPrice AS original_price,b.InStockedNum AS instocked_num,
                         'instock' AS doc_type
@@ -355,23 +351,23 @@ class WmsService:
                         WHERE a.InStockNo=%s
                           AND a.Deleted=0;
                     """
-                    params = [f"%{material_name}%", stock_code]
-                    await cur.execute(sql_instock, params)
-                    rows = await cur.fetchall()
-                    
-                    for row in rows:
-                        results.append({
-                            "detail_id": str(row[0]),
-                            "material_name": str(row[1]),
-                            "original_price": str(row[2]),
-                            "instocked_num": str(row[3]) if row[3] is not None else "0",
-                            "doc_type": row[4],
-                            "new_price": new_price
-                        })
+                params = [f"%{material_name}%", stock_code]
+                await cur.execute(sql_instock, params)
+                rows = await cur.fetchall()
 
-                    # 如果入库单没查到，尝试查询出库单
-                    if not results:
-                        sql_outstock = """
+                for row in rows:
+                    results.append({
+                        "detail_id": str(row[0]),
+                        "material_name": str(row[1]),
+                        "original_price": str(row[2]),
+                        "instocked_num": str(row[3]) if row[3] is not None else "0",
+                        "doc_type": row[4],
+                        "new_price": new_price
+                    })
+
+                # 如果入库单没查到，尝试查询出库单
+                if not results:
+                    sql_outstock = """
                             SELECT b.Id AS detail_id,b.MaterialName AS material_name,
                             b.OutStockPrice AS original_price,b.OutStockedNum AS instocked_num,
                             'outstock' AS doc_type
@@ -383,24 +379,24 @@ class WmsService:
                             WHERE a.OutStockNo=%s
                               AND a.Deleted=0;
                         """
-                        await cur.execute(sql_outstock, params)
-                        rows = await cur.fetchall()
-                        
-                        for row in rows:
-                            results.append({
-                                "detail_id": str(row[0]),
-                                "material_name": str(row[1]),
-                                "original_price": str(row[2]),
-                                "instocked_num": str(row[3]) if row[3] is not None else "0",
-                                "doc_type": row[4],
-                                "new_price": new_price
-                            })
+                    await cur.execute(sql_outstock, params)
+                    rows = await cur.fetchall()
+
+                    for row in rows:
+                        results.append({
+                            "detail_id": str(row[0]),
+                            "material_name": str(row[1]),
+                            "original_price": str(row[2]),
+                            "instocked_num": str(row[3]) if row[3] is not None else "0",
+                            "doc_type": row[4],
+                            "new_price": new_price
+                        })
         else:
             raise ValueError("不支持的连接池类型")
 
         return results
 
-    async def validate_owing_status(self, stock_id: str) -> Dict:
+    async def validate_owing_status(self, stock_id: str) -> dict:
         """验证应付单是否对账，有记录时ReconcStatus必须为0"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
@@ -408,37 +404,36 @@ class WmsService:
             raise ValueError("连接池不存在")
 
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    # 查询应付单
-                    sql_owing = "SELECT ReconcStatus FROM whcenter.tb_owinginfo WHERE StockId=%s LIMIT 1"
-                    await cur.execute(sql_owing, (stock_id,))
-                    row = await cur.fetchone()
-                    if row:
-                        reconc_status = row[0]
-                        if reconc_status != 0:
-                            return {
-                                "success": False,
-                                "message": f"应付单已对账，ReconcStatus={ReconcStatus}（需为0未对账）",
-                                "reconc_status": reconc_status,
-                            }
-                        return {"success": True, "message": "应付单未对账，允许修改", "reconc_status": reconc_status}
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                # 查询应付单
+                sql_owing = "SELECT ReconcStatus FROM whcenter.tb_owinginfo WHERE StockId=%s LIMIT 1"
+                await cur.execute(sql_owing, (stock_id,))
+                row = await cur.fetchone()
+                if row:
+                    reconc_status = row[0]
+                    if reconc_status != 0:
+                        return {
+                            "success": False,
+                            "message": f"应付单已对账，ReconcStatus={ReconcStatus}（需为0未对账）",
+                            "reconc_status": reconc_status,
+                        }
+                    return {"success": True, "message": "应付单未对账，允许修改", "reconc_status": reconc_status}
 
-                    # 查询应付单历史
-                    sql_owing_his = "SELECT ReconcStatus FROM whcenter.tb_owinginfohis WHERE StockId=%s LIMIT 1"
-                    await cur.execute(sql_owing_his, (stock_id,))
-                    row = await cur.fetchone()
-                    if row:
-                        reconc_status = row[0]
-                        if reconc_status != 0:
-                            return {
-                                "success": False,
-                                "message": f"应付单历史已对账，ReconcStatus={ReconcStatus}（需为0未对账）",
-                                "reconc_status": reconc_status,
-                            }
-                        return {"success": True, "message": "应付单历史未对账，允许修改", "reconc_status": reconc_status}
+                # 查询应付单历史
+                sql_owing_his = "SELECT ReconcStatus FROM whcenter.tb_owinginfohis WHERE StockId=%s LIMIT 1"
+                await cur.execute(sql_owing_his, (stock_id,))
+                row = await cur.fetchone()
+                if row:
+                    reconc_status = row[0]
+                    if reconc_status != 0:
+                        return {
+                            "success": False,
+                            "message": f"应付单历史已对账，ReconcStatus={ReconcStatus}（需为0未对账）",
+                            "reconc_status": reconc_status,
+                        }
+                    return {"success": True, "message": "应付单历史未对账，允许修改", "reconc_status": reconc_status}
 
-                    return {"success": True, "message": "无应付单记录，允许修改", "reconc_status": None}
+                return {"success": True, "message": "无应付单记录，允许修改", "reconc_status": None}
         else:
             raise ValueError("不支持的连接池类型")
 
@@ -459,16 +454,15 @@ class WmsService:
             raise ValueError("连接池不存在")
 
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    # TODO: 请根据实际业务需求修改存储过程名称和参数
-                    # 调用存储过程：修改价格，参数：detail_id, new_price
-                    await cur.execute("CALL proc_StockPriceChange(%s, %s)", (detail_id, new_price))
-                    return True
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                # TODO: 请根据实际业务需求修改存储过程名称和参数
+                # 调用存储过程：修改价格，参数：detail_id, new_price
+                await cur.execute("CALL proc_StockPriceChange(%s, %s)", (detail_id, new_price))
+                return True
         else:
             raise ValueError("不支持的连接池类型")
 
-    async def query_stock_status(self, stock_nos: List[str]) -> Dict:
+    async def query_stock_status(self, stock_nos: list[str]) -> dict:
         """查询单据状态信息，返回Id、单号、AuditTime、Deleted、DeletedById、DeletedAt，并关联OA获取删除人姓名"""
         from app.services.user_service import user_service
 

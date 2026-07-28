@@ -145,7 +145,7 @@ class HttpAuditLogMiddleware(BaseHTTPMiddleware):
     ):
         if request.method in self.methods:
             for path in self.exclude_paths:
-                if re.search(path, request.url.path, re.I) is not None:
+                if re.search(path, request.url.path, re.IGNORECASE) is not None:
                     return
             data: dict = await self.get_request_log(
                 request=request,

@@ -33,6 +33,7 @@ warnings.filterwarnings(
 
 if __name__ == "__main__":
     import uvicorn
+
     from app.core.config_loader import get_config
 
     config = get_config()

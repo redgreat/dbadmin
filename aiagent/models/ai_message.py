@@ -1,6 +1,7 @@
 from tortoise import fields
 from tortoise.models import Model
 
+
 class AiMessage(Model):
     """对话消息"""
     id = fields.BigIntField(pk=True)

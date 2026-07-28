@@ -25,4 +25,4 @@ async def search_users(
         return Success(data=users, msg=f"查询到 {len(users)} 条记录")
     except Exception as e:
         logger.error(f"查询OA人员失败: {e}")
-        return Fail(code=500, msg=f"查询失败: {str(e)}")
+        return Fail(code=500, msg=f"查询失败: {e!s}")

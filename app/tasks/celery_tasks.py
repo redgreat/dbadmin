@@ -44,7 +44,7 @@ def process_imptask_task(self, task_id: int):
 
     try:
         # #region debug-point C:celery-task-received
-        import json, urllib.request, os, time; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'C','location':'celery_tasks.process_imptask_task','msg':'[DEBUG] celery task received','data':{'request_id':getattr(self.request,'id',None),'task_id':task_id,'retries':getattr(self.request,'retries',None)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()
+        import json; import urllib.request; import os; import time; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'C','location':'celery_tasks.process_imptask_task','msg':'[DEBUG] celery task received','data':{'request_id':getattr(self.request,'id',None),'task_id':task_id,'retries':getattr(self.request,'retries',None)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()  # noqa: I001, E501
         # #endregion
         return run_async_with_tortoise(process_imptask, task_id, True)
     except RetryableImportError as exc:
@@ -72,7 +72,7 @@ def execute_imptask_sql_task(self, task_id: int, user_id: int, username: str):
 
     try:
         # #region debug-point C:celery-task-received
-        import json, urllib.request, os, time; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'C','location':'celery_tasks.execute_imptask_sql_task','msg':'[DEBUG] celery task received','data':{'request_id':getattr(self.request,'id',None),'task_id':task_id,'user_id':user_id,'retries':getattr(self.request,'retries',None)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()
+        import json; import urllib.request; import os; import time; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'C','location':'celery_tasks.execute_imptask_sql_task','msg':'[DEBUG] celery task received','data':{'request_id':getattr(self.request,'id',None),'task_id':task_id,'user_id':user_id,'retries':getattr(self.request,'retries',None)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()  # noqa: I001, E501
         # #endregion
         return run_async_with_tortoise(execute_imptask_sql, task_id, user_id, username, True)
     except RetryableImportError as exc:
@@ -84,7 +84,7 @@ def execute_imptask_sql_task(self, task_id: int, user_id: int, username: str):
 
     except Exception as exc:
         # #region debug-point D:celery-task-exception
-        import json, urllib.request, os, time; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'D','location':'celery_tasks.execute_imptask_sql_task','msg':'[DEBUG] celery task exception','data':{'request_id':getattr(self.request,'id',None),'task_id':task_id,'error':str(exc)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()
+        import json; import urllib.request; import os; import time; _p='.dbg/excel-imptask-celery-fail.env'; _u,_s=os.environ.get('DEBUG_SERVER_URL','http://127.0.0.1:7777/event'),os.environ.get('DEBUG_SESSION_ID','excel-imptask-celery-fail'); exec("try:\n with open(_p,encoding='utf-8') as f: c=f.read();\n _u=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SERVER_URL=')),_u); _s=next((l.split('=',1)[1] for l in c.split('\\n') if l.startswith('DEBUG_SESSION_ID=')),_s)\nexcept: pass"); urllib.request.urlopen(urllib.request.Request(_u, data=json.dumps({'sessionId':_s,'runId':'pre-fix','hypothesisId':'D','location':'celery_tasks.execute_imptask_sql_task','msg':'[DEBUG] celery task exception','data':{'request_id':getattr(self.request,'id',None),'task_id':task_id,'error':str(exc)},'ts':int(time.time()*1000)}).encode(), headers={'Content-Type':'application/json'}), timeout=2).read()  # noqa: I001, E501
         # #endregion
         raise
 
@@ -102,7 +102,7 @@ def generate_excelimp_sql_task(self, file_path: str, filename: str, db_type: str
     from app.services.imptask_processor import RetryableImportError
 
     try:
-        return generate_sql_file_task(file_path, filename, db_type, stamp)
+        return generate_sql_file_task(file_path, filename, db_type, stamp)  # type: ignore[arg-type]
     except (MemoryError, OSError, TimeoutError, ConnectionError) as exc:
         countdown = _retry_countdown(self.request.retries)
         if self.request.retries >= self.max_retries:

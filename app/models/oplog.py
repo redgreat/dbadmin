@@ -1,4 +1,3 @@
-from tortoise.models import Model
 from tortoise import fields
 
 from .base import BaseModel, TimestampMixin

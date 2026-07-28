@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter
 
@@ -30,7 +30,7 @@ async def login_access_token(credentials: CredentialsSchema):
 
         await user_controller.update_last_login(user.id)
         access_token_expires = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-        expire = datetime.now(timezone.utc) + access_token_expires
+        expire = datetime.now(UTC) + access_token_expires
 
         data = JWTOut(
             access_token=create_access_token(
@@ -95,7 +95,7 @@ async def get_user_api():
         api_objs: list[Api] = await Api.all()
         apis = [api.method.lower() + api.path for api in api_objs]
         return Success(data=apis)
-    
+
     # 获取用户的所有角色
     role_objs: list[Role] = await user_obj.roles
     # 获取所有角色的菜单
@@ -103,16 +103,16 @@ async def get_user_api():
     for role_obj in role_objs:
         menus = await role_obj.menus
         menu_ids.update([menu.id for menu in menus])
-    
+
     # 通过菜单-API映射表获取API
     from app.models.admin import MenuApi
     menu_api_relations = await MenuApi.filter(menu_id__in=menu_ids).prefetch_related("api")
-    
+
     apis = []
     for relation in menu_api_relations:
         if relation.api:
             apis.append(relation.api.method.lower() + relation.api.path)
-    
+
     apis = list(set(apis))
     return Success(data=apis)
 

@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+
 from .report import router
 
 report_router = APIRouter()

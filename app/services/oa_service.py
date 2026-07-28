@@ -1,11 +1,11 @@
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Any, Dict, List, Sequence
+from typing import Any
 
 import aiomysql
 
 from app.models.conn import DBConnection
 from app.services.db_pool import db_pool
-
 
 OA_CONN_ALIAS = "OA_CONN"
 FCC_CONN_ALIAS = "FCC_CONN"
@@ -14,7 +14,7 @@ FCC_CONN_ALIAS = "FCC_CONN"
 class OAPositiveTimeService:
     """OA转正时间维护服务"""
 
-    async def validate_positive_time(self, codes: Sequence[str]) -> Dict[str, Any]:
+    async def validate_positive_time(self, codes: Sequence[str]) -> dict[str, Any]:
         normalized_codes = self._normalize_codes(codes)
         if not normalized_codes:
             raise ValueError("人员工号不能为空")
@@ -33,7 +33,7 @@ class OAPositiveTimeService:
             "not_found_codes": not_found_codes,
         }
 
-    async def update_positive_time(self, codes: Sequence[str], positive_time: datetime) -> Dict[str, Any]:
+    async def update_positive_time(self, codes: Sequence[str], positive_time: datetime) -> dict[str, Any]:
         normalized_codes = self._normalize_codes(codes)
         if not normalized_codes:
             raise ValueError("人员工号不能为空")
@@ -67,7 +67,7 @@ class OAPositiveTimeService:
             "validation": validation,
         }
 
-    async def validate_entry_time(self, codes: Sequence[str]) -> Dict[str, Any]:
+    async def validate_entry_time(self, codes: Sequence[str]) -> dict[str, Any]:
         normalized_codes = self._normalize_codes(codes)
         if not normalized_codes:
             raise ValueError("人员工号不能为空")
@@ -86,7 +86,7 @@ class OAPositiveTimeService:
             "not_found_codes": not_found_codes,
         }
 
-    async def update_entry_time(self, codes: Sequence[str], entry_time: datetime) -> Dict[str, Any]:
+    async def update_entry_time(self, codes: Sequence[str], entry_time: datetime) -> dict[str, Any]:
         normalized_codes = self._normalize_codes(codes)
         if not normalized_codes:
             raise ValueError("人员工号不能为空")
@@ -120,7 +120,7 @@ class OAPositiveTimeService:
             "validation": validation,
         }
 
-    def _normalize_codes(self, codes: Sequence[str]) -> List[str]:
+    def _normalize_codes(self, codes: Sequence[str]) -> list[str]:
         seen = set()
         result = []
         for code in codes:
@@ -142,7 +142,7 @@ class OAPositiveTimeService:
     def _sqlserver_in_clause(self, values: Sequence[Any]) -> str:
         return ",".join(["?"] * len(values))
 
-    async def _fetch_oa_users(self, conn_id: int, codes: Sequence[str]) -> List[Dict[str, Any]]:
+    async def _fetch_oa_users(self, conn_id: int, codes: Sequence[str]) -> list[dict[str, Any]]:
         await db_pool.ensure_pool(conn_id)
         pool = db_pool.get_pool(conn_id)
         if not isinstance(pool, aiomysql.Pool):
@@ -154,13 +154,12 @@ class OAPositiveTimeService:
             "FROM oa_hrcenter.membership_userbaseinfo "
             f"WHERE Code IN ({placeholders}) AND Deleted=0"
         )
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                await cur.execute(sql, tuple(codes))
-                rows = await cur.fetchall()
+        async with pool.acquire() as conn, conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(sql, tuple(codes))
+            rows = await cur.fetchall()
         return list(rows or [])
 
-    async def _fetch_oa_positive_times(self, conn_id: int, codes: Sequence[str]) -> tuple[List[Dict[str, Any]], List[str]]:
+    async def _fetch_oa_positive_times(self, conn_id: int, codes: Sequence[str]) -> tuple[list[dict[str, Any]], list[str]]:
         users = await self._fetch_oa_users(conn_id, codes)
         user_ids = [row["Id"] for row in users]
         found_codes = [row["Code"] for row in users]
@@ -204,23 +203,22 @@ class OAPositiveTimeService:
         ]
 
         code_by_id = {row["Id"]: row["Code"] for row in users}
-        rows: List[Dict[str, Any]] = []
-        seen_tables_by_user_id: Dict[str, set[str]] = {user_id: set() for user_id in user_ids}
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                for table_name, sql in queries:
-                    await cur.execute(sql, tuple(user_ids))
-                    for row in await cur.fetchall():
-                        seen_tables_by_user_id.setdefault(row["user_id"], set()).add(table_name)
-                        rows.append(
-                            {
-                                "source": "OA",
-                                "table": table_name,
-                                "code": code_by_id.get(row["user_id"]),
-                                "user_id": row["user_id"],
-                                "positive_time": self._format_value(row.get("positive_time")),
-                            }
-                        )
+        rows: list[dict[str, Any]] = []
+        seen_tables_by_user_id: dict[str, set[str]] = {user_id: set() for user_id in user_ids}
+        async with pool.acquire() as conn, conn.cursor(aiomysql.DictCursor) as cur:
+            for table_name, sql in queries:
+                await cur.execute(sql, tuple(user_ids))
+                for row in await cur.fetchall():
+                    seen_tables_by_user_id.setdefault(row["user_id"], set()).add(table_name)
+                    rows.append(
+                        {
+                            "source": "OA",
+                            "table": table_name,
+                            "code": code_by_id.get(row["user_id"]),
+                            "user_id": row["user_id"],
+                            "positive_time": self._format_value(row.get("positive_time")),
+                        }
+                    )
         for user_id in user_ids:
             if "membership_positiveconfirm" not in seen_tables_by_user_id.get(user_id, set()):
                 rows.append(
@@ -234,7 +232,7 @@ class OAPositiveTimeService:
                 )
         return rows, not_found_codes
 
-    async def _fetch_fcc_positive_times(self, conn_id: int, codes: Sequence[str]) -> List[Dict[str, Any]]:
+    async def _fetch_fcc_positive_times(self, conn_id: int, codes: Sequence[str]) -> list[dict[str, Any]]:
         await db_pool.ensure_pool(conn_id)
         pool = db_pool.get_pool(conn_id)
         if pool is None:
@@ -246,25 +244,24 @@ class OAPositiveTimeService:
             "FROM MemberShip_UserBaseInfo "
             f"WHERE Code IN ({placeholders}) AND Deleted=0"
         )
-        rows: List[Dict[str, Any]] = []
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql, tuple(codes))
-                columns = [col[0] for col in cur.description]
-                for row in await cur.fetchall():
-                    data = dict(zip(columns, row))
-                    rows.append(
-                        {
-                            "source": "FCC",
-                            "table": "MemberShip_UserBaseInfo",
-                            "code": data.get("Code"),
-                            "user_id": self._format_value(data.get("Id")),
-                            "positive_time": self._format_value(data.get("PositiveTime")),
-                        }
-                    )
+        rows: list[dict[str, Any]] = []
+        async with pool.acquire() as conn, conn.cursor() as cur:
+            await cur.execute(sql, tuple(codes))
+            columns = [col[0] for col in cur.description]
+            for row in await cur.fetchall():
+                data = dict(zip(columns, row))
+                rows.append(
+                    {
+                        "source": "FCC",
+                        "table": "MemberShip_UserBaseInfo",
+                        "code": data.get("Code"),
+                        "user_id": self._format_value(data.get("Id")),
+                        "positive_time": self._format_value(data.get("PositiveTime")),
+                    }
+                )
         return rows
 
-    async def _fetch_oa_entry_times(self, conn_id: int, codes: Sequence[str]) -> tuple[List[Dict[str, Any]], List[str]]:
+    async def _fetch_oa_entry_times(self, conn_id: int, codes: Sequence[str]) -> tuple[list[dict[str, Any]], list[str]]:
         users = await self._fetch_oa_users(conn_id, codes)
         user_ids = [row["Id"] for row in users]
         found_codes = {row["Code"] for row in users}
@@ -303,24 +300,23 @@ class OAPositiveTimeService:
             ),
         ]
 
-        rows: List[Dict[str, Any]] = []
-        async with pool.acquire() as conn:
-            async with conn.cursor(aiomysql.DictCursor) as cur:
-                for table_name, sql, params in queries:
-                    await cur.execute(sql, params)
-                    for row in await cur.fetchall():
-                        rows.append(
-                            {
-                                "source": "OA",
-                                "table": table_name,
-                                "code": row.get("code"),
-                                "user_id": row.get("user_id"),
-                                "entry_time": self._format_value(row.get("entry_time")),
-                            }
-                        )
+        rows: list[dict[str, Any]] = []
+        async with pool.acquire() as conn, conn.cursor(aiomysql.DictCursor) as cur:
+            for table_name, sql, params in queries:
+                await cur.execute(sql, params)
+                for row in await cur.fetchall():
+                    rows.append(
+                        {
+                            "source": "OA",
+                            "table": table_name,
+                            "code": row.get("code"),
+                            "user_id": row.get("user_id"),
+                            "entry_time": self._format_value(row.get("entry_time")),
+                        }
+                    )
         return rows, not_found_codes
 
-    async def _fetch_fcc_entry_times(self, conn_id: int, codes: Sequence[str]) -> List[Dict[str, Any]]:
+    async def _fetch_fcc_entry_times(self, conn_id: int, codes: Sequence[str]) -> list[dict[str, Any]]:
         await db_pool.ensure_pool(conn_id)
         pool = db_pool.get_pool(conn_id)
         if pool is None:
@@ -332,22 +328,21 @@ class OAPositiveTimeService:
             "FROM MemberShip_UserBaseInfo "
             f"WHERE Code IN ({placeholders}) AND Deleted=0"
         )
-        rows: List[Dict[str, Any]] = []
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql, tuple(codes))
-                columns = [col[0] for col in cur.description]
-                for row in await cur.fetchall():
-                    data = dict(zip(columns, row))
-                    rows.append(
-                        {
-                            "source": "FCC",
-                            "table": "MemberShip_UserBaseInfo",
-                            "code": data.get("Code"),
-                            "user_id": self._format_value(data.get("Id")),
-                            "entry_time": self._format_value(data.get("EntryTime")),
-                        }
-                    )
+        rows: list[dict[str, Any]] = []
+        async with pool.acquire() as conn, conn.cursor() as cur:
+            await cur.execute(sql, tuple(codes))
+            columns = [col[0] for col in cur.description]
+            for row in await cur.fetchall():
+                data = dict(zip(columns, row))
+                rows.append(
+                    {
+                        "source": "FCC",
+                        "table": "MemberShip_UserBaseInfo",
+                        "code": data.get("Code"),
+                        "user_id": self._format_value(data.get("Id")),
+                        "entry_time": self._format_value(data.get("EntryTime")),
+                    }
+                )
         return rows
 
     async def _update_oa_positive_time(
@@ -356,7 +351,7 @@ class OAPositiveTimeService:
         user_ids: Sequence[str],
         mysql_time: str,
         json_time: str,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         await db_pool.ensure_pool(conn_id)
         pool = db_pool.get_pool(conn_id)
         if not isinstance(pool, aiomysql.Pool):
@@ -388,18 +383,17 @@ class OAPositiveTimeService:
             ),
         ]
 
-        affected: Dict[str, int] = {}
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                try:
-                    await conn.begin()
-                    for table_name, sql, params in statements:
-                        await cur.execute(sql, params)
-                        affected[table_name] = cur.rowcount or 0
-                    await conn.commit()
-                except Exception:
-                    await conn.rollback()
-                    raise
+        affected: dict[str, int] = {}
+        async with pool.acquire() as conn, conn.cursor() as cur:
+            try:
+                await conn.begin()
+                for table_name, sql, params in statements:
+                    await cur.execute(sql, params)
+                    affected[table_name] = cur.rowcount or 0
+                await conn.commit()
+            except Exception:
+                await conn.rollback()
+                raise
         return affected
 
     async def _update_fcc_positive_time(self, conn_id: int, codes: Sequence[str], positive_time: str) -> int:
@@ -416,16 +410,15 @@ class OAPositiveTimeService:
             "UPDATE MemberShip_UserBaseInfo "
             f"SET PositiveTime=? WHERE Code IN ({placeholders}) AND Deleted=0"
         )
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                try:
-                    await cur.execute(sql, tuple([positive_time, *codes]))
-                    affected = cur.rowcount or 0
-                    await conn.commit()
-                    return affected
-                except Exception:
-                    await conn.rollback()
-                    raise
+        async with pool.acquire() as conn, conn.cursor() as cur:
+            try:
+                await cur.execute(sql, tuple([positive_time, *codes]))
+                affected = cur.rowcount or 0
+                await conn.commit()
+                return affected
+            except Exception:
+                await conn.rollback()
+                raise
 
     async def _update_oa_entry_time(
         self,
@@ -434,7 +427,7 @@ class OAPositiveTimeService:
         codes: Sequence[str],
         mysql_time: str,
         date_value: str,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         await db_pool.ensure_pool(conn_id)
         pool = db_pool.get_pool(conn_id)
         if not isinstance(pool, aiomysql.Pool):
@@ -460,18 +453,17 @@ class OAPositiveTimeService:
             ),
         ]
 
-        affected: Dict[str, int] = {}
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                try:
-                    await conn.begin()
-                    for table_name, sql, params in statements:
-                        await cur.execute(sql, params)
-                        affected[table_name] = cur.rowcount or 0
-                    await conn.commit()
-                except Exception:
-                    await conn.rollback()
-                    raise
+        affected: dict[str, int] = {}
+        async with pool.acquire() as conn, conn.cursor() as cur:
+            try:
+                await conn.begin()
+                for table_name, sql, params in statements:
+                    await cur.execute(sql, params)
+                    affected[table_name] = cur.rowcount or 0
+                await conn.commit()
+            except Exception:
+                await conn.rollback()
+                raise
         return affected
 
     async def _update_fcc_entry_time(self, conn_id: int, codes: Sequence[str], entry_time: str) -> int:
@@ -488,23 +480,22 @@ class OAPositiveTimeService:
             "UPDATE MemberShip_UserBaseInfo "
             f"SET EntryTime=? WHERE Code IN ({placeholders}) AND Deleted=0"
         )
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                try:
-                    await cur.execute(sql, tuple([entry_time, *codes]))
-                    affected = cur.rowcount or 0
-                    await conn.commit()
-                    return affected
-                except Exception:
-                    await conn.rollback()
-                    raise
+        async with pool.acquire() as conn, conn.cursor() as cur:
+            try:
+                await cur.execute(sql, tuple([entry_time, *codes]))
+                affected = cur.rowcount or 0
+                await conn.commit()
+                return affected
+            except Exception:
+                await conn.rollback()
+                raise
 
     def _merge_rows(
         self,
         codes: Sequence[str],
-        oa_rows: Sequence[Dict[str, Any]],
-        fcc_rows: Sequence[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        oa_rows: Sequence[dict[str, Any]],
+        fcc_rows: Sequence[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         order = {code: index for index, code in enumerate(codes)}
         rows = [*oa_rows, *fcc_rows]
         return sorted(rows, key=lambda row: (order.get(row.get("code"), len(order)), row.get("source"), row.get("table")))

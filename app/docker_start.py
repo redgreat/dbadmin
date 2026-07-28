@@ -29,11 +29,12 @@ warnings.filterwarnings(
 
 if __name__ == "__main__":
     import uvicorn
+
     from app.core.config_loader import get_config
 
     # 从配置文件加载配置
     config = get_config()
-    
+
     # 日志配置（内置，不使用外部 JSON 文件）
     log_config = {
         "version": 1,
@@ -80,7 +81,7 @@ if __name__ == "__main__":
             "handlers": ["default"],
         },
     }
-    
+
     # 启动 uvicorn（配置从 config.yml 读取）
     uvicorn.run(
         "app.main:app",

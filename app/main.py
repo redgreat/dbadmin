@@ -53,12 +53,12 @@ def create_app() -> FastAPI:
     )
     register_routers(app)
     register_exceptions(app)
-    
+
     from aiagent.api.router import ai_router
     from aiagent.server import mcp_router
     app.include_router(ai_router, prefix="/api/v1/ai")
     app.include_router(mcp_router, prefix="/mcp")
-    
+
     return app
 
 

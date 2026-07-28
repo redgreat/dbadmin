@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Query
+from fastapi.encoders import jsonable_encoder
+
 from aiagent.models.ai_tool_call_log import AiToolCallLog
 from app.schemas.base import SuccessExtra
-from fastapi.encoders import jsonable_encoder
 
 call_log_router = APIRouter()
 

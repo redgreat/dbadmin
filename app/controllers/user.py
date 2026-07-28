@@ -1,11 +1,11 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from fastapi.exceptions import HTTPException
 
 from app.core.crud import CRUDBase
-from app.models.conn import DBConnection
 from app.models.admin import User
+from app.models.conn import DBConnection
 from app.schemas.login import CredentialsSchema
 from app.schemas.users import UserCreate, UserUpdate
 from app.utils.password import get_password_hash, verify_password
@@ -17,10 +17,10 @@ class UserController(CRUDBase[User, UserCreate, UserUpdate]):
     def __init__(self):
         super().__init__(model=User)
 
-    async def get_by_email(self, email: str) -> Optional[User]:
+    async def get_by_email(self, email: str) -> User | None:
         return await self.model.filter(email=email).first()
 
-    async def get_by_username(self, username: str) -> Optional[User]:
+    async def get_by_username(self, username: str) -> User | None:
         return await self.model.filter(username=username).first()
 
     async def create_user(self, obj_in: UserCreate) -> User:
@@ -34,7 +34,7 @@ class UserController(CRUDBase[User, UserCreate, UserUpdate]):
         user.last_login = datetime.now()
         await user.save()
 
-    async def authenticate(self, credentials: CredentialsSchema) -> tuple[Optional["User"], Optional[str]]:
+    async def authenticate(self, credentials: CredentialsSchema) -> tuple[Optional["User"], str | None]:
         """验证用户登录
 
         Returns:
@@ -52,13 +52,13 @@ class UserController(CRUDBase[User, UserCreate, UserUpdate]):
             return None, "用户已被禁用"
         return user, None
 
-    async def update_roles(self, user: User, role_ids: List[int]) -> None:
+    async def update_roles(self, user: User, role_ids: list[int]) -> None:
         await user.roles.clear()
         for role_id in role_ids:
             role_obj = await role_controller.get(id=role_id)
             await user.roles.add(role_obj)
 
-    async def update_conn_permissions(self, user: User, conn_ids: List[int]) -> None:
+    async def update_conn_permissions(self, user: User, conn_ids: list[int]) -> None:
         await user.conn_permissions.clear()
         if not conn_ids:
             return

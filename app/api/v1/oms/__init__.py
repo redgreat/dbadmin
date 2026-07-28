@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from .orders import router
 from .oms import router as oms_router_orders
+from .orders import router
 
 oms_router = APIRouter()
 oms_router.include_router(router, prefix="/orders", tags=["订单操作"])

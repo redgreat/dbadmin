@@ -1,6 +1,9 @@
 from pydantic import BaseModel, Field
-from .base import mcp_tool, _ok, _err
+
 from aiagent.models.ai_approval import AiApproval
+
+from .base import _err, _ok, mcp_tool
+
 
 class QueryApprovalStatusInput(BaseModel):
     approval_no: str = Field(..., description="审批单号")

@@ -1,9 +1,11 @@
+
 from pydantic import BaseModel, Field
-from typing import List
-from .base import mcp_tool, _ok, _err, _create_approval, _notify_dba_wecom
+
+from .base import _create_approval, _notify_dba_wecom, _ok, mcp_tool
+
 
 class QueryStockStatusInput(BaseModel):
-    stock_nos: List[str] = Field(..., description="仓储单据编码列表")
+    stock_nos: list[str] = Field(..., description="仓储单据编码列表")
 
 @mcp_tool(
     name="query_stock_status",
@@ -15,7 +17,7 @@ async def query_stock_status(args: QueryStockStatusInput):
     return _ok({"found_docs": []}, "查询成功")
 
 class SubmitDeleteStockInput(BaseModel):
-    stock_nos: List[str] = Field(..., description="要删除的仓储单据编码列表")
+    stock_nos: list[str] = Field(..., description="要删除的仓储单据编码列表")
     operator_id: str = Field(..., description="申请人工号")
     remark: str = Field(default="", description="备注")
 

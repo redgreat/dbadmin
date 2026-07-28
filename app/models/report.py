@@ -1,5 +1,7 @@
 from datetime import datetime
+
 from tortoise import fields
+
 from .base import BaseModel, TimestampMixin
 
 

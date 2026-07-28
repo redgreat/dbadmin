@@ -1,6 +1,7 @@
 from tortoise import fields
 from tortoise.models import Model
 
+
 class AiApproval(Model):
     """DBA 运维操作审批单"""
 

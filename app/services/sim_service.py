@@ -1,8 +1,10 @@
-from typing import List, Tuple, Dict, Any, Optional
-from io import BytesIO
 import csv
 import uuid
+from io import BytesIO
+from typing import Any
+
 import aiomysql
+
 from app.services.db_pool import db_pool
 from app.settings.config import settings
 
@@ -15,7 +17,7 @@ async def _get_sim_conn_id():
         _sim_conn_id = await settings.SIM_CONN_ID()
     return _sim_conn_id
 
-_PROGRESS: Dict[str, Dict[str, Any]] = {}
+_PROGRESS: dict[str, dict[str, Any]] = {}
 
 class SIMService:
     """SIM-ICCID导入服务"""
@@ -44,7 +46,7 @@ class SIMService:
         """完成"""
         self._progress_update(stamp, stage="done", message="处理完成", success=True)
 
-    def get_progress(self, stamp: str) -> Dict[str, Any]:
+    def get_progress(self, stamp: str) -> dict[str, Any]:
         """获取进度"""
         return _PROGRESS.get(stamp, {"stage": "", "message": ""})
 
@@ -52,7 +54,7 @@ class SIMService:
         """确保连接池已注册"""
         await db_pool.ensure_pool(await _get_sim_conn_id())
 
-    async def _insert_rows(self, stamp: str, rows: List[Tuple[str, str]]) -> int:
+    async def _insert_rows(self, stamp: str, rows: list[tuple[str, str]]) -> int:
         """批量写入临时表"""
         if not rows:
             return 0
@@ -62,24 +64,23 @@ class SIMService:
         if pool is None:
             raise ValueError("连接池不存在")
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    await cur.executemany(
-                        "INSERT INTO tm_simiccidimp (ImpStamp, SimNumber, ICCID) VALUES (%s, %s, %s)",
-                        [(stamp, r[0], r[1]) for r in rows],
-                    )
-                    await conn.commit()
-                    self._progress_update(stamp, current=len(rows))
-                    return cur.rowcount or 0
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                await cur.executemany(
+                    "INSERT INTO tm_simiccidimp (ImpStamp, SimNumber, ICCID) VALUES (%s, %s, %s)",
+                    [(stamp, r[0], r[1]) for r in rows],
+                )
+                await conn.commit()
+                self._progress_update(stamp, current=len(rows))
+                return cur.rowcount or 0
         raise ValueError("不支持的连接池类型")
 
-    async def upload_excel(self, file_bytes: bytes, filename: str, stamp: Optional[str] = None) -> str:
+    async def upload_excel(self, file_bytes: bytes, filename: str, stamp: str | None = None) -> str:
         """上传Excel并写入临时表"""
         if stamp is None:
             stamp = str(uuid.uuid4())
         self._progress_start(stamp, filename)
         ext = filename.split(".")[-1].lower() if "." in filename else ""
-        rows: List[Tuple[str, str]] = []
+        rows: list[tuple[str, str]] = []
         if ext in ("xlsx",):
             try:
                 import openpyxl  # type: ignore
@@ -126,40 +127,39 @@ class SIMService:
         if pool is None:
             raise ValueError("连接池不存在")
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    try:
-                        self._progress_update(stamp, stage="processing", message="调用存储过程")
-                        await cur.execute("CALL proc_ImportSimICCID(%s)", (stamp,))
-                        result_row = await cur.fetchone()
-                        er_type = 0
-                        er_message = ""
-                        if result_row is not None and len(result_row) >= 1:
-                            try:
-                                er_type = int(result_row[0])
-                            except Exception:
-                                er_type = 0
-                            if len(result_row) > 1 and result_row[1]:
-                                er_message = str(result_row[1])
-                        while True:
-                            has_next = await cur.nextset()
-                            if not has_next:
-                                break
-                        await conn.commit()
-                        if er_type != 0:
-                            self._progress_fail(stamp, er_message or "存储过程执行失败")
-                            raise ValueError(er_message or "存储过程执行失败")
-                        if er_message:
-                            self._progress_update(stamp, message=er_message)
-                        self._progress_done(stamp)
-                    except Exception as e:
-                        await conn.commit()
-                        self._progress_fail(stamp, str(e))
-                        raise
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                try:
+                    self._progress_update(stamp, stage="processing", message="调用存储过程")
+                    await cur.execute("CALL proc_ImportSimICCID(%s)", (stamp,))
+                    result_row = await cur.fetchone()
+                    er_type = 0
+                    er_message = ""
+                    if result_row is not None and len(result_row) >= 1:
+                        try:
+                            er_type = int(result_row[0])
+                        except Exception:
+                            er_type = 0
+                        if len(result_row) > 1 and result_row[1]:
+                            er_message = str(result_row[1])
+                    while True:
+                        has_next = await cur.nextset()
+                        if not has_next:
+                            break
+                    await conn.commit()
+                    if er_type != 0:
+                        self._progress_fail(stamp, er_message or "存储过程执行失败")
+                        raise ValueError(er_message or "存储过程执行失败")
+                    if er_message:
+                        self._progress_update(stamp, message=er_message)
+                    self._progress_done(stamp)
+                except Exception as e:
+                    await conn.commit()
+                    self._progress_fail(stamp, str(e))
+                    raise
             return
         raise ValueError("不支持的连接池类型")
 
-    async def submit_and_process(self, file_bytes: bytes, filename: str, stamp: Optional[str] = None) -> str:
+    async def submit_and_process(self, file_bytes: bytes, filename: str, stamp: str | None = None) -> str:
         """后台执行：上传并处理"""
         if stamp is None:
             stamp = str(uuid.uuid4())

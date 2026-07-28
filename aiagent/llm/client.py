@@ -1,6 +1,7 @@
 from openai import AsyncOpenAI
-from openai import APITimeoutError, APIConnectionError
+
 from aiagent.models.ai_llm_config import AiLlmConfig
+
 
 class LLMClient:
     """异步大模型调用客户端，支持 OpenAI 兼容接口"""

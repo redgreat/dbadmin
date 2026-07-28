@@ -2,29 +2,29 @@
 Excel导入任务API接口
 """
 import os
-import uuid
 import re
+import uuid
 from datetime import datetime
-from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Form, Query, Request, HTTPException, Body
+
+from fastapi import APIRouter, Body, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 
+from app.controllers.conn import conn_controller
+from app.controllers.imptask import imptask_controller
+from app.core.dependency import DependAuth
+from app.models.admin import User
 from app.schemas.base import Success
 from app.schemas.imptask import ImpTaskOut
-from app.controllers.imptask import imptask_controller
+from app.services.celery_dispatcher import dispatch_excelimp_execute, revoke_celery_task
+from app.services.conn_permission_service import ensure_conn_access
+from app.services.excelimp_service import get_progress
 from app.services.imptask_processor import (
+    cancel_local_imptask_execute,
+    cancel_local_imptask_process,
     submit_imptask,
     submit_imptask_execute,
-    cancel_local_imptask_process,
-    cancel_local_imptask_execute,
 )
-from app.models.admin import User
-from app.core.dependency import DependAuth
-from app.controllers.conn import conn_controller
-from app.services.excelimp_service import get_progress
-from app.services.sql_apply_service import execute_sql_on_connection, calc_sha256
-from app.services.conn_permission_service import ensure_conn_access
-from app.services.celery_dispatcher import dispatch_excelimp_execute, revoke_celery_task
+from app.services.sql_apply_service import calc_sha256
 
 router = APIRouter()
 
@@ -37,7 +37,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(SQL_DIR, exist_ok=True)
 
 
-def _extract_temp_table_name(sql_text: str) -> Optional[str]:
+def _extract_temp_table_name(sql_text: str) -> str | None:
     """从SQL内容中提取临时表名。"""
     if not sql_text:
         return None
@@ -51,8 +51,8 @@ def _extract_temp_table_name(sql_text: str) -> Optional[str]:
 async def get_task_list(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
-    task_name: Optional[str] = Query(None, description="任务名称筛选"),
-    status: Optional[str] = Query(None, description="任务状态筛选"),
+    task_name: str | None = Query(None, description="任务名称筛选"),
+    status: str | None = Query(None, description="任务状态筛选"),
 ):
     """获取Excel导入任务列表"""
     items, total = await imptask_controller.get_list(
@@ -67,7 +67,7 @@ async def get_task_list(
         sql_file_path = item_dict.get("sql_file_path")
         if sql_file_path and os.path.exists(sql_file_path):
             try:
-                with open(sql_file_path, "r", encoding="utf-8") as f:
+                with open(sql_file_path, encoding="utf-8") as f:
                     sql_text = f.read()
                 temp_table_name = _extract_temp_table_name(sql_text)
             except Exception:
@@ -88,7 +88,7 @@ async def create_task(
     current_user: User = DependAuth,
     file: UploadFile = File(...),
     task_name: str = Form(...),
-    target_conn_id: Optional[int] = Form(None),
+    target_conn_id: int | None = Form(None),
     db_type: str = Form("mysql"),
 ):
     """创建Excel导入任务"""
@@ -198,7 +198,7 @@ async def execute_task_sql(
             )
         await ensure_conn_access(current_user, int(task.target_conn_id), "使用该任务目标连接")
 
-        with open(task.sql_file_path, "r", encoding="utf-8") as file_obj:
+        with open(task.sql_file_path, encoding="utf-8") as file_obj:
             sql_text = file_obj.read()
 
         # 防篡改：比对生成时哈希
@@ -236,6 +236,7 @@ async def execute_task_sql(
         celery_task_id = dispatch_excelimp_execute(file_key, int(target_conn_id))
         if not celery_task_id:
             import asyncio
+
             from app.services.excelimp_service import execute_sql_file_task
 
             asyncio.create_task(execute_sql_file_task(file_key, int(target_conn_id)))
@@ -265,20 +266,21 @@ async def download_sql_file(task_id: int, req: Request):
     """下载生成的SQL文件（支持查询参数token）"""
     # 手动验证token（支持Header和查询参数两种方式）
     import jwt
+
     from app.settings import settings
-    
+
     try:
         # 优先从Header获取token
         token = req.headers.get("token")
-        
+
         # 如果Header中没有，尝试从查询参数获取
         if not token:
             token = req.query_params.get("token")
-        
+
         # 如果还是没有token，返回错误
         if not token:
             raise HTTPException(status_code=401, detail="未提供认证token，请在Header或查询参数中提供token")
-        
+
         # 验证token（直接解析JWT）
         try:
             decode_data = jwt.decode(token, settings.SECRET_KEY, algorithms=settings.JWT_ALGORITHM)
@@ -287,17 +289,17 @@ async def download_sql_file(task_id: int, req: Request):
             raise HTTPException(status_code=401, detail="无效的Token")
         except jwt.ExpiredSignatureError:
             raise HTTPException(status_code=401, detail="登录已过期")
-        
+
         # 验证用户是否存在
         user = await User.filter(id=user_id).first()
         if not user:
             raise HTTPException(status_code=401, detail="用户不存在")
-            
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"认证失败: {str(e)}")
-    
+        raise HTTPException(status_code=401, detail=f"认证失败: {e!s}")
+
     # 获取任务
     task = await imptask_controller.get(task_id)
     if not task:

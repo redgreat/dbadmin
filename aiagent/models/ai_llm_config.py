@@ -1,6 +1,7 @@
 from tortoise import fields
 from tortoise.models import Model
 
+
 class AiLlmConfig(Model):
     """大模型配置"""
 

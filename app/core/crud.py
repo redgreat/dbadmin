@@ -1,9 +1,8 @@
-from typing import Any, Dict, Generic, List, NewType, Tuple, Type, TypeVar, Union
+from typing import Any, Generic, NewType, TypeVar
 
 from pydantic import BaseModel
 from tortoise.expressions import Q
 from tortoise.models import Model
-from datetime import datetime
 
 Total = NewType("Total", int)
 ModelType = TypeVar("ModelType", bound=Model)
@@ -12,7 +11,7 @@ UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
 
 class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
-    def __init__(self, model: Type[ModelType]):
+    def __init__(self, model: type[ModelType]):
         self.model = model
 
     def get_schema_model(self):
@@ -30,18 +29,18 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             obj_dict['created_at'] = obj.created_at
         if hasattr(obj, 'updated_at'):
             obj_dict['updated_at'] = obj.updated_at
-            
+
         return schema_model.model_validate(obj_dict)
 
     async def get(self, id: int) -> ModelType:
         return await self.model.get(id=id)
 
-    async def list(self, page: int, page_size: int, search: Q = Q(), order: list = []) -> Tuple[Total, List[ModelType]]:
+    async def list(self, page: int, page_size: int, search: Q = Q(), order: list = []) -> tuple[Total, list[ModelType]]:
         query = self.model.filter(search)
         return await query.count(), await query.offset((page - 1) * page_size).limit(page_size).order_by(*order)
 
     async def create(self, obj_in: CreateSchemaType) -> ModelType:
-        if isinstance(obj_in, Dict):
+        if isinstance(obj_in, dict):
             obj_dict = obj_in
         else:
             obj_dict = obj_in.model_dump()
@@ -49,8 +48,8 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         await obj.save()
         return obj
 
-    async def update(self, id: int, obj_in: Union[UpdateSchemaType, Dict[str, Any]]) -> ModelType:
-        if isinstance(obj_in, Dict):
+    async def update(self, id: int, obj_in: UpdateSchemaType | dict[str, Any]) -> ModelType:
+        if isinstance(obj_in, dict):
             obj_dict = obj_in
         else:
             obj_dict = obj_in.model_dump(exclude_unset=True, exclude={"id"})

@@ -5,7 +5,6 @@ from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise import Tortoise
-from tortoise.expressions import Q
 
 from app.api import api_router
 from app.controllers.api import api_controller
@@ -28,7 +27,6 @@ from app.schemas.menus import MenuType
 from app.services.task_scheduler import scheduler
 from app.settings.config import settings
 from app.settings.database import get_tortoise_config, load_dynamic_connections
-from app.utils.password import get_password_hash
 from app.utils.password import get_password_hash
 
 from .middlewares import BackGroundTaskMiddleware, HttpAuditLogMiddleware
@@ -108,7 +106,7 @@ async def init_database(app: FastAPI):
 
         logger.info("数据库初始化成功完成！")
     except Exception as e:
-        logger.error(f"初始化数据库时出错: {str(e)}")
+        logger.error(f"初始化数据库时出错: {e!s}")
         raise
 
 
@@ -260,7 +258,7 @@ async def init_task_scheduler():
         await scheduler.start()
         logger.info("任务调度器已启动！")
     except Exception as e:
-        logger.error(f"启动任务调度器时发生错误: {str(e)}")
+        logger.error(f"启动任务调度器时发生错误: {e!s}")
 
 
 async def init_dynamic_connections():
@@ -271,7 +269,7 @@ async def init_dynamic_connections():
         await load_dynamic_connections()
         logger.info("动态数据库连接池初始化完成！")
     except Exception as e:
-        logger.error(f"初始化动态数据库连接池时发生错误: {str(e)}")
+        logger.error(f"初始化动态数据库连接池时发生错误: {e!s}")
 
 
 async def reinit_tortoise_with_dynamic_connections():
@@ -282,16 +280,16 @@ async def reinit_tortoise_with_dynamic_connections():
         # 获取包含动态连接的完整配置
         from app.settings.database import get_tortoise_config_with_dynamic
         dynamic_config = get_tortoise_config_with_dynamic()
-        
+
         # 关闭现有连接
         await Tortoise.close_connections()
-        
+
         # 重新初始化
         await Tortoise.init(config=dynamic_config)
-        
+
         logger.info("Tortoise动态连接重新初始化完成！")
     except Exception as e:
-        logger.error(f"重新初始化Tortoise动态连接时发生错误: {str(e)}")
+        logger.error(f"重新初始化Tortoise动态连接时发生错误: {e!s}")
 
 
 async def init_app(app: FastAPI):

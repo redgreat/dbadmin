@@ -1,28 +1,23 @@
 import hashlib
 import hmac
-import logging
 import os
 import time
 from datetime import datetime
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
+
 from app.core.dependency import get_current_user
-from app.schemas.base import Fail, Success, SuccessExtra
-from app.schemas.report import (
-    ReportConfigCreate,
-    ReportConfigUpdate,
-    ReportGenerateRequest
-)
-from app.services.report_service import ReportService
-from app.services.excel_export_service import ExcelExportService
-from app.models.report import ReportConfig, ReportGeneration
-from app.models.admin import User
 from app.log import logger
+from app.models.admin import User
+from app.models.report import ReportConfig, ReportGeneration
+from app.schemas.base import Fail, Success, SuccessExtra
+from app.schemas.report import ReportConfigCreate, ReportConfigUpdate, ReportGenerateRequest
 from app.services.celery_dispatcher import dispatch_report_export, revoke_celery_task
+from app.services.excel_export_service import ExcelExportService, cancel_local_report_task, register_local_report_task
 from app.services.oss_service import oss_service
-from app.services.excel_export_service import register_local_report_task, cancel_local_report_task
+from app.services.report_service import ReportService
 from app.settings import settings
 
 router = APIRouter()
@@ -30,7 +25,7 @@ router = APIRouter()
 def _build_public_download_sig(generation_id: int, exp: int) -> str:
     """生成公开下载签名（HMAC-SHA256）。"""
     key = settings.SECRET_KEY.encode("utf-8")
-    raw = f"{generation_id}:{exp}".encode("utf-8")
+    raw = f"{generation_id}:{exp}".encode()
     return hmac.new(key, raw, hashlib.sha256).hexdigest()
 
 
@@ -127,8 +122,8 @@ async def get_config_list(
 
         return SuccessExtra(data=data, total=total, page=page, page_size=page_size)
     except Exception as e:
-        logger.error(f"获取报表配置列表失败: {str(e)}")
-        return Fail(msg=f"获取列表失败: {str(e)}")
+        logger.error(f"获取报表配置列表失败: {e!s}")
+        return Fail(msg=f"获取列表失败: {e!s}")
 
 
 @router.get("/config/detail", summary="获取报表配置详情")
@@ -148,8 +143,8 @@ async def get_config_detail(
 
         return Success(data=data)
     except Exception as e:
-        logger.error(f"获取报表配置详情失败: {str(e)}")
-        return Fail(msg=f"获取详情失败: {str(e)}")
+        logger.error(f"获取报表配置详情失败: {e!s}")
+        return Fail(msg=f"获取详情失败: {e!s}")
 
 
 @router.post("/config/create", summary="创建报表配置")
@@ -171,8 +166,8 @@ async def create_config(
     except ValueError as e:
         return Fail(msg=str(e))
     except Exception as e:
-        logger.error(f"创建报表配置失败: {str(e)}")
-        return Fail(msg=f"创建失败: {str(e)}")
+        logger.error(f"创建报表配置失败: {e!s}")
+        return Fail(msg=f"创建失败: {e!s}")
 
 
 @router.post("/config/update", summary="更新报表配置")
@@ -198,8 +193,8 @@ async def update_config(
     except ValueError as e:
         return Fail(msg=str(e))
     except Exception as e:
-        logger.error(f"更新报表配置失败: {str(e)}")
-        return Fail(msg=f"更新失败: {str(e)}")
+        logger.error(f"更新报表配置失败: {e!s}")
+        return Fail(msg=f"更新失败: {e!s}")
 
 
 @router.delete("/config/delete", summary="删除报表配置")
@@ -221,8 +216,8 @@ async def delete_config(
     except ValueError as e:
         return Fail(msg=str(e))
     except Exception as e:
-        logger.error(f"删除报表配置失败: {str(e)}")
-        return Fail(msg=f"删除失败: {str(e)}")
+        logger.error(f"删除报表配置失败: {e!s}")
+        return Fail(msg=f"删除失败: {e!s}")
 
 
 @router.get("/options/systems", summary="获取系统名称选项")
@@ -236,8 +231,8 @@ async def get_system_name_options(
         data = [{"label": opt, "value": opt} for opt in options]
         return Success(data=data)
     except Exception as e:
-        logger.error(f"获取系统名称选项失败: {str(e)}")
-        return Fail(msg=f"获取选项失败: {str(e)}")
+        logger.error(f"获取系统名称选项失败: {e!s}")
+        return Fail(msg=f"获取选项失败: {e!s}")
 
 
 # ==================== 报表生成相关接口 ====================
@@ -289,8 +284,8 @@ async def generate_report(
             data={"generation_id": generation.id, "celery_task_id": celery_task_id},
         )
     except Exception as e:
-        logger.error(f"提交报表生成失败: config_id={request.config_id}, user={current_user.username}, error={str(e)}", exc_info=True)
-        return Fail(code=500, msg=f"提交报表生成失败: {str(e)}")
+        logger.error(f"提交报表生成失败: config_id={request.config_id}, user={current_user.username}, error={e!s}", exc_info=True)
+        return Fail(code=500, msg=f"提交报表生成失败: {e!s}")
 
 
 @router.get("/generation/list", summary="获取报表生成记录列表")
@@ -317,8 +312,8 @@ async def get_generation_list(
 
         return SuccessExtra(data=data, total=total, page=page, page_size=page_size)
     except Exception as e:
-        logger.error(f"获取报表生成记录列表失败: {str(e)}")
-        return Fail(msg=f"获取列表失败: {str(e)}")
+        logger.error(f"获取报表生成记录列表失败: {e!s}")
+        return Fail(msg=f"获取列表失败: {e!s}")
 
 
 @router.get("/generation/download", summary="下载报表文件")
@@ -333,8 +328,8 @@ async def download_report(
             return Fail(msg="报表生成记录不存在")
         return await _file_response_from_generation(generation)
     except Exception as e:
-        logger.error(f"下载报表文件失败: {str(e)}")
-        return Fail(msg=f"下载失败: {str(e)}")
+        logger.error(f"下载报表文件失败: {e!s}")
+        return Fail(msg=f"下载失败: {e!s}")
 
 
 async def download_report_direct(generation_id: int = Path(..., ge=1, description="报表生成记录ID"), req: Request = None):
@@ -365,8 +360,8 @@ async def download_report_direct(generation_id: int = Path(..., ge=1, descriptio
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"下载报表文件失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"下载失败: {str(e)}")
+        logger.error(f"下载报表文件失败: {e!s}")
+        raise HTTPException(status_code=500, detail=f"下载失败: {e!s}")
 
 
 async def download_report_public(
@@ -419,8 +414,8 @@ async def delete_generation(
 
         return Success(msg="删除成功")
     except Exception as e:
-        logger.error(f"删除报表生成记录失败: {str(e)}")
-        return Fail(msg=f"删除失败: {str(e)}")
+        logger.error(f"删除报表生成记录失败: {e!s}")
+        return Fail(msg=f"删除失败: {e!s}")
 
 
 @router.post("/generation/stop", summary="停止报表生成任务")
@@ -474,8 +469,8 @@ async def stop_generation(
             data={"generation_id": generation.id, "revoke_sent": revoke_ok, "local_cancelled": cancel_ok},
         )
     except Exception as e:
-        logger.error(f"停止报表生成任务失败: {str(e)}", exc_info=True)
-        return Fail(msg=f"停止失败: {str(e)}")
+        logger.error(f"停止报表生成任务失败: {e!s}", exc_info=True)
+        return Fail(msg=f"停止失败: {e!s}")
 
 
 async def _generate_report_async(request: ReportGenerateRequest, current_user: User):
@@ -518,6 +513,6 @@ async def _generate_report_async(request: ReportGenerateRequest, current_user: U
             logger.info(f"使用Celery任务处理报表生成: {report_name}, ID: {generation.id}, task_id: {celery_task_id}")
 
     except Exception as e:
-        logger.error(f"异步处理报表生成失败: config_id={request.config_id}, user={current_user.username}, error={str(e)}")
+        logger.error(f"异步处理报表生成失败: config_id={request.config_id}, user={current_user.username}, error={e!s}")
         # 注意：这里无法返回错误响应给前端，因为前端已经释放了
         # 错误信息会记录在日志中，用户可以通过查询生成记录状态来了解

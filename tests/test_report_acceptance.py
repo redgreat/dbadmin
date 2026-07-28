@@ -9,11 +9,11 @@ from pathlib import Path
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from app.core.config_loader import config
 from app.models.report import ReportConfig, ReportGeneration, SoftDeleteMixin
+from app.services.excel_export_service import ExcelExportService
 from app.services.report_service import ReportService
 from app.services.sql_execution_service import SQLExecutionService
-from app.services.excel_export_service import ExcelExportService
-from app.core.config_loader import config
 
 
 def print_header(title):
@@ -61,7 +61,7 @@ def test_models():
 
         return True
     except Exception as e:
-        print_error(f"模型测试失败: {str(e)}")
+        print_error(f"模型测试失败: {e!s}")
         return False
 
 
@@ -95,7 +95,7 @@ def test_sql_validation():
 
         return True
     except Exception as e:
-        print_error(f"SQL验证测试失败: {str(e)}")
+        print_error(f"SQL验证测试失败: {e!s}")
         return False
 
 
@@ -112,7 +112,7 @@ def test_system_names():
         print(f"   选项列表: {', '.join(options)}")
         return True
     except Exception as e:
-        print_error(f"系统名称选项测试失败: {str(e)}")
+        print_error(f"系统名称选项测试失败: {e!s}")
         return False
 
 
@@ -137,7 +137,7 @@ def test_config():
 
         return True
     except Exception as e:
-        print_error(f"配置测试失败: {str(e)}")
+        print_error(f"配置测试失败: {e!s}")
         return False
 
 
@@ -175,7 +175,7 @@ def test_services():
 
         return True
     except Exception as e:
-        print_error(f"服务类测试失败: {str(e)}")
+        print_error(f"服务类测试失败: {e!s}")
         return False
 
 
@@ -209,7 +209,7 @@ def test_api_routes():
 
         return True
     except Exception as e:
-        print_error(f"API路由测试失败: {str(e)}")
+        print_error(f"API路由测试失败: {e!s}")
         return False
 
 
@@ -254,7 +254,7 @@ def test_file_structure():
 
         return True
     except Exception as e:
-        print_error(f"文件结构测试失败: {str(e)}")
+        print_error(f"文件结构测试失败: {e!s}")
         return False
 
 
@@ -280,7 +280,7 @@ def main():
             result = test_func()
             results.append((name, result))
         except Exception as e:
-            print_error(f"{name}测试异常: {str(e)}")
+            print_error(f"{name}测试异常: {e!s}")
             results.append((name, False))
 
     # 打印总结

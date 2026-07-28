@@ -1,14 +1,13 @@
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.log import logger
 from app.services.celery_dispatcher import dispatch_simtrans_sync
 from app.services.simtrans import sim_trans_service
 
-
-_LOCAL_TASKS: Dict[str, Dict[str, Any]] = {}
+_LOCAL_TASKS: dict[str, dict[str, Any]] = {}
 
 
 def _now() -> str:
@@ -22,7 +21,7 @@ def _local_update(task_id: str, **kwargs):
 
 
 async def _run_local_sync(task_id: str, receipt_numbers_text: str):
-    async def progress_cb(payload: Dict[str, Any]):
+    async def progress_cb(payload: dict[str, Any]):
         _local_update(task_id, status="running", **payload)
 
     try:
@@ -52,7 +51,7 @@ async def _run_local_sync(task_id: str, receipt_numbers_text: str):
         )
 
 
-async def submit_simtrans_sync(receipt_numbers_text: str) -> Dict[str, Any]:
+async def submit_simtrans_sync(receipt_numbers_text: str) -> dict[str, Any]:
     celery_task_id = dispatch_simtrans_sync(receipt_numbers_text)
     if celery_task_id:
         return {
@@ -77,9 +76,10 @@ async def submit_simtrans_sync(receipt_numbers_text: str) -> Dict[str, Any]:
     return _LOCAL_TASKS[task_id]
 
 
-def _status_from_celery(task_id: str) -> Optional[Dict[str, Any]]:
+def _status_from_celery(task_id: str) -> dict[str, Any] | None:
     try:
         from celery.result import AsyncResult
+
         from app.core.celery_app import celery_app
 
         async_result = AsyncResult(task_id, app=celery_app)
@@ -125,7 +125,7 @@ def _status_from_celery(task_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def get_simtrans_sync_status(task_id: str) -> Dict[str, Any]:
+def get_simtrans_sync_status(task_id: str) -> dict[str, Any]:
     if task_id in _LOCAL_TASKS:
         return _LOCAL_TASKS[task_id]
 

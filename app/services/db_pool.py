@@ -1,10 +1,9 @@
 import asyncio
 import logging
-from typing import Dict, Optional, Union
 
-import asyncpg
 import aiomysql
 import aioodbc
+import asyncpg
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +12,9 @@ class DBPoolManager:
     """数据库连接池管理服务"""
 
     def __init__(self):
-        self._pools: Dict[int, Union[asyncpg.Pool, aiomysql.Pool, aioodbc.Pool]] = {}
-        self._configs: Dict[int, dict] = {}
-        self._locks: Dict[int, asyncio.Lock] = {}
+        self._pools: dict[int, asyncpg.Pool | aiomysql.Pool | aioodbc.Pool] = {}
+        self._configs: dict[int, dict] = {}
+        self._locks: dict[int, asyncio.Lock] = {}
 
     def _get_lock(self, conn_id: int) -> asyncio.Lock:
         if conn_id not in self._locks:
@@ -31,7 +30,7 @@ class DBPoolManager:
         username: str,
         password: str,
         database: str,
-        params: Optional[str] = None,
+        params: str | None = None,
         min_size: int = 1,
         max_size: int = 10,
     ):
@@ -95,7 +94,7 @@ class DBPoolManager:
             )
             if params:
                 conn_str += f";{params}"
-            
+
             pool = await aioodbc.create_pool(
                 dsn=conn_str,
                 minsize=min_size,
@@ -105,11 +104,11 @@ class DBPoolManager:
             return pool
         raise ValueError("不支持的数据库类型")
 
-    def get_pool(self, conn_id: int) -> Optional[Union[asyncpg.Pool, aiomysql.Pool, aioodbc.Pool]]:
+    def get_pool(self, conn_id: int) -> asyncpg.Pool | aiomysql.Pool | aioodbc.Pool | None:
         """获取已注册连接池"""
         return self._pools.get(conn_id)
 
-    async def ensure_pool(self, conn_id: int) -> Union[asyncpg.Pool, aiomysql.Pool, aioodbc.Pool]:
+    async def ensure_pool(self, conn_id: int) -> asyncpg.Pool | aiomysql.Pool | aioodbc.Pool:
         """获取连接池；不存在或已关闭时按连接表配置自动重建。"""
         pool = self._pools.get(conn_id)
         if pool and not self._is_pool_closed(pool):
@@ -129,7 +128,7 @@ class DBPoolManager:
             logger.info(f"[连接池] 自动创建数据库连接池: conn_id={conn_id}")
             return await self.register_pool(**config)
 
-    async def reconnect_pool(self, conn_id: int) -> Union[asyncpg.Pool, aiomysql.Pool, aioodbc.Pool]:
+    async def reconnect_pool(self, conn_id: int) -> asyncpg.Pool | aiomysql.Pool | aioodbc.Pool:
         """强制关闭旧连接池并重建，用于处理 MySQL/PG 空闲连接被服务端断开。"""
         async with self._get_lock(conn_id):
             await self.close_pool(conn_id, keep_config=True)
@@ -172,7 +171,7 @@ class DBPoolManager:
             if asyncio.iscoroutine(result):
                 await result
 
-    async def _load_config_from_db(self, conn_id: int) -> Optional[dict]:
+    async def _load_config_from_db(self, conn_id: int) -> dict | None:
         from app.controllers.conn import conn_controller
 
         conn = await conn_controller.get_decrypted_connection(conn_id)

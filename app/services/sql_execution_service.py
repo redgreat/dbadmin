@@ -1,6 +1,7 @@
-from typing import List, Dict, Any, Optional, Tuple
-import asyncpg
+from typing import Any
+
 import aiomysql
+import asyncpg
 
 from app.controllers.conn import conn_controller
 from app.log import logger
@@ -24,7 +25,7 @@ class SQLExecutionService:
                 raise ValueError("无法解密数据库连接密码，请重新保存连接配置")
 
             logger.info(f"连接类型: {conn_info['db_type']}, 主机: {conn_info['host']}")
-            
+
             if conn_info["db_type"] == "mysql":
                 conn = await aiomysql.connect(
                     host=conn_info["host"],
@@ -55,7 +56,7 @@ class SQLExecutionService:
             else:
                 raise ValueError(f"不支持的数据库类型: {conn_info['db_type']}")
         except Exception as e:
-            logger.error(f"获取数据库连接失败: {str(e)}")
+            logger.error(f"获取数据库连接失败: {e!s}")
             raise
 
     @staticmethod
@@ -64,7 +65,7 @@ class SQLExecutionService:
         sql: str,
         offset: int = 0,
         limit: int = 1000
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         执行SQL查询（分页）
         :param db_conn: 数据库连接对象
@@ -115,7 +116,7 @@ class SQLExecutionService:
                 raise ValueError(f"不支持的数据库类型: {db_conn.db_type}")
 
         except Exception as e:
-            logger.error(f"执行SQL查询失败: {str(e)}")
+            logger.error(f"执行SQL查询失败: {e!s}")
             raise
         finally:
             if conn:
@@ -127,7 +128,7 @@ class SQLExecutionService:
         sql: str,
         offset: int = 0,
         limit: int = 1000
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         执行SQL分页查询（不统计总数，供大报表导出使用）
         :param db_conn: 数据库连接对象
@@ -161,7 +162,7 @@ class SQLExecutionService:
             raise ValueError(f"不支持的数据库类型: {db_conn.db_type}")
 
         except Exception as e:
-            logger.error(f"执行SQL分页查询失败: {str(e)}")
+            logger.error(f"执行SQL分页查询失败: {e!s}")
             raise
         finally:
             if conn:
@@ -199,7 +200,7 @@ class SQLExecutionService:
                 raise ValueError(f"不支持的数据库类型: {db_conn.db_type}")
 
         except Exception as e:
-            logger.error(f"获取总数失败: {str(e)}")
+            logger.error(f"获取总数失败: {e!s}")
             raise
         finally:
             if conn:
@@ -240,7 +241,7 @@ class SQLExecutionService:
                         break
                     yield list(rows)
         except Exception as e:
-            logger.error(f"MySQL流式查询失败: {str(e)}")
+            logger.error(f"MySQL流式查询失败: {e!s}")
             raise
         finally:
             if conn:

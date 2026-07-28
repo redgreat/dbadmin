@@ -1,19 +1,19 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
-from typing import Literal
 import asyncio
 import os
 import uuid
-from typing import Optional
+from typing import Literal
 
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+
+from app.controllers.conn import conn_controller
+from app.core.dependency import DependAuth
+from app.models.admin import User
 from app.schemas.base import Success
+from app.services.celery_dispatcher import dispatch_excelimp_generate
+from app.services.conn_permission_service import ensure_conn_access
 from app.services.excelimp_service import EXCELIMP_TASK_DIR, generate_sql, generate_sql_file_task, get_progress
 from app.services.formatter_service import format_sql
-from app.models.admin import User
 from app.utils.audit_log import create_operation_audit_log
-from app.core.dependency import DependAuth
-from app.controllers.conn import conn_controller
-from app.services.conn_permission_service import ensure_conn_access
-from app.services.celery_dispatcher import dispatch_excelimp_generate
 
 router = APIRouter(tags=["日常工具"])
 
@@ -36,10 +36,10 @@ async def generate_excel_sql(
     # 验证文件扩展名
     if not file.filename:
         raise HTTPException(status_code=400, detail="文件名不能为空")
-    
+
     if not file.filename.lower().endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 和 .xls 格式的Excel文件")
-    
+
     try:
         # 读取文件内容
         content = await file.read()
@@ -60,7 +60,7 @@ async def generate_excel_sql(
         sql_result = generate_sql(content, file.filename, db_type)
 
         return Success(data={"sql": sql_result})
-    
+
     except HTTPException:
         # 原样重新抛出HTTP异常
         raise
@@ -77,13 +77,13 @@ async def generate_excel_sql(
             raise HTTPException(status_code=400, detail=f"Excel文件解析错误: {error_msg}")
     except Exception as e:
         # 处理其他意外错误
-        raise HTTPException(status_code=500, detail=f"处理Excel文件时出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"处理Excel文件时出错: {e!s}")
 
 
 @router.post("/excelimp/submit", summary="异步生成Excel临时表SQL")
 async def submit_excel_sql(
     file: UploadFile = File(...),
-    target_conn_id: Optional[int] = Form(None),
+    target_conn_id: int | None = Form(None),
     db_type: str = Form("mysql"),
     current_user: User = DependAuth,
 ):
@@ -100,14 +100,14 @@ async def submit_excel_sql(
     # 验证文件扩展名
     if not file.filename:
         raise HTTPException(status_code=400, detail="文件名不能为空")
-    
+
     if not file.filename.lower().endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 和 .xls 格式的Excel文件")
-    
+
     try:
         # 读取文件内容
         content = await file.read()
-        
+
         # 验证文件大小（最大100MB）
         max_size = 100 * 1024 * 1024  # 100MB
         if len(content) > max_size:
@@ -115,7 +115,7 @@ async def submit_excel_sql(
                 status_code=400,
                 detail=f"文件大小超过限制（最大100MB），当前文件大小: {len(content) / 1024 / 1024:.2f}MB"
             )
-        
+
         # 验证文件不为空
         if len(content) == 0:
             raise HTTPException(status_code=400, detail="文件内容为空")
@@ -131,14 +131,14 @@ async def submit_excel_sql(
                 raise HTTPException(status_code=400, detail=f"目标连接类型不支持: {db_type}")
         elif db_type not in ("mysql", "postgresql"):
             db_type = "mysql"
-        
+
         # 生成任务标识并保存上传文件，避免后台任务依赖请求内存
         file_key = str(uuid.uuid4())
         file_ext = file.filename.split(".")[-1].lower()
         file_path = os.path.join(EXCELIMP_TASK_DIR, f"{file_key}.{file_ext}")
         with open(file_path, "wb") as f:
             f.write(content)
-        
+
         celery_task_id = dispatch_excelimp_generate(file_path, file.filename, db_type, file_key)
         if not celery_task_id:
             async def _runner():
@@ -148,7 +148,7 @@ async def submit_excel_sql(
                     return
 
             asyncio.create_task(_runner())
-        
+
         # 记录审计日志
         try:
             await create_operation_audit_log(
@@ -164,13 +164,13 @@ async def submit_excel_sql(
             )
         except Exception:
             pass
-        
+
         return Success(data={"file_key": file_key}, msg="任务已提交，正在后台处理")
-    
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"提交处理失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"提交处理失败: {e!s}")
 
 
 @router.get("/excelimp/progress", summary="查询Excel临时表SQL生成进度")
@@ -209,23 +209,23 @@ async def format_sql_statement(
     valid_cases = ["upper", "lower", "capitalize"]
     if keyword_case not in valid_cases:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"无效的关键字大小写选项。有效值: {', '.join(valid_cases)}"
         )
-    
+
     # 验证indent_width
     if indent_width < 0 or indent_width > 8:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="缩进宽度必须在0到8之间"
         )
-    
+
     try:
         formatted_sql = format_sql(sql, keyword_case=keyword_case, indent_width=indent_width)
         return Success(data={"sql": formatted_sql})
-    
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"格式化SQL时出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"格式化SQL时出错: {e!s}")
 
 
 @router.post("/passwordgen/save", summary="保存密码生成记录")
@@ -237,8 +237,9 @@ async def save_password_history(
     count: int = Form(1),
     current_user: User = DependAuth,
 ):
-    from app.models.password import PasswordHistory
     import json
+
+    from app.models.password import PasswordHistory
 
     try:
         password_list = json.loads(passwords)

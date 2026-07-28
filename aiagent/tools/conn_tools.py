@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional
-from aiagent.tools.base import mcp_tool, _ok, _err
+from pydantic import BaseModel
+
+from aiagent.tools.base import _ok, mcp_tool
+
 
 class ListConnectionsInput(BaseModel):
     pass

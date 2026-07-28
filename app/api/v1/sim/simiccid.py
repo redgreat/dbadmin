@@ -1,11 +1,13 @@
-from fastapi import APIRouter, UploadFile, File, Request, Query
 import asyncio
+
+from fastapi import APIRouter, File, Query, Request, UploadFile
 from pydantic import BaseModel
-from app.schemas.base import Success, Fail
+
 from app.core.dependency import AuthControl
 from app.models.admin import User
-from app.utils.audit_log import create_operation_audit_log
+from app.schemas.base import Fail, Success
 from app.services.sim_service import sim_service
+from app.utils.audit_log import create_operation_audit_log
 
 router = APIRouter()
 
@@ -43,7 +45,7 @@ async def upload_sim_iccid(req: Request, file: UploadFile = File(...)):
             pass
         return Success(data={"file_key": file_key}, msg="上传成功")
     except Exception as e:
-        return Fail(code=400, msg=f"上传失败: {str(e)}")
+        return Fail(code=400, msg=f"上传失败: {e!s}")
 
 
 class ProcessBody(BaseModel):
@@ -82,7 +84,7 @@ async def process_sim_iccid(req: Request, body: ProcessBody):
             pass
         return Success(msg="处理成功")
     except Exception as e:
-        return Fail(code=500, msg=f"处理失败: {str(e)}")
+        return Fail(code=500, msg=f"处理失败: {e!s}")
 
 
 @router.post("/submit", summary="上传并处理SIM-ICCID数据")
@@ -126,7 +128,7 @@ async def submit_sim_iccid(req: Request, file: UploadFile = File(...)):
             pass
         return Success(data={"file_key": file_key}, msg="处理成功")
     except Exception as e:
-        return Fail(code=500, msg=f"提交处理失败: {str(e)}")
+        return Fail(code=500, msg=f"提交处理失败: {e!s}")
 
 
 @router.get("/progress", summary="查询SIM-ICCID导入进度")

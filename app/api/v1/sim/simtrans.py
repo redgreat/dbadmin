@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
-from app.schemas.base import Success, Fail
+
 from app.core.dependency import AuthControl
 from app.models.admin import User
-from app.utils.audit_log import create_operation_audit_log
+from app.schemas.base import Fail, Success
 from app.services.simtrans_task import get_simtrans_sync_status, submit_simtrans_sync
+from app.utils.audit_log import create_operation_audit_log
 
 router = APIRouter()
 
@@ -40,7 +41,7 @@ async def sync_sim_cards(req: Request, body: SyncRequest):
         try:
             receipt_list = body.receipt_numbers.strip().split('\n')
             receipt_count = len([r for r in receipt_list if r.strip()])
-            
+
             await create_operation_audit_log(
                 user_id=user_id,
                 username=username,
@@ -60,7 +61,7 @@ async def sync_sim_cards(req: Request, body: SyncRequest):
     except ValueError as e:
         return Fail(code=400, msg=str(e))
     except Exception as e:
-        return Fail(code=500, msg=f"同步失败: {str(e)}")
+        return Fail(code=500, msg=f"同步失败: {e!s}")
 
 
 @router.get("/sync/status", summary="查询SIM卡同步任务状态")
@@ -68,4 +69,4 @@ async def get_sync_status(task_id: str = Query(..., description="同步任务ID"
     try:
         return Success(data=get_simtrans_sync_status(task_id), msg="OK")
     except Exception as e:
-        return Fail(code=500, msg=f"查询同步状态失败: {str(e)}")
+        return Fail(code=500, msg=f"查询同步状态失败: {e!s}")

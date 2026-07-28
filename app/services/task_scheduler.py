@@ -2,11 +2,7 @@ import asyncio
 import json
 import logging
 import os
-import pathlib
-import subprocess
-import time
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
 
 import requests
 from apscheduler.executors.asyncio import AsyncIOExecutor
@@ -14,14 +10,12 @@ from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from tortoise import Tortoise
 
 from app.models.task import Task, TaskLog, TaskStatus, TaskType
 from app.services.celery_dispatcher import (
     dispatch_notify_report_send,
     dispatch_notify_sql_alert,
 )
-from app.settings.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +71,7 @@ class TaskScheduler:
                     await self.add_job(task)
                 logger.info(f"已加载 {len(tasks)} 个任务")
             except Exception as e:
-                logger.warning(f"加载任务失败，可能是 Task 表不存在: {str(e)}")
+                logger.warning(f"加载任务失败，可能是 Task 表不存在: {e!s}")
                 logger.info("跳过加载任务，等待数据库表创建后再加载")
             try:
                 from app.models.task_notify import ReportSendTask, SqlAlertTask
@@ -92,9 +86,9 @@ class TaskScheduler:
                     await self.add_sql_alert_job(task)
                 logger.info(f"已加载 {len(sql_tasks)} 个SQL预警任务")
             except Exception as e:
-                logger.warning(f"加载通知任务失败，可能是表不存在: {str(e)}")
+                logger.warning(f"加载通知任务失败，可能是表不存在: {e!s}")
         except Exception as e:
-            logger.error(f"加载任务时发生错误: {str(e)}")
+            logger.error(f"加载任务时发生错误: {e!s}")
 
     def _build_cron_trigger(self, cron: str) -> CronTrigger:
         cron_parts = (cron or "").split()
@@ -299,7 +293,7 @@ class TaskScheduler:
         logger.info(f"任务 {task.id} 执行完成，状态: {task_log.status}")
         return task_log.status == TaskStatus.SUCCESS
 
-    async def _execute_shell_command(self, task: Task) -> Tuple[Optional[str], Optional[str]]:
+    async def _execute_shell_command(self, task: Task) -> tuple[str | None, str | None]:
         """执行Shell命令"""
         try:
             # 准备环境变量
@@ -342,7 +336,7 @@ class TaskScheduler:
                 if process.returncode != 0:
                     return stdout_text, stderr_text
                 return stdout_text, None
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 try:
                     process.kill()
                 except ProcessLookupError:
@@ -353,7 +347,7 @@ class TaskScheduler:
             logger.exception(f"执行Shell命令时发生错误，任务ID: {task.id}")
             return None, str(e)
 
-    async def _execute_python_function(self, task: Task) -> Tuple[Optional[str], Optional[str]]:
+    async def _execute_python_function(self, task: Task) -> tuple[str | None, str | None]:
         """执行Python函数"""
         try:
             # 准备环境变量
@@ -396,7 +390,7 @@ class TaskScheduler:
                 if process.returncode != 0:
                     return stdout_text, stderr_text
                 return stdout_text, None
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 try:
                     process.kill()
                 except ProcessLookupError:
@@ -407,7 +401,7 @@ class TaskScheduler:
             logger.exception(f"执行Python函数时发生错误，任务ID: {task.id}")
             return None, str(e)
 
-    async def _execute_http_request(self, task: Task) -> Tuple[Optional[str], Optional[str]]:
+    async def _execute_http_request(self, task: Task) -> tuple[str | None, str | None]:
         """执行HTTP请求"""
         try:
             url = task.command

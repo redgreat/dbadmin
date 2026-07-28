@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -15,20 +14,20 @@ class AuditLogSchema(BaseModel):
     method: str
     path: str
     status: int
-    request_body: Optional[str] = None
-    response_body: Optional[str] = None
+    request_body: str | None = None
+    response_body: str | None = None
     response_time: int
     created_at: datetime
     updated_at: datetime
 
 
 class AuditLogQuerySchema(BaseModel):
-    username: Optional[str] = None
-    module: Optional[str] = None
-    method: Optional[str] = None
-    path: Optional[str] = None
-    status: Optional[int] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    username: str | None = None
+    module: str | None = None
+    method: str | None = None
+    path: str | None = None
+    status: int | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
     page: int = 1
     page_size: int = 10

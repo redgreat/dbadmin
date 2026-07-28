@@ -1,8 +1,9 @@
 """
 SQL格式化服务 - 格式化SQL语句以提高可读性
 """
+from typing import Literal
+
 import sqlparse
-from typing import Literal, Optional
 
 
 def format_sql(
@@ -25,11 +26,11 @@ def format_sql(
     """
     if not sql or not sql.strip():
         return sql
-    
+
     # 验证indent_width
     if indent_width < 0 or indent_width > 8:
         indent_width = 2  # 如果无效则默认为2
-    
+
     # sqlparse要求indent_width为正数，所以特殊处理0的情况
     if indent_width == 0:
         # 当indent_width为0时不重新缩进
@@ -48,5 +49,5 @@ def format_sql(
             indent_width=indent_width,
             wrap_after=80
         )
-    
+
     return formatted

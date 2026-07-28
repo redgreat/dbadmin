@@ -1,7 +1,6 @@
 from datetime import datetime
-from typing import List, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DBConnectionBase(BaseModel):
@@ -13,9 +12,9 @@ class DBConnectionBase(BaseModel):
     port: int = Field(..., description="端口")
     username: str = Field(..., description="用户名")
     database: str = Field(..., description="数据库名")
-    params: Optional[str] = Field(None, description="连接参数")
-    status: Optional[bool] = Field(False, description="连接状态")
-    remark: Optional[str] = Field(None, description="备注")
+    params: str | None = Field(None, description="连接参数")
+    status: bool | None = Field(False, description="连接状态")
+    remark: str | None = Field(None, description="备注")
 
 
 class DBConnectionCreate(DBConnectionBase):
@@ -26,17 +25,17 @@ class DBConnectionCreate(DBConnectionBase):
 class DBConnectionUpdate(BaseModel):
     """更新数据库连接请求模式"""
     id: int
-    name: Optional[str] = Field(None, description="连接名称")
-    alias: Optional[str] = Field(None, description="连接别名（不可修改）")
-    db_type: Optional[str] = Field(None, description="数据库类型：mysql, postgresql, sqlite, oracle, sqlserver")
-    host: Optional[str] = Field(None, description="主机地址")
-    port: Optional[int] = Field(None, description="端口")
-    username: Optional[str] = Field(None, description="用户名")
-    password: Optional[str] = Field(None, description="密码")
-    database: Optional[str] = Field(None, description="数据库名")
-    params: Optional[str] = Field(None, description="连接参数")
-    status: Optional[bool] = Field(None, description="连接状态")
-    remark: Optional[str] = Field(None, description="备注")
+    name: str | None = Field(None, description="连接名称")
+    alias: str | None = Field(None, description="连接别名（不可修改）")
+    db_type: str | None = Field(None, description="数据库类型：mysql, postgresql, sqlite, oracle, sqlserver")
+    host: str | None = Field(None, description="主机地址")
+    port: int | None = Field(None, description="端口")
+    username: str | None = Field(None, description="用户名")
+    password: str | None = Field(None, description="密码")
+    database: str | None = Field(None, description="数据库名")
+    params: str | None = Field(None, description="连接参数")
+    status: bool | None = Field(None, description="连接状态")
+    remark: str | None = Field(None, description="备注")
 
 
 class DBConnectionInDB(DBConnectionBase):
@@ -50,17 +49,17 @@ class DBConnectionInDB(DBConnectionBase):
 
 class DBConnectionList(BaseModel):
     """连接列表响应模式"""
-    items: List[DBConnectionInDB]
+    items: list[DBConnectionInDB]
     total: int
 
 
 class DBConnectionTest(BaseModel):
     """测试连接请求模式"""
-    id: Optional[int] = Field(None, description="连接ID，如果提供则使用已保存的连接信息")
-    db_type: Optional[str] = Field(None, description="数据库类型：mysql, postgresql, sqlite, oracle, sqlserver")
-    host: Optional[str] = Field(None, description="主机地址")
-    port: Optional[int] = Field(None, description="端口")
-    username: Optional[str] = Field(None, description="用户名")
-    password: Optional[str] = Field(None, description="密码")
-    database: Optional[str] = Field(None, description="数据库名")
-    params: Optional[str] = Field(None, description="连接参数")
+    id: int | None = Field(None, description="连接ID，如果提供则使用已保存的连接信息")
+    db_type: str | None = Field(None, description="数据库类型：mysql, postgresql, sqlite, oracle, sqlserver")
+    host: str | None = Field(None, description="主机地址")
+    port: int | None = Field(None, description="端口")
+    username: str | None = Field(None, description="用户名")
+    password: str | None = Field(None, description="密码")
+    database: str | None = Field(None, description="数据库名")
+    params: str | None = Field(None, description="连接参数")

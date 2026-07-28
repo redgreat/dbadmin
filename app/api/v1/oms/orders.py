@@ -1,15 +1,22 @@
 import logging
 from datetime import datetime
-from typing import List
 
 from fastapi import APIRouter, Request
 
 from app.core.dependency import AuthControl
 from app.models.admin import User
-from app.utils.audit_log import create_operation_audit_log
 from app.schemas.base import Fail, Success
-from app.schemas.oms import UpdateAuditTimeBatchIn, DeleteBatchIn, RestoreLogicalIn, OrderQueryIn, GfsQueryIn, GfsDeleteIn, CheckRecordDeleteIn
+from app.schemas.oms import (
+    CheckRecordDeleteIn,
+    DeleteBatchIn,
+    GfsDeleteIn,
+    GfsQueryIn,
+    OrderQueryIn,
+    RestoreLogicalIn,
+    UpdateAuditTimeBatchIn,
+)
 from app.services.order_service import order_service
+from app.utils.audit_log import create_operation_audit_log
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +27,7 @@ router = APIRouter()
 async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
     """批量更新订单审核时间，支持传入订单编码或订单Id"""
     try:
-        order_nos: List[str] = [s.strip() for s in body.order_nos if s and s.strip()]
+        order_nos: list[str] = [s.strip() for s in body.order_nos if s and s.strip()]
         if not order_nos:
             return Fail(code=400, msg="订单编码或订单Id不能为空")
 
@@ -34,10 +41,10 @@ async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
             order_result = await order_service.fetch_order_ids_by_nos(order_nos)
             order_no_id_map = order_result.get("order_id_map", {})
             not_found_nos = order_result.get("not_found_docs", [])
-            
+
             if not_found_nos:
                 logger.warning(f"以下订单编码未找到: {not_found_nos}")
-            
+
             if not order_no_id_map:
                 return Success(msg=f"未找到对应的订单，订单编码: {', '.join(not_found_nos)}", data={"success_count": 0, "failed_ids": not_found_nos})
 
@@ -50,7 +57,7 @@ async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
             new_map = new_audit_time_result.get("audit_time_map", {})
         except Exception as e:
             logger.error(f"执行更新失败: {e}")
-            return Fail(code=500, msg=f"执行失败: {str(e)}")
+            return Fail(code=500, msg=f"执行失败: {e!s}")
 
         try:
             token = req.headers.get("token")
@@ -86,7 +93,7 @@ async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
                 msg=f"部分订单更新失败，成功 {affected} 条，失败 {len(not_found_nos)} 条。失败订单: {', '.join(not_found_nos)}",
                 data={"success_count": affected, "failed_ids": not_found_nos}
             )
-        
+
         return Success(msg=f"更新成功，共 {affected} 条", data={"success_count": affected, "failed_ids": []})
     except Exception as e:
         logger.error(f"接口异常: {e}")
@@ -97,7 +104,7 @@ async def update_audit_time_batch(req: Request, body: UpdateAuditTimeBatchIn):
 async def delete_logical_batch(req: Request, body: DeleteBatchIn):
     """批量逻辑删除订单，支持传入订单编码或订单Id"""
     try:
-        order_nos: List[str] = [s.strip() for s in body.order_nos if s and s.strip()]
+        order_nos: list[str] = [s.strip() for s in body.order_nos if s and s.strip()]
         if not order_nos:
             return Fail(code=400, msg="订单编码或订单Id不能为空")
 
@@ -106,10 +113,10 @@ async def delete_logical_batch(req: Request, body: DeleteBatchIn):
             order_result = await order_service.fetch_order_ids_by_nos(order_nos)
             order_no_id_map = order_result.get("order_id_map", {})
             not_found_nos = order_result.get("not_found_docs", [])
-            
+
             if not_found_nos:
                 logger.warning(f"以下订单编码未找到: {not_found_nos}")
-            
+
             if not order_no_id_map:
                 return Success(msg=f"未找到对应的订单，订单编码: {', '.join(not_found_nos)}", data={"success_count": 0, "failed_ids": not_found_nos})
 
@@ -121,7 +128,7 @@ async def delete_logical_batch(req: Request, body: DeleteBatchIn):
             failed_nos = [id_order_no_map[fid] for fid in failed_ids if fid in id_order_no_map]
         except Exception as e:
             logger.error(f"逻辑删除失败: {e}")
-            return Fail(code=500, msg=f"执行失败: {str(e)}")
+            return Fail(code=500, msg=f"执行失败: {e!s}")
 
         try:
             token = req.headers.get("token")
@@ -158,13 +165,13 @@ async def delete_logical_batch(req: Request, body: DeleteBatchIn):
 
         # 汇总所有失败的订单编码
         all_failed_nos = not_found_nos + failed_nos
-        
+
         if all_failed_nos:
             return Success(
                 msg=f"部分订单删除失败，成功 {success_count} 条，失败 {len(all_failed_nos)} 条。失败订单: {', '.join(all_failed_nos)}",
                 data={"success_count": success_count, "failed_ids": all_failed_nos}
             )
-        
+
         return Success(msg=f"删除成功，共 {success_count} 条", data={"success_count": success_count, "failed_ids": []})
     except Exception as e:
         logger.error(f"接口异常: {e}")
@@ -175,7 +182,7 @@ async def delete_logical_batch(req: Request, body: DeleteBatchIn):
 async def delete_physical_batch(req: Request, body: DeleteBatchIn):
     """批量物理删除订单，支持传入订单编码或订单Id"""
     try:
-        order_nos: List[str] = [s.strip() for s in body.order_nos if s and s.strip()]
+        order_nos: list[str] = [s.strip() for s in body.order_nos if s and s.strip()]
         if not order_nos:
             return Fail(code=400, msg="订单编码或订单Id不能为空")
 
@@ -184,10 +191,10 @@ async def delete_physical_batch(req: Request, body: DeleteBatchIn):
             order_result = await order_service.fetch_order_ids_by_nos(order_nos)
             order_no_id_map = order_result.get("order_id_map", {})
             not_found_nos = order_result.get("not_found_docs", [])
-            
+
             if not_found_nos:
                 logger.warning(f"以下订单编码未找到: {not_found_nos}")
-            
+
             if not order_no_id_map:
                 return Success(msg=f"未找到对应的订单，订单编码: {', '.join(not_found_nos)}", data={"success_count": 0, "failed_ids": not_found_nos})
 
@@ -199,7 +206,7 @@ async def delete_physical_batch(req: Request, body: DeleteBatchIn):
             failed_nos = [id_order_no_map[fid] for fid in failed_ids if fid in id_order_no_map]
         except Exception as e:
             logger.error(f"物理删除失败: {e}")
-            return Fail(code=500, msg=f"执行失败: {str(e)}")
+            return Fail(code=500, msg=f"执行失败: {e!s}")
 
         try:
             token = req.headers.get("token")
@@ -236,13 +243,13 @@ async def delete_physical_batch(req: Request, body: DeleteBatchIn):
 
         # 汇总所有失败的订单编码
         all_failed_nos = not_found_nos + failed_nos
-        
+
         if all_failed_nos:
             return Success(
                 msg=f"部分订单删除失败，成功 {success_count} 条，失败 {len(all_failed_nos)} 条。失败订单: {', '.join(all_failed_nos)}",
                 data={"success_count": success_count, "failed_ids": all_failed_nos}
             )
-        
+
         return Success(msg=f"删除成功，共 {success_count} 条", data={"success_count": success_count, "failed_ids": []})
     except Exception as e:
         logger.error(f"接口异常: {e}")
@@ -255,7 +262,7 @@ async def restore_logical(req: Request, body: RestoreLogicalIn):
     try:
         # 先查询订单是否已删除（Deleted=1），同时验证 DeletedById
         deleted_order = await order_service.fetch_deleted_order_by_no(body.order_no, body.operator_id)
-        
+
         if not deleted_order:
             # 检查订单是否存在但未删除
             order_result = await order_service.fetch_order_ids_by_nos([body.order_no])
@@ -263,14 +270,14 @@ async def restore_logical(req: Request, body: RestoreLogicalIn):
             if order_no_id_map:
                 return Success(msg="该订单未删除，无需恢复", data={"order_no": body.order_no, "restored": False})
             return Success(msg=f"未找到订单 {body.order_no} 且删除人为 {body.operator_id} 的已删除订单", data={"order_no": body.order_no, "restored": False})
-        
+
         order_id = deleted_order["id"]
 
         try:
             await order_service.restore_logical(order_id=order_id, operator_id=body.operator_id)
         except Exception as e:
             logger.error(f"恢复失败: {e}")
-            return Fail(code=500, msg=f"执行失败: {str(e)}")
+            return Fail(code=500, msg=f"执行失败: {e!s}")
 
         try:
             token = req.headers.get("token")
@@ -308,7 +315,7 @@ async def restore_logical(req: Request, body: RestoreLogicalIn):
 async def query_order_status(body: OrderQueryIn):
     """查询订单状态信息，支持传入订单编码或订单Id，返回删除状态和删除人姓名"""
     try:
-        order_nos: List[str] = [s.strip() for s in body.order_nos if s and s.strip()]
+        order_nos: list[str] = [s.strip() for s in body.order_nos if s and s.strip()]
         if not order_nos:
             return Fail(code=400, msg="订单编码或订单Id不能为空")
 
@@ -316,7 +323,7 @@ async def query_order_status(body: OrderQueryIn):
         return Success(data=result, msg=result["message"])
     except Exception as e:
         logger.error(f"查询订单状态失败: {e}")
-        return Fail(code=500, msg=f"查询失败: {str(e)}")
+        return Fail(code=500, msg=f"查询失败: {e!s}")
 
 
 @router.post("/query_gfs_status", summary="查询GFS订单状态（验证对账、开票、回款、推广费状态）")
@@ -330,7 +337,7 @@ async def query_gfs_status(body: GfsQueryIn):
         return Success(data=result, msg=result["message"])
     except Exception as e:
         logger.error(f"查询GFS订单状态失败: {e}")
-        return Fail(code=500, msg=f"查询失败: {str(e)}")
+        return Fail(code=500, msg=f"查询失败: {e!s}")
 
 
 @router.post("/delete_gfs_order", summary="调用GFS存储过程删除订单")
@@ -368,7 +375,7 @@ async def delete_gfs_order(req: Request, body: GfsDeleteIn):
         return Success(msg="GFS订单删除成功", data={"order_id": body.order_id, "deleted": True})
     except Exception as e:
         logger.error(f"GFS订单删除失败: {e}")
-        return Fail(code=500, msg=f"删除失败: {str(e)}")
+        return Fail(code=500, msg=f"删除失败: {e!s}")
 
 
 @router.post("/delete_check_record", summary="删除校验记录")
@@ -406,4 +413,4 @@ async def delete_check_record(req: Request, body: CheckRecordDeleteIn):
         return Success(msg="校验记录删除成功", data={"order_id": body.order_id, "deleted": True})
     except Exception as e:
         logger.error(f"删除校验记录失败: {e}")
-        return Fail(code=500, msg=f"删除失败: {str(e)}")
+        return Fail(code=500, msg=f"删除失败: {e!s}")

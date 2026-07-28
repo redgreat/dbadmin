@@ -1,6 +1,6 @@
-from typing import Optional
-from app.models.imptask import ImpTask
+
 from app.core.crud import CRUDBase
+from app.models.imptask import ImpTask
 
 
 class ImpTaskController(CRUDBase[ImpTask, None, None]):
@@ -13,9 +13,9 @@ class ImpTaskController(CRUDBase[ImpTask, None, None]):
         self,
         page: int = 1,
         page_size: int = 20,
-        task_name: Optional[str] = None,
-        status: Optional[str] = None,
-        user_id: Optional[int] = None,
+        task_name: str | None = None,
+        status: str | None = None,
+        user_id: int | None = None,
     ):
         """获取任务列表"""
         query = self.model.all()

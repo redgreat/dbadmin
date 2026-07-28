@@ -15,7 +15,7 @@ passlib = "^1.7.4"
 pyjwt = "^2.7.0"
 black = "^23.7.0"
 isort = "^5.12.0"
-ruff = "^0.0.281"
+ruff = "^0.16.0"
 loguru = "^0.7.0"
 pydantic-settings = "^2.0.3"
 argon2-cffi = "^23.1.0"
@@ -45,25 +45,17 @@ httpx = "^0.28.1"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
 
-[tool.black]
-line-length = 120
-target-version = ["py311", "py312"]
-
 [tool.ruff]
 line-length = 120
-extend-select = [
-#   "I",    # isort
-#   "B",    # flake8-bugbear
-#   "C4",   # flake8-comprehensions
-#   "PGH",  # pygrep-hooks
-#   "RUF",  # ruff
-#   "W",    # pycodestyle
-#   "YTT",  # flake8-2020
-]
-ignore = [
-    "F403",
-    "F405",
-]
+target-version = "py312"
+
+# 启用 lint 检查（只保留 import 排序，其它规则全部关闭，避免新版 ruff 爆量告警）
+[tool.ruff.lint]
+select = ["I"]  # 只启用 isort，其他默认规则全部不启用
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
 [tool.aerich]
 tortoise_orm = "app.settings.TORTOISE_ORM"
 location = "./migrations"

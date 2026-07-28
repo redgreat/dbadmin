@@ -1,11 +1,10 @@
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Query
 
-from app.controllers.alert import alert_sender_controller, alert_log_controller
+from app.controllers.alert import alert_log_controller, alert_sender_controller
 from app.core.ctx import CTX_USER_ID
-from app.schemas.alert import AlertSenderCreate, AlertSenderUpdate, AlertLogCreate
+from app.schemas.alert import AlertLogCreate, AlertSenderCreate, AlertSenderUpdate
 from app.schemas.base import Fail, Success, SuccessExtra
 
 router = APIRouter()
@@ -23,9 +22,9 @@ def _validate_channel_type(channel_type: str):
 async def list_alert_sender(
     page: int = Query(1, description="页码"),
     page_size: int = Query(10, description="每页数量"),
-    sender_name: Optional[str] = Query(None, description="发送人名称"),
-    channel_type: Optional[str] = Query(None, description="发送渠道类型"),
-    is_enabled: Optional[bool] = Query(None, description="是否启用"),
+    sender_name: str | None = Query(None, description="发送人名称"),
+    channel_type: str | None = Query(None, description="发送渠道类型"),
+    is_enabled: bool | None = Query(None, description="是否启用"),
 ):
     total, items = await alert_sender_controller.list_with_filter(
         page=page,
@@ -93,12 +92,12 @@ async def delete_alert_sender(
 async def list_alert_log(
     page: int = Query(1, description="页码"),
     page_size: int = Query(10, description="每页数量"),
-    sender_id: Optional[int] = Query(None, description="发送人ID"),
-    sender_name: Optional[str] = Query(None, description="发送人名称"),
-    channel_type: Optional[str] = Query(None, description="发送渠道类型"),
-    send_status: Optional[int] = Query(None, description="发送状态：1成功，0失败"),
-    start_time: Optional[datetime] = Query(None, description="发送开始时间"),
-    end_time: Optional[datetime] = Query(None, description="发送结束时间"),
+    sender_id: int | None = Query(None, description="发送人ID"),
+    sender_name: str | None = Query(None, description="发送人名称"),
+    channel_type: str | None = Query(None, description="发送渠道类型"),
+    send_status: int | None = Query(None, description="发送状态：1成功，0失败"),
+    start_time: datetime | None = Query(None, description="发送开始时间"),
+    end_time: datetime | None = Query(None, description="发送结束时间"),
 ):
     total, items = await alert_log_controller.list_with_filter(
         page=page,

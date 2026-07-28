@@ -1,6 +1,9 @@
-from fastapi import HTTPException
-from aiagent.models.ai_token import AiToken
 from datetime import datetime
+
+from fastapi import HTTPException
+
+from aiagent.models.ai_token import AiToken
+
 
 async def verify_token(token_value: str) -> AiToken:
     """验证 AI Token 有效性"""

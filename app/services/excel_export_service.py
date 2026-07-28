@@ -1,23 +1,25 @@
 """
 Excel导出服务 - 支持大数据量导出、分sheet、分文件、ZIP压缩
 """
+import asyncio
 import os
 import zipfile
-import asyncio
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 import openpyxl
-from openpyxl.workbook.workbook import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.workbook.workbook import Workbook
 from openpyxl.worksheet.table import Table, TableStyleInfo
-from app.models.report import ReportGeneration, ReportConfig
-from app.models.conn import DBConnection
-from app.services.sql_execution_service import SQLExecutionService
-from app.services.oss_service import oss_service
-from app.services.db_pool import is_connection_error
-from app.log import logger
+
 from app.core.config_loader import config
+from app.log import logger
+from app.models.conn import DBConnection
+from app.models.report import ReportGeneration
+from app.services.db_pool import is_connection_error
+from app.services.oss_service import oss_service
+from app.services.sql_execution_service import SQLExecutionService
 from app.settings import settings
 
 
@@ -71,7 +73,7 @@ class ExcelExportService:
         generation = None
         try:
             logger.info(f"开始导出报表, generation_id: {generation_id}")
-            
+
             # 获取生成记录
             generation = await ReportGeneration.get_or_none(id=generation_id).prefetch_related("report_config")
             if not generation:
@@ -200,7 +202,7 @@ class ExcelExportService:
                 await self._mark_generation_manual_stopped(generation)
             return
         except Exception as e:
-            logger.error(f"报表导出失败: {str(e)}", exc_info=True)
+            logger.error(f"报表导出失败: {e!s}", exc_info=True)
             if generation:
                 try:
                     if raise_retryable and self._is_retryable_error(e):
@@ -217,7 +219,7 @@ class ExcelExportService:
                 except Exception as update_error:
                     if isinstance(update_error, RetryableReportError):
                         raise
-                    logger.error(f"更新状态失败: {str(update_error)}")
+                    logger.error(f"更新状态失败: {update_error!s}")
 
     def _is_retryable_error(self, exc: Exception) -> bool:
         return isinstance(exc, (MemoryError, OSError, TimeoutError, ConnectionError)) or is_connection_error(exc)
@@ -247,7 +249,7 @@ class ExcelExportService:
         logger.info(f"_execute_export 开始, sql长度: {len(sql)}")
         if db_conn.db_type == "mysql":
             return await self._execute_export_mysql_stream(generation, db_conn, sql)
-        
+
         logger.info("大报表导出使用无count分页模式，避免COUNT(*)拖慢导出")
 
         # 创建文件存储目录
@@ -363,7 +365,7 @@ class ExcelExportService:
             )
             return final_path
 
-        except Exception as e:
+        except Exception:
             # 清理临时文件
             for file_path in file_list:
                 if os.path.exists(file_path):
@@ -382,7 +384,7 @@ class ExcelExportService:
         logger.info("MySQL报表导出使用流式拉取模式")
         file_dir = self._get_file_dir()
         os.makedirs(file_dir, exist_ok=True)
-        file_list: List[str] = []
+        file_list: list[str] = []
         wb = None
         ws = None
         current_sheet = 0
@@ -513,9 +515,9 @@ class ExcelExportService:
         sql: str,
         offset: int,
         limit: int,
-        headers: Optional[List[str]] = None,
-        generation_id: Optional[int] = None,
-    ) -> tuple[int, List[str]]:
+        headers: list[str] | None = None,
+        generation_id: int | None = None,
+    ) -> tuple[int, list[str]]:
         """
         收集数据并写入sheet，应用样式美化
         :return: (写入的行数, 表头列表)
@@ -565,9 +567,9 @@ class ExcelExportService:
     def _write_with_styles(
         self,
         ws,
-        headers: List[str],
-        data: List[Dict],
-        original_headers: List[str]
+        headers: list[str],
+        data: list[dict],
+        original_headers: list[str]
     ):
         """
         写入数据并应用Excel样式美化
@@ -619,9 +621,9 @@ class ExcelExportService:
     def _auto_adjust_column_width(
         self,
         ws,
-        headers: List[str],
-        data: List[Dict],
-        original_headers: List[str]
+        headers: list[str],
+        data: list[dict],
+        original_headers: list[str]
     ):
         """
         自动调整列宽
@@ -654,7 +656,7 @@ class ExcelExportService:
                 width += 1
         return width
 
-    def _apply_sheet_style(self, ws, headers: Optional[List[str]]):
+    def _apply_sheet_style(self, ws, headers: list[str] | None):
         """
         对已有sheet应用统一样式：
         - 首行冻结
@@ -731,7 +733,7 @@ class ExcelExportService:
             )
             ws.add_table(table)
 
-    def _apply_sheet_style_light(self, ws, headers: Optional[List[str]]):
+    def _apply_sheet_style_light(self, ws, headers: list[str] | None):
         """
         大数据量轻量样式：
         - 保留表头样式、首行冻结、筛选、基础列宽
@@ -798,7 +800,7 @@ class ExcelExportService:
         logger.info(f"保存Excel文件: {file_path}")
         return file_path
 
-    def _build_unique_headers(self, original_headers: List[str]) -> List[str]:
+    def _build_unique_headers(self, original_headers: list[str]) -> list[str]:
         seen = {}
         unique_headers = []
         for h in original_headers:
@@ -829,7 +831,7 @@ class ExcelExportService:
         logger.info(f"单文件超过10MB，已压缩: {zip_path}")
         return zip_path
 
-    async def _finalize_export_files(self, file_list: List[str], file_dir: str, report_name: str) -> str:
+    async def _finalize_export_files(self, file_list: list[str], file_dir: str, report_name: str) -> str:
         if len(file_list) > 1:
             safe_name = report_name.replace('/', '_').replace('\\', '_').replace(':', '_')
             zip_path = os.path.join(file_dir, f"{safe_name}.zip")
@@ -839,12 +841,12 @@ class ExcelExportService:
             return zip_path
         return await asyncio.to_thread(self._compress_if_large, file_list[0])
 
-    def _zip_files(self, zip_path: str, file_list: List[str]):
+    def _zip_files(self, zip_path: str, file_list: list[str]):
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for file_path in file_list:
                 zipf.write(file_path, os.path.basename(file_path))
 
-    def _remove_files(self, file_list: List[str]):
+    def _remove_files(self, file_list: list[str]):
         for file_path in file_list:
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -867,7 +869,7 @@ class ExcelExportService:
         except ManualStopError:
             raise
         except Exception as e:
-            logger.warning(f"更新导出进度失败: {str(e)}")
+            logger.warning(f"更新导出进度失败: {e!s}")
 
     async def _raise_if_stop_requested(self, generation_id: int):
         generation = await ReportGeneration.get_or_none(id=generation_id)
@@ -891,7 +893,7 @@ class ExcelExportService:
         self,
         generation: ReportGeneration,
         status: str,
-        error_msg: Optional[str] = None
+        error_msg: str | None = None
     ):
         """
         更新生成记录状态
@@ -921,7 +923,7 @@ class ExcelExportService:
 
             await generation.save()
         except Exception as e:
-            logger.error(f"更新生成记录状态失败: {str(e)}")
+            logger.error(f"更新生成记录状态失败: {e!s}")
 
     async def _mark_generation_manual_stopped(self, generation: ReportGeneration):
         generation.stopped_at = datetime.now()

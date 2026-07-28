@@ -1,10 +1,10 @@
-from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.controllers.oplog import oplog_controller
-from app.schemas.oplog import OpLogCreateRequest
 from app.core.dependency import DependAuth
+from app.schemas.oplog import OpLogCreateRequest
 
 router = APIRouter()
 
@@ -55,10 +55,10 @@ async def create_oplog(
 
 @router.get("/list", summary="获取运维日志列表")
 async def list_oplogs(
-    logger: Optional[str] = None,
-    operater: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    logger: str | None = None,
+    operater: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     page: int = 1,
     page_size: int = 20,
     _ = DependAuth
@@ -79,8 +79,9 @@ async def list_oplogs(
     """
     try:
         from datetime import datetime
+
         from app.schemas.oplog import OpLogQueryRequest
-        
+
         # 构建查询请求
         query_request = OpLogQueryRequest(
             logger=logger,
@@ -90,7 +91,7 @@ async def list_oplogs(
             page=page,
             page_size=page_size
         )
-        
+
         result = await oplog_controller.query_oplogs(query_request)
         return JSONResponse(
             status_code=200,

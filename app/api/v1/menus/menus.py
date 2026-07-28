@@ -4,9 +4,9 @@ from fastapi import APIRouter, Body, Query
 from fastapi.routing import APIRoute
 from tortoise import connections
 
-from app.controllers.menu import menu_controller
 from app.controllers.api import api_controller
-from app.models.admin import Api, MenuApi, Menu
+from app.controllers.menu import menu_controller
+from app.models.admin import Api, Menu, MenuApi
 from app.schemas.base import Fail, Success, SuccessExtra
 from app.schemas.menus import *
 
@@ -62,17 +62,17 @@ async def list_menu(
     """
     import time
     start_time = time.time()
-    
+
     # 一次性获取所有菜单（避免N+1查询问题）
     all_menus = await menu_controller.model.all().order_by("order")
     query_time = time.time()
     logger.debug(f"查询所有菜单耗时: {query_time - start_time:.3f}秒, 菜单数量: {len(all_menus)}")
-    
+
     # 构建菜单字典，方便快速查找
     menu_dict = {menu.id: await menu.to_dict() for menu in all_menus}
     dict_time = time.time()
     logger.debug(f"构建菜单字典耗时: {dict_time - query_time:.3f}秒")
-    
+
     # 构建树形结构
     root_menus = []
     for menu in all_menus:
@@ -87,11 +87,11 @@ async def list_menu(
                 if "children" not in parent:
                     parent["children"] = []
                 parent["children"].append(menu_data)
-    
+
     build_time = time.time()
     logger.debug(f"构建树形结构耗时: {build_time - dict_time:.3f}秒")
     logger.info(f"菜单列表查询总耗时: {build_time - start_time:.3f}秒")
-    
+
     return SuccessExtra(data=root_menus, total=len(root_menus), page=page, page_size=page_size)
 
 
@@ -155,25 +155,25 @@ async def update_menu_apis(
     """更新菜单关联的API列表"""
     menu_id = data.get("menu_id")
     api_ids = data.get("api_ids", [])
-    
+
     if not menu_id:
         return Fail(msg="菜单ID不能为空")
-    
+
     # 验证菜单存在
     menu = await menu_controller.get(id=menu_id)
     if not menu:
         return Fail(msg="菜单不存在")
-    
+
     # 删除现有关联
     await MenuApi.filter(menu_id=menu_id).delete()
     await sync_menu_api_sequence()
-    
+
     # 添加新关联
     for api_id in set(api_ids):
         api = await Api.filter(id=api_id).first()
         if api:
             await ensure_menu_api(menu_id, api_id)
-    
+
     return Success(msg="更新成功")
 
 
@@ -187,11 +187,11 @@ async def get_available_apis(
     query = Api.all()
     if tags:
         query = query.filter(tags=tags)
-    
+
     total = await query.count()
     apis = await query.offset((page - 1) * page_size).limit(page_size)
     data = [await api.to_dict() for api in apis]
-    
+
     return SuccessExtra(data=data, total=total, page=page, page_size=page_size)
 
 
@@ -210,20 +210,20 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
             - "smart": 智能更新，识别多菜单共用API并保留
     """
     from app.main import app
-    
+
     global _refresh_task_status
     _refresh_task_status["running"] = True
     _refresh_task_status["result"] = None
-    
+
     try:
         # 1. 先刷新API表
         await api_controller.refresh_api()
         logger.info("API表刷新完成")
         await sync_menu_api_sequence()
-        
+
         # 2. 获取所有菜单（只处理menu类型，不处理catalog类型）
         menus = await Menu.filter(menu_type="menu")
-        
+
         # 3. 构建路由路径到API的映射
         route_api_map = {}  # {"/api/v1/user/list": Api对象}
         for route in app.routes:
@@ -233,28 +233,28 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
                 api_obj = await Api.filter(path=path, method=method).first()
                 if api_obj:
                     route_api_map[path] = api_obj
-        
+
         # 4. 根据菜单的component路径匹配API
         # 规则：菜单component如 "/system/user"，对应API路径前缀 "/api/v1/user"
-        
+
         if mode == "full":
             # 完全刷新模式：删除所有现有关联
             await MenuApi.all().delete()
             logger.info("已删除所有现有关联")
-        
+
         updated_count = 0
         new_count = 0
         preserved_count = 0
-        
+
         for menu in menus:
             if not menu.component:
                 continue
-            
+
             # 从component提取模块名，如 "/system/user" -> "user"
             component_parts = menu.component.strip("/").split("/")
             if len(component_parts) < 1:
                 continue
-            
+
             # 尝试匹配API路径
             matched_api_ids = []
             for api_path, api_obj in route_api_map.items():
@@ -264,29 +264,29 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
                     if f"/{part}/" in api_path or api_path.endswith(f"/{part}"):
                         matched_api_ids.append(api_obj.id)
                         break
-            
+
             if matched_api_ids:
                 matched_api_ids = set(matched_api_ids)  # 去重
-                
+
                 if mode == "increment":
                     # 增量更新模式：只添加新的关联，不删除现有关联
                     existing_relations = await MenuApi.filter(menu_id=menu.id)
                     existing_api_ids = {rel.api_id for rel in existing_relations}
-                    
+
                     new_api_ids = matched_api_ids - existing_api_ids
                     for api_id in new_api_ids:
                         if await ensure_menu_api(menu.id, api_id):
                             new_count += 1
-                    
+
                     if new_api_ids:
                         updated_count += 1
                         logger.info(f"菜单 [{menu.name}] 新增 {len(new_api_ids)} 个API关联")
-                    
+
                 elif mode == "smart":
                     # 智能更新模式：识别多菜单共用API并保留
                     existing_relations = await MenuApi.filter(menu_id=menu.id)
                     existing_api_ids = {rel.api_id for rel in existing_relations}
-                    
+
                     # 检查哪些API被多个菜单使用
                     multi_menu_apis = set()
                     for api_id in existing_api_ids:
@@ -294,26 +294,26 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
                         usage_count = await MenuApi.filter(api_id=api_id).count()
                         if usage_count > 1:
                             multi_menu_apis.add(api_id)
-                    
+
                     # 保留多菜单共用的API，只更新其他API
                     new_api_ids = matched_api_ids - existing_api_ids
                     removed_api_ids = existing_api_ids - matched_api_ids - multi_menu_apis
-                    
+
                     # 添加新关联
                     for api_id in new_api_ids:
                         if await ensure_menu_api(menu.id, api_id):
                             new_count += 1
-                    
+
                     # 删除不再匹配的关联（保留多菜单共用的）
                     for api_id in removed_api_ids:
                         await MenuApi.filter(menu_id=menu.id, api_id=api_id).delete()
-                    
+
                     preserved_count += len(multi_menu_apis & existing_api_ids)
-                    
+
                     if new_api_ids or removed_api_ids:
                         updated_count += 1
                         logger.info(f"菜单 [{menu.name}] 新增 {len(new_api_ids)} 个，删除 {len(removed_api_ids)} 个，保留 {len(multi_menu_apis & existing_api_ids)} 个多菜单共用API")
-                
+
                 else:  # mode == "full"
                     # 完全刷新模式：直接添加所有关联
                     for api_id in matched_api_ids:
@@ -321,17 +321,17 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
                             new_count += 1
                     updated_count += 1
                     logger.info(f"菜单 [{menu.name}] 关联了 {len(matched_api_ids)} 个API")
-        
+
         if mode == "increment":
             _refresh_task_status["result"] = f"增量更新完成：更新了 {updated_count} 个菜单，新增 {new_count} 个API关联"
         elif mode == "smart":
             _refresh_task_status["result"] = f"智能更新完成：更新了 {updated_count} 个菜单，新增 {new_count} 个，保留了 {preserved_count} 个多菜单共用API"
         else:
             _refresh_task_status["result"] = f"完全刷新完成：更新了 {updated_count} 个菜单，共 {new_count} 个API关联"
-        
+
         logger.info(_refresh_task_status["result"])
     except Exception as e:
-        _refresh_task_status["result"] = f"刷新失败: {str(e)}"
+        _refresh_task_status["result"] = f"刷新失败: {e!s}"
         logger.error(_refresh_task_status["result"])
     finally:
         _refresh_task_status["running"] = False
@@ -354,23 +354,23 @@ async def refresh_menu_api_relations(mode: str = "increment"):
         3. 根据模式更新菜单-API关联
     """
     global _refresh_task_status
-    
+
     if _refresh_task_status["running"]:
         return Success(msg="刷新任务正在执行中，请稍后查询结果")
-    
+
     if mode not in ["increment", "full", "smart"]:
         return Fail(msg="无效的刷新模式，支持: increment, full, smart")
-    
+
     # 启动后台任务
     import asyncio
     asyncio.create_task(_do_refresh_menu_api_relations(mode=mode))
-    
+
     mode_desc = {
         "increment": "增量更新（只新增不删除）",
         "full": "完全刷新（删除所有后重建）",
         "smart": "智能更新（保留多菜单共用API）"
     }
-    
+
     return Success(msg=f"刷新任务已启动（{mode_desc[mode]}），请稍后查询结果")
 
 

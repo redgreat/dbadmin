@@ -12,18 +12,18 @@ MAX_AUDIT_BODY_LEN = 32 * 1024
 # 文件上传类接口：不记录请求体
 SKIP_REQUEST_BODY_PATH_RE = re.compile(
     r"(/upload\b|/excelimp/|/imptask/create|/sim/simiccid/)",
-    re.I,
+    re.IGNORECASE,
 )
 
 # 文件/SQL 下载或大段 SQL 返回：不记录响应体
 SKIP_RESPONSE_BODY_PATH_RE = re.compile(
     r"(/download|public-download|download-direct|/excelimp/generate)",
-    re.I,
+    re.IGNORECASE,
 )
 
 BINARY_RESPONSE_CONTENT_TYPE_RE = re.compile(
     r"(application/octet-stream|spreadsheetml|ms-excel|vnd\.|application/zip|/sql\b)",
-    re.I,
+    re.IGNORECASE,
 )
 
 

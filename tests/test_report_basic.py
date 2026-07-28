@@ -2,6 +2,7 @@
 测试报表管理功能
 """
 import pytest
+
 from app.models.report import ReportConfig, ReportGeneration, SoftDeleteMixin
 from app.services.report_service import ReportService
 

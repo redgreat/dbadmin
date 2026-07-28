@@ -2,11 +2,11 @@
 FCC报销单关联服务
 实现财务报销单与仓储对账单的关联功能
 """
+import asyncio
 import logging
 import uuid
-import asyncio
 from datetime import datetime
-from typing import Dict, List, Optional
+
 import aiomysql
 
 from app.services.db_pool import db_pool
@@ -33,19 +33,19 @@ async def _get_fcc_conn_id():
 
 class FccRelationService:
     """FCC报销单关联服务"""
-    
+
     def __init__(self):
-        self.tasks: Dict[str, Dict] = {}  # 任务存储
-    
+        self.tasks: dict[str, dict] = {}  # 任务存储
+
     async def _ensure_wms_pool(self) -> None:
         """确保仓储中心连接池已注册"""
         await db_pool.ensure_pool(await _get_wms_conn_id())
-    
+
     async def _ensure_fcc_pool(self) -> None:
         """确保FCC连接池已注册"""
         await db_pool.ensure_pool(await _get_fcc_conn_id())
-    
-    def parse_input_text(self, input_text: str) -> Dict:
+
+    def parse_input_text(self, input_text: str) -> dict:
         """
         解析输入文本
         
@@ -62,20 +62,20 @@ class FccRelationService:
         """
         relations = []
         lines = input_text.strip().split('\n')
-        
+
         for line in lines:
             line = line.strip()
             if not line or not line.endswith(';'):
                 continue
-            
+
             line = line[:-1]  # 去除分号
             if ':' not in line:
                 continue
-            
+
             parts = line.split(':')
             if len(parts) != 2:
                 continue
-            
+
             fcc_no = parts[0].strip()
             # 支持逗号、顿号、中文逗号分隔
             wms_nos = []
@@ -83,23 +83,23 @@ class FccRelationService:
                 w = w.strip()
                 if w:
                     wms_nos.append(w)
-            
+
             if fcc_no and wms_nos:
                 relations.append({
                     'fcc_no': fcc_no,
                     'wms_nos': wms_nos
                 })
-        
+
         total_fcc = len(relations)
         total_wms = sum(len(r['wms_nos']) for r in relations)
-        
+
         return {
             'relations': relations,
             'total_fcc': total_fcc,
             'total_wms': total_wms
         }
-    
-    async def validate_codenumber(self, relations: List[Dict]) -> Dict:
+
+    async def validate_codenumber(self, relations: list[dict]) -> dict:
         """
         验证单据存在性
         
@@ -111,23 +111,23 @@ class FccRelationService:
         """
         await self._ensure_wms_pool()
         await self._ensure_fcc_pool()
-        
+
         wms_pool = db_pool.get_pool(await _get_wms_conn_id())
         fcc_pool = db_pool.get_pool(await _get_fcc_conn_id())
-        
+
         if not wms_pool or not fcc_pool:
             raise ValueError("数据库连接池不存在")
-        
+
         not_found_fcc = []
         not_found_wms = []
         paid_wms = []
         not_full_reconc_wms = []
         existing_relations = []  # 已存在的对应关系
-        
+
         # 收集所有单号
         all_fcc_nos = list(set(r['fcc_no'] for r in relations))
         all_wms_nos = list(set(w for r in relations for w in r['wms_nos']))
-        
+
         # 验证FCC报销单（SQL Server）
         async with fcc_pool.acquire() as conn:
             async with conn.cursor() as cur:
@@ -136,23 +136,23 @@ class FccRelationService:
                     sql_reim = "SELECT COUNT(*) FROM [dbo].[fms.reimbursement_info] WHERE CodeNumber = ? AND Deleted=0"
                     await cur.execute(sql_reim, (fcc_no,))
                     res_reim = await cur.fetchone()
-                    
+
                     if not res_reim or res_reim[0] == 0:
                         # 报销单里没查到，继续查借款单
                         sql_loan = "SELECT COUNT(*) FROM [dbo].[fms.Loan_Info] WHERE CodeNumber = ? AND Deleted=0"
                         await cur.execute(sql_loan, (fcc_no,))
                         res_loan = await cur.fetchone()
-                        
+
                         if not res_loan or res_loan[0] == 0:
                             # 借款单里也没查到，继续查还款核销单
                             sql_repay = "SELECT COUNT(*) FROM [dbo].[fms.LoanRepaymentOrVerification_Info] WHERE CodeNumber = ? AND Deleted=0"
                             await cur.execute(sql_repay, (fcc_no,))
                             res_repay = await cur.fetchone()
-                            
+
                             # 三个表都没有记录，才能判定它不存在
                             if not res_repay or res_repay[0] == 0:
                                 not_found_fcc.append(fcc_no)
-                
+
                 # 验证是否已存在对应关系（查询fms_costdetail_reconcinfo）
                 for relation in relations:
                     fcc_no = relation['fcc_no']
@@ -165,29 +165,28 @@ class FccRelationService:
                         res_exist = await cur.fetchone()
                         if res_exist and res_exist[0] > 0:
                             existing_relations.append({'fcc_no': fcc_no, 'wms_no': wms_no})
-        
+
         # 验证仓储对账单（MySQL）
         if isinstance(wms_pool, aiomysql.Pool):
-            async with wms_pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    for wms_no in all_wms_nos:
-                        # SQL2: 验证仓储对账单是否存在
-                        sql = "SELECT COUNT(*) FROM tb_reconcinfo WHERE ReconcNo = %s AND Deleted=0"
-                        await cur.execute(sql, (wms_no,))
-                        result = await cur.fetchone()
-                        if not result or result[0] == 0:
-                            not_found_wms.append(wms_no)
-                            continue
-                        
-                        # SQL3: 验证仓储对账单是否已付款
-                        sql_paid = "SELECT 1 FROM tb_reconcinfo a WHERE ReconcNo = %s AND a.PayStatus=3 AND a.Deleted=0"
-                        await cur.execute(sql_paid, (wms_no,))
-                        result_paid = await cur.fetchone()
-                        if result_paid:
-                            paid_wms.append(wms_no)
+            async with wms_pool.acquire() as conn, conn.cursor() as cur:
+                for wms_no in all_wms_nos:
+                    # SQL2: 验证仓储对账单是否存在
+                    sql = "SELECT COUNT(*) FROM tb_reconcinfo WHERE ReconcNo = %s AND Deleted=0"
+                    await cur.execute(sql, (wms_no,))
+                    result = await cur.fetchone()
+                    if not result or result[0] == 0:
+                        not_found_wms.append(wms_no)
+                        continue
 
-                        # SQL4: 验证对账单是否均为全部对账的应付单
-                        sql_full = """SELECT a.OwingId,SUM(a.ReconcNum),b.StockNum
+                    # SQL3: 验证仓储对账单是否已付款
+                    sql_paid = "SELECT 1 FROM tb_reconcinfo a WHERE ReconcNo = %s AND a.PayStatus=3 AND a.Deleted=0"
+                    await cur.execute(sql_paid, (wms_no,))
+                    result_paid = await cur.fetchone()
+                    if result_paid:
+                        paid_wms.append(wms_no)
+
+                    # SQL4: 验证对账单是否均为全部对账的应付单
+                    sql_full = """SELECT a.OwingId,SUM(a.ReconcNum),b.StockNum
                                       FROM tb_reconcdetail a
                                       JOIN tb_owinginfo b
                                         ON b.Id=a.OwingId
@@ -200,17 +199,17 @@ class FccRelationService:
                                       GROUP BY a.OwingId
                                       HAVING ABS(SUM(a.ReconcNum))!=b.StockNum
                                    """
-                        await cur.execute(sql_full, (wms_no,))
-                        result_full = await cur.fetchone()
-                        if result_full:
-                            not_full_reconc_wms.append(wms_no)
-        
-        valid = (len(not_found_fcc) == 0 and 
-                 len(not_found_wms) == 0 and 
-                 len(paid_wms) == 0 and 
+                    await cur.execute(sql_full, (wms_no,))
+                    result_full = await cur.fetchone()
+                    if result_full:
+                        not_full_reconc_wms.append(wms_no)
+
+        valid = (len(not_found_fcc) == 0 and
+                 len(not_found_wms) == 0 and
+                 len(paid_wms) == 0 and
                  len(not_full_reconc_wms) == 0 and
                  len(existing_relations) == 0)
-        
+
         if valid:
             message = "所有单据验证通过"
         else:
@@ -226,7 +225,7 @@ class FccRelationService:
             if existing_relations:
                 parts.append(f"{len(existing_relations)} 个对应关系已存在")
             message = "，".join(parts)
-        
+
         return {
             'valid': valid,
             'not_found_fcc': not_found_fcc,
@@ -236,8 +235,8 @@ class FccRelationService:
             'existing_relations': existing_relations,
             'message': message
         }
-    
-    async def execute_relation_task(self, task_id: str, relations: List[Dict]) -> None:
+
+    async def execute_relation_task(self, task_id: str, relations: list[dict]) -> None:
         """
         执行关联任务（异步）
         
@@ -489,7 +488,7 @@ class FccRelationService:
                             self.tasks[task_id]['progress']['processed'] = processed
                             self.tasks[task_id]['progress']['success'] = success_count
                             self.tasks[task_id]['progress']['failed'] = len(failed_items)
-            
+
             # 更新任务状态为completed
             self.tasks[task_id]['status'] = 'completed'
             self.tasks[task_id]['finished_at'] = datetime.now().isoformat()
@@ -497,7 +496,7 @@ class FccRelationService:
                 'success_count': success_count,
                 'failed_items': failed_items
             }
-            
+
         except Exception as e:
             logger.error(f"任务执行失败: {e}")
             self.tasks[task_id]['status'] = 'failed'
@@ -510,8 +509,8 @@ class FccRelationService:
                     'reason': str(e)
                 }]
             }
-    
-    async def submit_task(self, relations: List[Dict]) -> str:
+
+    async def submit_task(self, relations: list[dict]) -> str:
         """
         提交任务
         
@@ -536,13 +535,13 @@ class FccRelationService:
             'created_at': datetime.now().isoformat(),
             'finished_at': None
         }
-        
+
         # 异步执行任务
         asyncio.create_task(self.execute_relation_task(task_id, relations))
-        
+
         return task_id
-    
-    def query_task_status(self, task_id: str) -> Optional[Dict]:
+
+    def query_task_status(self, task_id: str) -> dict | None:
         """
         查询任务状态
         

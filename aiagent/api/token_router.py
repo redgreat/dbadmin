@@ -1,9 +1,10 @@
+
 from fastapi import APIRouter, Query
-from aiagent.models.ai_token import AiToken
-from pydantic import BaseModel
-from app.schemas.base import Success, SuccessExtra, Fail
 from fastapi.encoders import jsonable_encoder
-from typing import Optional, List
+from pydantic import BaseModel
+
+from aiagent.models.ai_token import AiToken
+from app.schemas.base import Fail, Success, SuccessExtra
 
 token_router = APIRouter()
 
@@ -14,11 +15,11 @@ class TokenCreate(BaseModel):
 
 class TokenUpdate(BaseModel):
     id: int
-    name: Optional[str] = None
-    description: Optional[str] = None
-    enabled: Optional[bool] = None
-    allow_write: Optional[bool] = None
-    allow_tools: Optional[list] = None
+    name: str | None = None
+    description: str | None = None
+    enabled: bool | None = None
+    allow_write: bool | None = None
+    allow_tools: list | None = None
 
 class TokenDelete(BaseModel):
     id: int
@@ -42,7 +43,7 @@ async def update_token(req: TokenUpdate):
     obj = await AiToken.get_or_none(id=req.id)
     if not obj:
         return Fail(msg="Token 不存在")
-    
+
     update_data = req.model_dump(exclude_unset=True)
     update_data.pop('id', None)
     for k, v in update_data.items():

@@ -2,14 +2,15 @@
 FCC报销单关联API接口
 """
 import logging
+
 from fastapi import APIRouter, Request
 
 from app.core.dependency import AuthControl
 from app.models.admin import User
-from app.utils.audit_log import create_operation_audit_log
 from app.schemas.base import Fail, Success
-from app.schemas.wms import FccParseIn, FccValidateIn, FccSubmitIn
+from app.schemas.wms import FccParseIn, FccSubmitIn, FccValidateIn
 from app.services.fcc_relation_service import fcc_relation_service
+from app.utils.audit_log import create_operation_audit_log
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ async def parse_input(body: FccParseIn):
         return Success(data=result)
     except Exception as e:
         logger.error(f"解析失败: {e}")
-        return Fail(code=500, msg=f"解析失败: {str(e)}")
+        return Fail(code=500, msg=f"解析失败: {e!s}")
 
 
 @router.post("/fcc/validate", summary="验证单据存在性")
@@ -47,7 +48,7 @@ async def validate_codenumber(body: FccValidateIn):
         return Success(data=result)
     except Exception as e:
         logger.error(f"验证失败: {e}")
-        return Fail(code=500, msg=f"验证失败: {str(e)}")
+        return Fail(code=500, msg=f"验证失败: {e!s}")
 
 
 @router.post("/fcc/submit", summary="提交关联任务")
@@ -60,7 +61,7 @@ async def submit_task(req: Request, body: FccSubmitIn):
     try:
         relations = [r.dict() for r in body.relations]
         task_id = await fcc_relation_service.submit_task(relations)
-        
+
         # 记录审计日志
         try:
             token = req.headers.get("token")
@@ -87,11 +88,11 @@ async def submit_task(req: Request, body: FccSubmitIn):
             )
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")
-        
+
         return Success(data={'task_id': task_id})
     except Exception as e:
         logger.error(f"提交失败: {e}")
-        return Fail(code=500, msg=f"提交失败: {str(e)}")
+        return Fail(code=500, msg=f"提交失败: {e!s}")
 
 
 @router.get("/fcc/task/{task_id}", summary="查询任务状态")
@@ -108,4 +109,4 @@ async def get_task_status(task_id: str):
         return Success(data=result)
     except Exception as e:
         logger.error(f"查询失败: {e}")
-        return Fail(code=500, msg=f"查询失败: {str(e)}")
+        return Fail(code=500, msg=f"查询失败: {e!s}")

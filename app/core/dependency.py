@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import jwt
 from fastapi import Depends, Header, HTTPException, Request
@@ -10,7 +10,7 @@ from app.settings import settings
 
 class AuthControl:
     @classmethod
-    async def is_authed(cls, token: str = Header(..., description="token验证")) -> Optional[Any]:
+    async def is_authed(cls, token: str = Header(..., description="token验证")) -> Any | None:
         try:
             if token == "dev":
                 user = await User.filter().first()
@@ -28,7 +28,7 @@ class AuthControl:
         except jwt.ExpiredSignatureError:
             raise HTTPException(status_code=401, detail="登录已过期")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"{repr(e)}")
+            raise HTTPException(status_code=500, detail=f"{e!r}")
 
 
 class PermissionControl:
@@ -41,14 +41,14 @@ class PermissionControl:
         roles: list[Role] = await current_user.roles
         if not roles:
             raise HTTPException(status_code=403, detail="The user is not bound to a role")
-        
+
         # 获取用户所有角色的菜单ID
         menu_ids = set()
         for role in roles:
             role_menus = await role.menus.all()
             for menu in role_menus:
                 menu_ids.add(menu.id)
-        
+
         # 通过menu_api表获取菜单对应的API
         if menu_ids:
             menu_api_relations = await MenuApi.filter(menu_id__in=menu_ids).prefetch_related("api")
@@ -58,7 +58,7 @@ class PermissionControl:
                     permission_apis.add((relation.api.method, relation.api.path))
         else:
             permission_apis = set()
-        
+
         if (method, path) not in permission_apis:
             # 提供更详细的错误信息
             from app.models.admin import Api

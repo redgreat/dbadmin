@@ -1,18 +1,17 @@
 from datetime import datetime
-from typing import Optional, Tuple
 
 from tortoise.expressions import Q
 
 from app.core.crud import CRUDBase
 from app.models.alert import AlertSender, AlertSendLog
-from app.schemas.alert import AlertSenderCreate, AlertSenderUpdate, AlertLogCreate
+from app.schemas.alert import AlertLogCreate, AlertSenderCreate, AlertSenderUpdate
 
 
 class AlertSenderController(CRUDBase[AlertSender, AlertSenderCreate, AlertSenderUpdate]):
     def __init__(self):
         super().__init__(model=AlertSender)
 
-    async def check_name_exists(self, sender_name: str, exclude_id: Optional[int] = None) -> bool:
+    async def check_name_exists(self, sender_name: str, exclude_id: int | None = None) -> bool:
         query = self.model.filter(sender_name=sender_name)
         if exclude_id:
             query = query.exclude(id=exclude_id)
@@ -22,10 +21,10 @@ class AlertSenderController(CRUDBase[AlertSender, AlertSenderCreate, AlertSender
         self,
         page: int,
         page_size: int,
-        sender_name: Optional[str] = None,
-        channel_type: Optional[str] = None,
-        is_enabled: Optional[bool] = None,
-    ) -> Tuple[int, list[AlertSender]]:
+        sender_name: str | None = None,
+        channel_type: str | None = None,
+        is_enabled: bool | None = None,
+    ) -> tuple[int, list[AlertSender]]:
         search = Q()
         if sender_name:
             search &= Q(sender_name__icontains=sender_name)
@@ -52,13 +51,13 @@ class AlertLogController(CRUDBase[AlertSendLog, AlertLogCreate, AlertLogCreate])
         self,
         page: int,
         page_size: int,
-        sender_id: Optional[int] = None,
-        sender_name: Optional[str] = None,
-        channel_type: Optional[str] = None,
-        send_status: Optional[int] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-    ) -> Tuple[int, list[AlertSendLog]]:
+        sender_id: int | None = None,
+        sender_name: str | None = None,
+        channel_type: str | None = None,
+        send_status: int | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+    ) -> tuple[int, list[AlertSendLog]]:
         search = Q()
         if sender_id:
             search &= Q(sender_id=sender_id)

@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
-from .base import mcp_tool, _ok, _err, _create_approval, _notify_dba_wecom
+
+from .base import _create_approval, _notify_dba_wecom, _ok, mcp_tool
+
 
 class ValidateOaPositiveTimeInput(BaseModel):
     emp_id: str = Field(..., description="员工号")

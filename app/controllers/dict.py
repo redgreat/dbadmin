@@ -1,5 +1,5 @@
-from typing import Optional, List, Dict as TypingDict, Any
 from datetime import datetime
+from typing import Any
 
 from app.core.crud import CRUDBase
 from app.models.dict import Dict as DictModel
@@ -10,26 +10,26 @@ class DictController(CRUDBase[DictModel, DictCreate, DictUpdate]):
     def __init__(self):
         super().__init__(model=DictModel)
 
-    async def get_by_code(self, code: str) -> Optional[DictModel]:
+    async def get_by_code(self, code: str) -> DictModel | None:
         """根据编码获取字典"""
         return await self.model.filter(code=code, deleted=False).first()
 
-    async def get_children_by_parent_code(self, parent_code: str) -> List[DictModel]:
+    async def get_children_by_parent_code(self, parent_code: str) -> list[DictModel]:
         """根据父级编码获取子级字典列表"""
         return await self.model.filter(parent_code=parent_code, deleted=False).order_by("created_at")
 
-    async def get_root_dicts(self) -> List[DictModel]:
+    async def get_root_dicts(self) -> list[DictModel]:
         """获取根级字典（parent_code为空）"""
         return await self.model.filter(parent_code__isnull=True, deleted=False).order_by("created_at")
 
-    async def check_code_exists(self, code: str, exclude_id: Optional[int] = None) -> bool:
+    async def check_code_exists(self, code: str, exclude_id: int | None = None) -> bool:
         """检查编码是否已存在"""
         query = self.model.filter(code=code, deleted=False)
         if exclude_id:
             query = query.exclude(id=exclude_id)
         return await query.exists()
 
-    async def check_name_exists(self, name: str, exclude_id: Optional[int] = None) -> bool:
+    async def check_name_exists(self, name: str, exclude_id: int | None = None) -> bool:
         """检查名称是否已存在"""
         query = self.model.filter(name=name, deleted=False)
         if exclude_id:
@@ -40,9 +40,9 @@ class DictController(CRUDBase[DictModel, DictCreate, DictUpdate]):
         """检查是否存在子级字典"""
         return await self.model.filter(parent_code=code, deleted=False).exists()
 
-    async def get_dict_tree(self) -> List[TypingDict[str, Any]]:
+    async def get_dict_tree(self) -> list[dict[str, Any]]:
         """获取字典树形结构"""
-        async def build_tree(parent_code: Optional[str] = None, level: int = 0) -> List[TypingDict[str, Any]]:
+        async def build_tree(parent_code: str | None = None, level: int = 0) -> list[dict[str, Any]]:
             if level >= 3:  # 最多三层
                 return []
 
@@ -63,9 +63,9 @@ class DictController(CRUDBase[DictModel, DictCreate, DictUpdate]):
 
         return await build_tree()
 
-    async def get_dict_options(self, code: str) -> List[TypingDict[str, Any]]:
+    async def get_dict_options(self, code: str) -> list[dict[str, Any]]:
         """根据编码获取字典选项（用于下拉框）"""
-        async def build_options(parent_code: Optional[str] = None, level: int = 0) -> List[TypingDict[str, Any]]:
+        async def build_options(parent_code: str | None = None, level: int = 0) -> list[dict[str, Any]]:
             if level >= 3:  # 最多三层
                 return []
 
@@ -103,7 +103,7 @@ class DictController(CRUDBase[DictModel, DictCreate, DictUpdate]):
         await obj.save()
 
     async def list_with_filter(
-        self, page: int, page_size: int, parent_code: Optional[str] = None
+        self, page: int, page_size: int, parent_code: str | None = None
     ) -> tuple:
         """带筛选条件的分页查询"""
         query = self.model.filter(deleted=False)
