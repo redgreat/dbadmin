@@ -1,15 +1,9 @@
-from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.controllers.oplog import oplog_controller
-from app.schemas.oplog import (
-    OpLogCreateRequest,
-    OpLogUpdateRequest,
-    OpLogQueryRequest,
-    OpLogResponse,
-    OpLogListResponse
-)
+from app.schemas.oplog import OpLogCreateRequest
 from app.core.dependency import DependAuth
 
 router = APIRouter()
@@ -18,7 +12,7 @@ router = APIRouter()
 @router.post("/create", summary="创建运维日志")
 async def create_oplog(
     request: OpLogCreateRequest,
-    _: str = DependAuth
+    _ = DependAuth
 ) -> JSONResponse:
     """
     创建运维日志记录
@@ -48,12 +42,12 @@ async def create_oplog(
                 "data": None
             }
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return JSONResponse(
             status_code=500,
             content={
                 "code": 500,
-                "message": f"服务器内部错误: {str(e)}",
+                "message": f"服务器内部错误: {e}",
                 "data": None
             }
         )
@@ -61,13 +55,13 @@ async def create_oplog(
 
 @router.get("/list", summary="获取运维日志列表")
 async def list_oplogs(
-    logger: str = None,
-    operater: str = None,
-    start_date: str = None,
-    end_date: str = None,
+    logger: Optional[str] = None,
+    operater: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
-    _: str = DependAuth
+    _ = DependAuth
 ) -> JSONResponse:
     """
     获取运维日志列表
@@ -115,12 +109,12 @@ async def list_oplogs(
                 "data": None
             }
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return JSONResponse(
             status_code=500,
             content={
                 "code": 500,
-                "message": f"服务器内部错误: {str(e)}",
+                "message": f"服务器内部错误: {e}",
                 "data": None
             }
         )

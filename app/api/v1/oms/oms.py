@@ -1,5 +1,4 @@
-from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.controllers.oms import oms_controller, OrderValidationRequest, OrderUpdateRequest, OrderDeleteValidationRequest, OrderDeleteRequest
@@ -11,7 +10,7 @@ router = APIRouter()
 @router.post("/validate-orders", summary="验证订单ID")
 async def validate_orders(
     request: OrderValidationRequest,
-    _: str = DependAuth
+    _ = DependAuth
 ) -> JSONResponse:
     """
     验证订单ID是否存在
@@ -41,12 +40,12 @@ async def validate_orders(
                 "data": None
             }
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return JSONResponse(
             status_code=500,
             content={
                 "code": 500,
-                "message": f"服务器内部错误: {str(e)}",
+                "message": f"服务器内部错误: {e}",
                 "data": None
             }
         )
@@ -55,7 +54,7 @@ async def validate_orders(
 @router.post("/validate-orders-for-delete", summary="验证订单是否可删除")
 async def validate_orders_for_delete(
     request: OrderDeleteValidationRequest,
-    _: str = DependAuth
+    _ = DependAuth
 ) -> JSONResponse:
     """
     验证订单是否存在且可删除
@@ -85,12 +84,12 @@ async def validate_orders_for_delete(
                 "data": None
             }
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return JSONResponse(
             status_code=500,
             content={
                 "code": 500,
-                "message": f"服务器内部错误: {str(e)}",
+                "message": f"服务器内部错误: {e}",
                 "data": None
             }
         )
@@ -99,7 +98,7 @@ async def validate_orders_for_delete(
 @router.post("/batch-update-audit-time", summary="批量更新订单审核时间")
 async def batch_update_audit_time(
     request: OrderUpdateRequest,
-    _: str = DependAuth
+    _ = DependAuth
 ) -> JSONResponse:
     """
     批量更新订单审核时间
@@ -129,12 +128,12 @@ async def batch_update_audit_time(
                 "data": None
             }
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return JSONResponse(
             status_code=500,
             content={
                 "code": 500,
-                "message": f"服务器内部错误: {str(e)}",
+                "message": f"服务器内部错误: {e}",
                 "data": None
             }
         )
@@ -143,7 +142,7 @@ async def batch_update_audit_time(
 @router.post("/batch-delete-orders", summary="批量删除订单")
 async def batch_delete_orders(
     request: OrderDeleteRequest,
-    _: str = DependAuth
+    _ = DependAuth
 ) -> JSONResponse:
     """
     批量删除订单，调用MySQL存储过程
@@ -173,12 +172,12 @@ async def batch_delete_orders(
                 "data": None
             }
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return JSONResponse(
             status_code=500,
             content={
                 "code": 500,
-                "message": f"服务器内部错误: {str(e)}",
+                "message": f"服务器内部错误: {e}",
                 "data": None
             }
         )
@@ -186,7 +185,7 @@ async def batch_delete_orders(
 
 @router.get("/connections", summary="获取可用数据库连接")
 async def get_connections(
-    _: str = DependAuth
+    _ = DependAuth
 ) -> JSONResponse:
     """
     获取所有可用的数据库连接
@@ -204,12 +203,12 @@ async def get_connections(
                 "data": result
             }
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return JSONResponse(
             status_code=500,
             content={
                 "code": 500,
-                "message": f"服务器内部错误: {str(e)}",
+                "message": f"服务器内部错误: {e}",
                 "data": None
             }
         )
@@ -217,7 +216,7 @@ async def get_connections(
 
 @router.post("/refresh-connections", summary="刷新数据库连接池")
 async def refresh_connections(
-    _: str = DependAuth
+    _ = DependAuth
 ) -> JSONResponse:
     """
     刷新数据库连接池
@@ -244,12 +243,12 @@ async def refresh_connections(
                 "data": None
             }
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return JSONResponse(
             status_code=500,
             content={
                 "code": 500,
-                "message": f"服务器内部错误: {str(e)}",
+                "message": f"服务器内部错误: {e}",
                 "data": None
             }
         )
