@@ -217,6 +217,10 @@ class Settings:
         """GFS数据库连接ID（从数据库读取）"""
         return await self._get_conn_id_by_alias('GFS_CONN')
 
+    async def EHCF_CONN_ID(self) -> int:
+        """壹好车服数据库连接ID（从数据库读取）"""
+        return await self._get_conn_id_by_alias('EHCF_CONN')
+
     async def _get_conn_id_by_alias(self, alias: str) -> int:
         """
         根据连接别名从数据库获取连接ID（使用Tortoise ORM连接池）

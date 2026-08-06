@@ -171,4 +171,9 @@ export default {
   fccGetTaskStatus: (taskId) => request.get(`/wms/fcc/task/${taskId}`),
   // usercenter - OA人员信息查询
   searchUserCenterUsers: (params = {}) => request.get('/usercenter/search', { params }),
+  // ehcf - 壹好车服订单ID重新生成
+  queryEhcfWorkorder: (data = {}) => request.post('/ehcf/order-regenerate/query_workorder', data),
+  queryEhcfDetails: (data = {}) => request.post('/ehcf/order-regenerate/query_details', data),
+  fixEhcfDetailId: (data = {}) => request.post('/ehcf/order-regenerate/fix_detail', data),
+  regenerateEhcfOrderId: (data = {}) => request.post('/ehcf/order-regenerate/regenerate_order', data),
 }
