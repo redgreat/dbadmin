@@ -1,4 +1,4 @@
-from fastapi.routing import APIRoute, _IncludedRouter
+from fastapi.routing import APIRoute, _IncludedRouter, _EffectiveRouteContext
 from tortoise import connections
 
 from app.core.crud import CRUDBase
@@ -7,12 +7,14 @@ from app.models.admin import Api
 from app.schemas.apis import ApiCreate, ApiUpdate
 
 
-def collect_api_routes(routes) -> list[APIRoute]:
-    """递归遍历路由列表，收集所有需要鉴权的 APIRoute。"""
+def collect_api_routes(routes) -> list[_EffectiveRouteContext]:
+    """递归遍历路由列表，收集所有需要鉴权的有效路由上下文（已合并父级 tags/dependencies）。"""
     result = []
     for route in routes:
         if isinstance(route, _IncludedRouter):
-            result.extend(collect_api_routes(route.original_router.routes))
+            for context in route.effective_route_contexts():
+                if len(context.dependencies) > 0:
+                    result.append(context)
         elif isinstance(route, APIRoute) and len(route.dependencies) > 0:
             result.append(route)
     return result
@@ -65,7 +67,7 @@ class ApiController(CRUDBase[Api, ApiCreate, ApiUpdate]):
             method = sorted(route.methods)[0]
             path = route.path_format
             summary = route.summary
-            tags = list(route.tags)[0]
+            tags = list(route.tags)[0] if route.tags else "未分类"
             api_obj = await Api.filter(method=method, path=path).first()
             if api_obj:
                 await api_obj.update_from_dict(dict(method=method, path=path, summary=summary, tags=tags)).save()
