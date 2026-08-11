@@ -63,9 +63,9 @@ RUN curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /u
 # 设置时区
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 安装 Poetry 并固定 packaging 版本（避免 setuptools 构建时找不到 packaging.tags）
-RUN pip install poetry==1.8.2 && \
-    pip install 'packaging<25' 'setuptools>=75.0.0' wheel
+# 安装 Poetry 1.8.5+，修复 setuptools 构建时找不到 packaging.tags 的问题
+RUN pip install 'poetry>=1.8.5,<2.0' && \
+    pip install 'packaging' 'setuptools>=75.0.0' wheel
 
 # 复制项目依赖文件
 COPY pyproject.toml poetry.lock ./
