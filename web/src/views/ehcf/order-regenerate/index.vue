@@ -23,25 +23,54 @@
             <n-descriptions-item label="VIN码">{{ workorder.vin_number || '-' }}</n-descriptions-item>
             <n-descriptions-item label="订单类型">{{ workorder.order_type_name }}</n-descriptions-item>
             <n-descriptions-item label="状态类型">{{ workorder.status_type_name }}</n-descriptions-item>
-            <n-descriptions-item label="工单状态">{{ workorder.work_status }}</n-descriptions-item>
+            <n-descriptions-item label="工单状态">
+              <n-tag :type="workorder.work_status === 9 ? 'success' : 'default'" size="small">
+                {{ workorder.work_status === 9 ? '已完成(9)' : workorder.work_status }}
+              </n-tag>
+            </n-descriptions-item>
             <n-descriptions-item label="关闭状态">{{ workorder.close_status_name }}</n-descriptions-item>
             <n-descriptions-item label="客户名称" :span="2">{{ workorder.customer_name }}</n-descriptions-item>
           </n-descriptions>
+
+          <n-alert v-if="workorder.work_status === 9" type="warning" class="mt-3">
+            该工单已完成（WorkStatus=9），不允许执行订单ID重新生成操作
+          </n-alert>
         </n-card>
       </div>
     </n-card>
 
     <n-card v-if="workorder" title="订单ID重新生成" class="mb-4">
+      <n-form label-placement="left" label-align="left" :label-width="100">
+        <n-form-item label="原因备注">
+          <n-input
+            v-model:value="remark"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            placeholder="请填写操作原因，此操作不可逆"
+          />
+        </n-form-item>
+      </n-form>
       <n-space>
-        <n-button type="warning" :loading="fixing" @click="handleFixDetail">
+        <n-button
+          type="warning"
+          :loading="fixing"
+          :disabled="workorder.work_status === 9"
+          @click="handleFixDetail"
+        >
           <TheIcon icon="material-symbols:build" :size="16" class="mr-2" />
           修复订单明细Id
         </n-button>
-        <n-button type="error" :loading="regenerating" @click="handleRegenerateOrder">
+        <n-button
+          type="error"
+          :loading="regenerating"
+          :disabled="workorder.work_status === 9"
+          @click="handleRegenerateOrder"
+        >
           <TheIcon icon="material-symbols:refresh" :size="16" class="mr-2" />
           更新订单Id和订单明细Id
         </n-button>
       </n-space>
+      <n-text depth="3" class="mt-2">注意：此操作为不可逆操作，执行后无法恢复旧值</n-text>
 
       <!-- 修复结果 -->
       <n-card v-if="fixResult" title="修复结果" size="small" class="mt-4">
@@ -134,6 +163,7 @@ defineOptions({ name: '订单ID重新生成' })
 const message = useMessage()
 
 const keyword = ref('')
+const remark = ref('')
 const querying = ref(false)
 const fixing = ref(false)
 const regenerating = ref(false)
@@ -154,6 +184,7 @@ const handleQuery = async () => {
   querying.value = true
   fixResult.value = null
   regenResult.value = null
+  remark.value = ''
   try {
     const res = await api.queryEhcfWorkorder({ keyword: keyword.value.trim() })
     if (res.code === 200 && res.data.found) {
@@ -176,11 +207,19 @@ const handleFixDetail = async () => {
     message.warning('请先查询工单')
     return
   }
+  if (workorder.value.work_status === 9) {
+    message.error('工单已完成（WorkStatus=9），不可操作')
+    return
+  }
+
   const confirmed = await new Promise((resolve) => {
-    const dialog = window.$dialog.warning({
-      title: '确认修复',
-      content: `将为工单 ${workorder.value.app_code} 生成新的OE编号并更新所有明细Id，确认继续？`,
-      positiveText: '确认',
+    const dialog = window.$dialog.error({
+      title: '确认修复（不可逆操作）',
+      content: `将为工单「${workorder.value.app_code}」生成新的OE编号并更新所有明细Id。
+
+此操作不可逆转，原有订单明细Id将被永久替换为新的OE编号，无法恢复！
+${remark.value ? `\n原因备注：${remark.value}` : ''}`,
+      positiveText: '确认操作',
       negativeText: '取消',
       onPositiveClick: () => resolve(true),
       onNegativeClick: () => resolve(false),
@@ -191,7 +230,10 @@ const handleFixDetail = async () => {
   fixing.value = true
   regenResult.value = null
   try {
-    const res = await api.fixEhcfDetailId({ workorder_id: workorder.value.id })
+    const res = await api.fixEhcfDetailId({
+      workorder_id: workorder.value.id,
+      remark: remark.value,
+    })
     if (res.code === 200) {
       fixResult.value = res.data
       message.success(res.data.message)
@@ -210,11 +252,19 @@ const handleRegenerateOrder = async () => {
     message.warning('请先查询工单')
     return
   }
+  if (workorder.value.work_status === 9) {
+    message.error('工单已完成（WorkStatus=9），不可操作')
+    return
+  }
+
   const confirmed = await new Promise((resolve) => {
-    const dialog = window.$dialog.warning({
-      title: '确认重新生成',
-      content: `将为工单 ${workorder.value.app_code} 重新生成OI订单编号和订单编码，并更新所有关联表，确认继续？`,
-      positiveText: '确认',
+    const dialog = window.$dialog.error({
+      title: '确认重新生成（不可逆操作）',
+      content: `将为工单「${workorder.value.app_code}」重新生成OI订单编号和订单编码，更新所有关联表。
+
+此操作不可逆转，原有订单Id、订单编码、明细Id将被永久替换，无法恢复！
+${remark.value ? `\n原因备注：${remark.value}` : ''}`,
+      positiveText: '确认操作',
       negativeText: '取消',
       onPositiveClick: () => resolve(true),
       onNegativeClick: () => resolve(false),
@@ -225,7 +275,10 @@ const handleRegenerateOrder = async () => {
   regenerating.value = true
   fixResult.value = null
   try {
-    const res = await api.regenerateEhcfOrderId({ workorder_id: workorder.value.id })
+    const res = await api.regenerateEhcfOrderId({
+      workorder_id: workorder.value.id,
+      remark: remark.value,
+    })
     if (res.code === 200) {
       regenResult.value = res.data
       message.success(res.data.message)

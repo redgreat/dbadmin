@@ -1,10 +1,21 @@
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, _IncludedRouter
 from tortoise import connections
 
 from app.core.crud import CRUDBase
 from app.log import logger
 from app.models.admin import Api
 from app.schemas.apis import ApiCreate, ApiUpdate
+
+
+def collect_api_routes(routes) -> list[APIRoute]:
+    """递归遍历路由列表，收集所有需要鉴权的 APIRoute。"""
+    result = []
+    for route in routes:
+        if isinstance(route, _IncludedRouter):
+            result.extend(collect_api_routes(route.original_router.routes))
+        elif isinstance(route, APIRoute) and len(route.dependencies) > 0:
+            result.append(route)
+    return result
 
 
 class ApiController(CRUDBase[Api, ApiCreate, ApiUpdate]):
@@ -33,10 +44,12 @@ class ApiController(CRUDBase[Api, ApiCreate, ApiUpdate]):
     async def refresh_api(self):
         from app.main import app
 
+        api_routes = collect_api_routes(app.routes)
+
         all_api_list = []
-        for route in app.routes:
-            if isinstance(route, APIRoute) and len(route.dependencies) > 0:
-                all_api_list.append((sorted(route.methods)[0], route.path_format))
+        for route in api_routes:
+            all_api_list.append((sorted(route.methods)[0], route.path_format))
+
         delete_api = []
         for api in await Api.all():
             if (api.method, api.path) not in all_api_list:
@@ -48,18 +61,17 @@ class ApiController(CRUDBase[Api, ApiCreate, ApiUpdate]):
 
         await self.sync_api_sequence()
 
-        for route in app.routes:
-            if isinstance(route, APIRoute) and len(route.dependencies) > 0:
-                method = sorted(route.methods)[0]
-                path = route.path_format
-                summary = route.summary
-                tags = list(route.tags)[0]
-                api_obj = await Api.filter(method=method, path=path).first()
-                if api_obj:
-                    await api_obj.update_from_dict(dict(method=method, path=path, summary=summary, tags=tags)).save()
-                else:
-                    logger.debug(f"API Created {method} {path}")
-                    await Api.create(**dict(method=method, path=path, summary=summary, tags=tags))
+        for route in api_routes:
+            method = sorted(route.methods)[0]
+            path = route.path_format
+            summary = route.summary
+            tags = list(route.tags)[0]
+            api_obj = await Api.filter(method=method, path=path).first()
+            if api_obj:
+                await api_obj.update_from_dict(dict(method=method, path=path, summary=summary, tags=tags)).save()
+            else:
+                logger.debug(f"API Created {method} {path}")
+                await Api.create(**dict(method=method, path=path, summary=summary, tags=tags))
 
 
 api_controller = ApiController()

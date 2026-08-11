@@ -1,10 +1,9 @@
 import logging
 
 from fastapi import APIRouter, Body, Query
-from fastapi.routing import APIRoute
 from tortoise import connections
 
-from app.controllers.api import api_controller
+from app.controllers.api import collect_api_routes, api_controller
 from app.controllers.menu import menu_controller
 from app.models.admin import Api, Menu, MenuApi
 from app.schemas.base import Fail, Success, SuccessExtra
@@ -226,13 +225,13 @@ async def _do_refresh_menu_api_relations(mode: str = "increment"):
 
         # 3. 构建路由路径到API的映射
         route_api_map = {}  # {"/api/v1/user/list": Api对象}
-        for route in app.routes:
-            if isinstance(route, APIRoute) and len(route.dependencies) > 0:
-                path = route.path_format
-                method = list(route.methods)[0]
-                api_obj = await Api.filter(path=path, method=method).first()
-                if api_obj:
-                    route_api_map[path] = api_obj
+        api_routes = collect_api_routes(app.routes)
+        for route in api_routes:
+            path = route.path_format
+            method = list(route.methods)[0]
+            api_obj = await Api.filter(path=path, method=method).first()
+            if api_obj:
+                route_api_map[path] = api_obj
 
         # 4. 根据菜单的component路径匹配API
         # 规则：菜单component如 "/system/user"，对应API路径前缀 "/api/v1/user"

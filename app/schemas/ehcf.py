@@ -9,11 +9,13 @@ class WorkorderQueryIn(BaseModel):
 class FixDetailIdIn(BaseModel):
     """修复明细Id入参"""
     workorder_id: str = Field(..., description="工单Id")
+    remark: str = Field(default="", description="原因备注")
 
 
 class RegenerateOrderIn(BaseModel):
     """重新生成订单Id入参"""
     workorder_id: str = Field(..., description="工单Id")
+    remark: str = Field(default="", description="原因备注")
 
 
 class WorkorderManageQueryIn(BaseModel):
