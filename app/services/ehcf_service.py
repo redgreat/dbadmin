@@ -40,9 +40,10 @@ class EhcfService:
                                fn_GetStatusTypeByCode(a.Id) AS StatusTypeName,
                                a.WorkStatus,
                                fn_GetCloseStatusNameByOrderId(a.Id) AS CloseStatusName,
-                               a.CustomerName
+                               a.CustomerName, b.VinNumber
                         FROM tb_workorderinfo a
-                        WHERE (a.Id=%s OR a.AppNo=%s) AND a.Deleted=0
+                        LEFT JOIN tb_workcarinfo b ON b.WorkOrderId = a.Id
+                        WHERE (a.Id=%s OR a.AppCode=%s) AND a.Deleted=0
                         LIMIT 1
                     """
                     await cur.execute(sql, (keyword, keyword))
@@ -55,12 +56,13 @@ class EhcfService:
                         "workorder": {
                             "app_code": row[0] if row[0] else "",
                             "id": str(row[1]) if row[1] else "",
-                            "order_type": row[2] if len(row) > 2 else "",
-                            "order_type_name": row[3] if len(row) > 3 else "",
-                            "status_type_name": row[4] if len(row) > 4 else "",
-                            "work_status": row[5] if len(row) > 5 else "",
-                            "close_status_name": row[6] if len(row) > 6 else "",
-                            "customer_name": row[7] if len(row) > 7 else "",
+                            "order_type": row[2] if row[2] else "",
+                            "order_type_name": row[3] if row[3] else "",
+                            "status_type_name": row[4] if row[4] else "",
+                            "work_status": row[5] if row[5] else "",
+                            "close_status_name": row[6] if row[6] else "",
+                            "customer_name": row[7] if row[7] else "",
+                            "vin_number": row[8] if row[8] else "",
                         },
                         "message": "查询成功",
                     }
@@ -101,7 +103,7 @@ class EhcfService:
 
                     # tb_workfixitemdetail
                     await cur.execute(
-                        "SELECT Id, OrderDetailId FROM tb_workfixitemdetail WHERE WorkOrderId=%s",
+                        "SELECT Id, NewOrderDetailId FROM tb_workfixitemdetail WHERE WorkOrderId=%s",
                         (workorder_id,),
                     )
                     for row in await cur.fetchall():
@@ -146,8 +148,10 @@ class EhcfService:
                     ]
 
                     for table, where_col in tables:
+                        # tb_workfixitemdetail 的字段名是 NewOrderDetailId
+                        detail_field = "NewOrderDetailId" if table == "tb_workfixitemdetail" else "OrderDetailId"
                         await cur.execute(
-                            f"SELECT Id, OrderDetailId FROM {table} WHERE {where_col}=%s",
+                            f"SELECT Id, {detail_field} FROM {table} WHERE {where_col}=%s",
                             (workorder_id,),
                         )
                         rows = await cur.fetchall()
@@ -156,7 +160,7 @@ class EhcfService:
                             old_detail_id = str(row[1]) if row[1] else ""
                             try:
                                 await cur.execute(
-                                    f"UPDATE {table} SET OrderDetailId=%s WHERE Id=%s",
+                                    f"UPDATE {table} SET {detail_field}=%s WHERE Id=%s",
                                     (new_oe_id, row_id),
                                 )
                                 results["updated"].append({
@@ -221,8 +225,10 @@ class EhcfService:
                         ("tb_workfixitemdetail", "WorkOrderId"),
                     ]
                     for table, where_col in detail_tables:
+                        # tb_workfixitemdetail 的字段名是 NewOrderDetailId
+                        detail_field = "NewOrderDetailId" if table == "tb_workfixitemdetail" else "OrderDetailId"
                         await cur.execute(
-                            f"SELECT Id, OrderDetailId FROM {table} WHERE {where_col}=%s",
+                            f"SELECT Id, {detail_field} FROM {table} WHERE {where_col}=%s",
                             (workorder_id,),
                         )
                         rows = await cur.fetchall()
@@ -231,7 +237,7 @@ class EhcfService:
                             old_detail_id = str(row[1]) if row[1] else ""
                             try:
                                 await cur.execute(
-                                    f"UPDATE {table} SET OrderDetailId=%s WHERE Id=%s",
+                                    f"UPDATE {table} SET {detail_field}=%s WHERE Id=%s",
                                     (new_oi_id, row_id),
                                 )
                                 results["updated"].append({
@@ -343,6 +349,192 @@ class EhcfService:
             },
             "results": results,
             "message": f"重新生成完成: 成功 {len(results['updated'])} 条, 失败 {len(results['failed'])} 条",
+        }
+
+    async def query_workorder_status(self, workorder_nos: list[str]) -> dict:
+        """查询工单状态信息"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("EHCF连接池不存在")
+
+        found_docs = []
+        not_found_docs = []
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    for wo in workorder_nos:
+                        await cur.execute(
+                            """SELECT a.Id, a.AppCode, a.Deleted, a.DeletedAt, a.DeletedById,
+                                      a.WorkStatus, a.CustomerName, a.OrderType,
+                                      fn_GetOrderTypeByCode(a.OrderType) AS OrderTypeName
+                               FROM tb_workorderinfo a
+                               WHERE (a.Id=%s OR a.AppCode=%s) LIMIT 1""",
+                            (wo, wo),
+                        )
+                        row = await cur.fetchone()
+                        if not row:
+                            not_found_docs.append(wo)
+                        else:
+                            found_docs.append({
+                                "id": str(row[0]) if row[0] else "",
+                                "app_code": str(row[1]) if row[1] else "",
+                                "deleted": row[2],
+                                "deleted_at": str(row[3]) if row[3] else "",
+                                "deleted_by_id": str(row[4]) if row[4] else "",
+                                "work_status": row[5] if row[5] is not None else "",
+                                "customer_name": str(row[6]) if row[6] else "",
+                                "order_type": str(row[7]) if row[7] else "",
+                                "order_type_name": str(row[8]) if row[8] else "",
+                            })
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        deleted_by_ids = [doc["deleted_by_id"] for doc in found_docs if doc["deleted_by_id"]]
+        user_map = {}
+        if deleted_by_ids:
+            try:
+                from app.services.user_service import user_service
+                user_map = await user_service.batch_get_by_user_center_ids(deleted_by_ids)
+            except Exception as e:
+                logger.warning(f"获取删除人信息失败: {e}")
+
+        unmatched_ids = [did for did in deleted_by_ids if did not in user_map]
+        if unmatched_ids:
+            try:
+                from app.services.user_service import user_service
+                local_map = await user_service.get_local_user_display_names(unmatched_ids)
+                for did, display_name in local_map.items():
+                    user_map[did] = {"user_name": display_name, "code": "", "user_center_user_id": did}
+            except Exception as e:
+                logger.warning(f"本库用户查询降级失败: {e}")
+
+        for doc in found_docs:
+            u = user_map.get(doc["deleted_by_id"], {})
+            doc["deleted_by_name"] = u.get("user_name", "")
+            doc["deleted_by_code"] = u.get("code", "")
+
+        return {
+            "success": len(not_found_docs) == 0,
+            "total_count": len(workorder_nos),
+            "found_count": len(found_docs),
+            "not_found_count": len(not_found_docs),
+            "found_docs": found_docs,
+            "not_found_docs": not_found_docs,
+            "message": f"找到 {len(found_docs)} 条，未找到 {len(not_found_docs)} 条",
+        }
+
+    async def delete_logical_workorder(self, workorder_ids: list[str], operator_id: str) -> tuple[int, list[str]]:
+        """批量逻辑删除工单（调用存储过程 proc_DeleteOrderInfo）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("EHCF连接池不存在")
+
+        success = 0
+        failed: list[str] = []
+        for wo_id in workorder_ids:
+            try:
+                if isinstance(pool, aiomysql.Pool):
+                    async with pool.acquire() as conn:
+                        async with conn.cursor() as cur:
+                            await cur.execute("CALL proc_DeleteOrderInfo(%s, %s)", (wo_id, operator_id))
+                else:
+                    raise ValueError("不支持的连接池类型")
+                success += 1
+            except Exception as e:
+                failed.append(wo_id)
+                logger.error(f"逻辑删除工单失败 {wo_id}: {e}")
+        return success, failed
+
+    async def restore_logical_workorder(self, workorder_id: str, operator_id: str) -> bool:
+        """恢复逻辑删除的工单（调用存储过程 proc_UnDeleteOrderInfo）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("EHCF连接池不存在")
+
+        from datetime import datetime
+
+        now = datetime.now()
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "CALL proc_UnDeleteOrderInfo(%s, %s, %s)",
+                        (workorder_id, operator_id, now),
+                    )
+                    return True
+        raise ValueError("不支持的连接池类型")
+
+    async def close_workorder_batch(self, workorder_ids: list[str]) -> tuple[int, list[str]]:
+        """批量关闭工单（修改 tb_workorderinfo 和 tb_workorderstatus 的 WorkStatus 为 10）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("EHCF连接池不存在")
+
+        success = 0
+        failed: list[str] = []
+        for wo_id in workorder_ids:
+            try:
+                if isinstance(pool, aiomysql.Pool):
+                    async with pool.acquire() as conn:
+                        async with conn.cursor() as cur:
+                            await cur.execute(
+                                "UPDATE tb_workorderinfo SET WorkStatus=10 WHERE Id=%s",
+                                (wo_id,),
+                            )
+                            await cur.execute(
+                                "UPDATE tb_workorderstatus SET WorkStatus=10 WHERE WorkOrderId=%s",
+                                (wo_id,),
+                            )
+                else:
+                    raise ValueError("不支持的连接池类型")
+                success += 1
+            except Exception as e:
+                failed.append(wo_id)
+                logger.error(f"关闭工单失败 {wo_id}: {e}")
+        return success, failed
+
+    async def fetch_workorder_ids_by_nos(self, workorder_nos: list[str]) -> dict:
+        """根据工单编码或Id获取对应的Id"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("EHCF连接池不存在")
+
+        found_docs = []
+        not_found_docs = []
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    for wo in workorder_nos:
+                        await cur.execute(
+                            "SELECT Id, AppCode FROM tb_workorderinfo WHERE Id=%s OR AppCode=%s LIMIT 1",
+                            (wo, wo),
+                        )
+                        row = await cur.fetchone()
+                        if not row:
+                            not_found_docs.append(wo)
+                        else:
+                            found_docs.append({
+                                "workorder_id": str(row[0]),
+                                "app_code": str(row[1]) if row[1] else "",
+                                "input": wo,
+                            })
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        return {
+            "success": len(not_found_docs) == 0,
+            "found_count": len(found_docs),
+            "not_found_count": len(not_found_docs),
+            "found_docs": found_docs,
+            "not_found_docs": not_found_docs,
+            "workorder_id_map": {doc["input"]: doc["workorder_id"] for doc in found_docs},
         }
 
 

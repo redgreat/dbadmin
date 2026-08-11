@@ -14,3 +14,29 @@ class FixDetailIdIn(BaseModel):
 class RegenerateOrderIn(BaseModel):
     """重新生成订单Id入参"""
     workorder_id: str = Field(..., description="工单Id")
+
+
+class WorkorderManageQueryIn(BaseModel):
+    """工单管理-查询状态入参"""
+    workorder_nos: list[str] = Field(default_factory=list, description="工单编码或Id列表")
+
+
+class WorkorderDeleteIn(BaseModel):
+    """工单逻辑删除入参"""
+    workorder_nos: list[str] = Field(default_factory=list, description="工单编码或Id列表")
+    operator_id: str = Field(..., description="操作人Id（GUID格式）")
+    remark: str = Field(default="", description="运维备注")
+
+
+class WorkorderRestoreIn(BaseModel):
+    """工单逻辑删除恢复入参"""
+    workorder_no: str = Field(..., description="工单编码或Id")
+    operator_id: str = Field(..., description="操作人Id（GUID格式）")
+    remark: str = Field(default="", description="运维备注")
+
+
+class WorkorderCloseIn(BaseModel):
+    """工单关闭入参"""
+    workorder_nos: list[str] = Field(default_factory=list, description="工单编码或Id列表")
+    operator_id: str = Field(..., description="操作人Id（GUID格式）")
+    remark: str = Field(default="", description="运维备注")

@@ -20,6 +20,7 @@
           <n-descriptions label-placement="left" :column="2" bordered>
             <n-descriptions-item label="工单编码">{{ workorder.app_code }}</n-descriptions-item>
             <n-descriptions-item label="工单Id">{{ workorder.id }}</n-descriptions-item>
+            <n-descriptions-item label="VIN码">{{ workorder.vin_number || '-' }}</n-descriptions-item>
             <n-descriptions-item label="订单类型">{{ workorder.order_type_name }}</n-descriptions-item>
             <n-descriptions-item label="状态类型">{{ workorder.status_type_name }}</n-descriptions-item>
             <n-descriptions-item label="工单状态">{{ workorder.work_status }}</n-descriptions-item>

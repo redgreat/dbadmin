@@ -176,4 +176,9 @@ export default {
   queryEhcfDetails: (data = {}) => request.post('/ehcf/order-regenerate/query_details', data),
   fixEhcfDetailId: (data = {}) => request.post('/ehcf/order-regenerate/fix_detail', data),
   regenerateEhcfOrderId: (data = {}) => request.post('/ehcf/order-regenerate/regenerate_order', data),
+  // ehcf - 工单管理（逻辑删除/恢复/关闭）
+  queryEhcfWorkorderStatus: (data = {}) => request.post('/ehcf/workorder-manage/query_status', data),
+  deleteEhcfWorkorderLogical: (data = {}) => request.post('/ehcf/workorder-manage/delete_logical', data),
+  restoreEhcfWorkorderLogical: (data = {}) => request.post('/ehcf/workorder-manage/restore_logical', data),
+  closeEhcfWorkorder: (data = {}) => request.post('/ehcf/workorder-manage/close', data),
 }
