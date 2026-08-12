@@ -459,15 +459,12 @@ class EhcfService:
         if pool is None:
             raise ValueError("EHCF连接池不存在")
 
-        from datetime import datetime
-
-        now = datetime.now()
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute(
-                        "CALL proc_UnDeleteOrderInfo(%s, %s, %s)",
-                        (workorder_id, operator_id, now),
+                        "CALL proc_UnDeleteOrderInfo(%s, %s)",
+                        (workorder_id, operator_id),
                     )
                     return True
         raise ValueError("不支持的连接池类型")
@@ -517,7 +514,7 @@ class EhcfService:
                 async with conn.cursor() as cur:
                     for wo in workorder_nos:
                         await cur.execute(
-                            """SELECT a.Id, a.AppCode, a.OrderType,
+                            """SELECT a.Id, a.AppCode, a.OrderType, a.Deleted,
                                       fn_GetOrderTypeByCode(a.OrderType) AS OrderTypeName
                                FROM tb_workorderinfo a
                                WHERE (a.Id=%s OR a.AppCode=%s)""",
@@ -532,7 +529,8 @@ class EhcfService:
                                 "workorder_id": str(row[0]),
                                 "app_code": str(row[1]) if row[1] else "",
                                 "order_type": str(row[2]) if row[2] else "",
-                                "order_type_name": str(row[3]) if row[3] else "",
+                                "deleted": row[3],
+                                "order_type_name": str(row[4]) if row[4] else "",
                                 "input": wo,
                             })
         else:

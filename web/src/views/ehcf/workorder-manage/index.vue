@@ -350,8 +350,12 @@ const formatMultiDocs = (multiDocs) =>
     })
     .join('\n\n')
 
-// 不全部删除时，让用户输入具体工单Id
-const askSpecificWorkorderIds = (allIds) =>
+// 不全部处理时，让用户输入具体工单Id
+const askSpecificWorkorderIds = ({
+  allIds = [],
+  title = '请输入工单Id',
+  placeholder = '输入具体工单Id，逗号分隔',
+} = {}) =>
   new Promise((resolve) => {
     let settled = false
     const settle = (v) => {
@@ -362,7 +366,7 @@ const askSpecificWorkorderIds = (allIds) =>
     }
     const inputValue = ref(allIds.join(','))
     const dialog = window.$dialog.warning({
-      title: '请输入要删除的工单Id',
+      title,
       content: () =>
         h(NInput, {
           value: inputValue.value,
@@ -371,9 +375,9 @@ const askSpecificWorkorderIds = (allIds) =>
           },
           type: 'textarea',
           autosize: { minRows: 3, maxRows: 6 },
-          placeholder: '输入要删除的具体工单Id，逗号分隔',
+          placeholder,
         }),
-      positiveText: '确认删除',
+      positiveText: '确认',
       negativeText: '取消',
       onPositiveClick: () => {
         const ids = parseIds(inputValue.value)
@@ -394,9 +398,18 @@ const askSpecificWorkorderIds = (allIds) =>
     })
   })
 
-// 同一编码对应多条工单时，确认是否全部删除
-const confirmMultiDelete = (data) =>
+// 同一编码对应多条工单时，确认处理范围（全部/指定/取消）
+const confirmMultiAction = (data, options = {}) =>
   new Promise((resolve) => {
+    const {
+      title = '存在多条工单记录，请确认处理范围',
+      prompt = '是否全部处理？如不全部处理，请点击「指定处理」并输入具体工单Id。',
+      allLabel = '全部处理',
+      allPayload = { all: true },
+      specificLabel = '指定处理',
+      specificTitle = '请输入工单Id',
+      specificPlaceholder = '输入具体工单Id，逗号分隔',
+    } = options
     let settled = false
     const settle = (v) => {
       if (!settled) {
@@ -405,10 +418,8 @@ const confirmMultiDelete = (data) =>
       }
     }
     const dialog = window.$dialog.warning({
-      title: '存在多条工单记录，请确认删除范围',
-      content: `${formatMultiDocs(
-        data.multi_docs
-      )}\n\n是否全部删除？如不全部删除，请点击「指定删除」并输入具体工单Id。`,
+      title,
+      content: `${formatMultiDocs(data.multi_docs)}\n\n${prompt}`,
       action: () =>
         h(
           NSpace,
@@ -430,10 +441,14 @@ const confirmMultiDelete = (data) =>
                 {
                   onClick: () => {
                     dialog.destroy()
-                    askSpecificWorkorderIds(data.all_ids || []).then(settle)
+                    askSpecificWorkorderIds({
+                      allIds: data.all_ids || [],
+                      title: specificTitle,
+                      placeholder: specificPlaceholder,
+                    }).then(settle)
                   },
                 },
-                { default: () => '指定删除' }
+                { default: () => specificLabel }
               ),
               h(
                 NButton,
@@ -441,10 +456,10 @@ const confirmMultiDelete = (data) =>
                   type: 'primary',
                   onClick: () => {
                     dialog.destroy()
-                    settle({ delete_all: true })
+                    settle(allPayload)
                   },
                 },
-                { default: () => '全部删除' }
+                { default: () => allLabel }
               ),
             ],
           }
@@ -467,7 +482,7 @@ const handleDeleteExecute = async () => {
   const confirmed = await new Promise((resolve) => {
     const dialog = window.$dialog.warning({
       title: '确认逻辑删除',
-      content: `确定要逻辑删除 ${ids.length} 个工单吗？`,
+      content: '确定要逻辑删除这些工单吗？',
       positiveText: '确认',
       negativeText: '取消',
       onPositiveClick: () => resolve(true),
@@ -486,7 +501,15 @@ const handleDeleteExecute = async () => {
     }
     if (res.data?.need_confirm) {
       // 存在一对多工单，需要用户确认是否全部删除
-      const choice = await confirmMultiDelete(res.data)
+      const choice = await confirmMultiAction(res.data, {
+        title: '存在多条工单记录，请确认删除范围',
+        prompt: '是否全部删除？如不全部删除，请点击「指定删除」并输入具体工单Id。',
+        allLabel: '全部删除',
+        allPayload: { delete_all: true },
+        specificLabel: '指定删除',
+        specificTitle: '请输入要删除的工单Id',
+        specificPlaceholder: '输入要删除的具体工单Id，逗号分隔',
+      })
       if (!choice) return
       const res2 = await api.deleteEhcfWorkorderLogical({ ...basePayload, ...choice })
       handleDeleteResult(res2)
@@ -532,24 +555,54 @@ const handleRestoreQuery = async () => {
   }
 }
 
+const handleRestoreResult = (res) => {
+  if (res.code === 200 || res.code === 0) {
+    const { restored = false } = res.data || {}
+    if (restored) {
+      message.success(res.msg || '逻辑删除恢复成功')
+    } else {
+      message.warning(res.msg || '工单无需恢复')
+    }
+  } else {
+    message.error(res.msg || '逻辑删除恢复失败')
+  }
+}
+
 const handleRestoreExecute = async () => {
   await restoreFormRef.value?.validate()
+  const workorderNo = String(restoreForm.value.workorderNo).trim()
+  const operatorId = String(restoreForm.value.operatorId).trim()
+  if (!operatorId) {
+    message.warning('请选择操作人')
+    return
+  }
+  const remark = String(restoreForm.value.remark || '').trim()
+
   restoreExecuting.value = true
   try {
-    const workorderNo = String(restoreForm.value.workorderNo).trim()
-    const operatorId = String(restoreForm.value.operatorId).trim()
-    const remark = String(restoreForm.value.remark || '').trim()
-    const res = await api.restoreEhcfWorkorderLogical({ workorder_no: workorderNo, operator_id: operatorId, remark })
-    if (res.code === 200 || res.code === 0) {
-      const { restored = false } = res.data || {}
-      if (restored) {
-        message.success(res.msg || '逻辑删除恢复成功')
-      } else {
-        message.warning(res.msg || '工单无需恢复')
-      }
-    } else {
+    const basePayload = { workorder_no: workorderNo, operator_id: operatorId, remark }
+    const res = await api.restoreEhcfWorkorderLogical(basePayload)
+    if (res.code !== 200 && res.code !== 0) {
       message.error(res.msg || '逻辑删除恢复失败')
+      return
     }
+    if (res.data?.need_confirm) {
+      // 同一编码对应多条已删除工单，需要用户确认是否全部恢复
+      const choice = await confirmMultiAction(res.data, {
+        title: '存在多条已删除工单，请确认恢复范围',
+        prompt: '是否全部恢复？如不全部恢复，请点击「指定恢复」并输入具体工单Id。',
+        allLabel: '全部恢复',
+        allPayload: { restore_all: true },
+        specificLabel: '指定恢复',
+        specificTitle: '请输入要恢复的工单Id',
+        specificPlaceholder: '输入要恢复的具体工单Id，逗号分隔',
+      })
+      if (!choice) return
+      const res2 = await api.restoreEhcfWorkorderLogical({ ...basePayload, ...choice })
+      handleRestoreResult(res2)
+      return
+    }
+    handleRestoreResult(res)
   } catch (e) {
     message.error('请求异常')
   } finally {
@@ -590,6 +643,19 @@ const handleCloseQuery = async () => {
   }
 }
 
+const handleCloseResult = (res) => {
+  if (res.code === 200 || res.code === 0) {
+    const { success_count = 0, failed_ids = [] } = res.data || {}
+    if (failed_ids.length > 0) {
+      message.warning(res.msg || `关闭完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`)
+    } else {
+      message.success(res.msg || `关闭成功：${success_count} 条`)
+    }
+  } else {
+    message.error(res.msg || '关闭失败')
+  }
+}
+
 const handleCloseExecute = async () => {
   await closeFormRef.value?.validate()
   const ids = parseIds(closeForm.value.workorderNos)
@@ -598,7 +664,7 @@ const handleCloseExecute = async () => {
   const confirmed = await new Promise((resolve) => {
     const dialog = window.$dialog.warning({
       title: '确认关闭工单',
-      content: `确定要关闭 ${ids.length} 个工单吗？将设置 WorkStatus=10`,
+      content: '确定要关闭这些工单吗？将设置 WorkStatus=10',
       positiveText: '确认',
       negativeText: '取消',
       onPositiveClick: () => resolve(true),
@@ -609,17 +675,29 @@ const handleCloseExecute = async () => {
 
   closeExecuting.value = true
   try {
-    const res = await api.closeEhcfWorkorder({ workorder_nos: ids, operator_id: '', remark })
-    if (res.code === 200 || res.code === 0) {
-      const { success_count = 0, failed_ids = [] } = res.data || {}
-      if (failed_ids.length > 0) {
-        message.warning(res.msg || `关闭完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`)
-      } else {
-        message.success(res.msg || `关闭成功：${success_count} 条`)
-      }
-    } else {
+    const basePayload = { workorder_nos: ids, operator_id: '', remark }
+    const res = await api.closeEhcfWorkorder(basePayload)
+    if (res.code !== 200 && res.code !== 0) {
       message.error(res.msg || '关闭失败')
+      return
     }
+    if (res.data?.need_confirm) {
+      // 同一编码对应多条工单，需要用户确认是否全部关闭
+      const choice = await confirmMultiAction(res.data, {
+        title: '存在多条工单记录，请确认关闭范围',
+        prompt: '是否全部关闭？如不全部关闭，请点击「指定关闭」并输入具体工单Id。',
+        allLabel: '全部关闭',
+        allPayload: { close_all: true },
+        specificLabel: '指定关闭',
+        specificTitle: '请输入要关闭的工单Id',
+        specificPlaceholder: '输入要关闭的具体工单Id，逗号分隔',
+      })
+      if (!choice) return
+      const res2 = await api.closeEhcfWorkorder({ ...basePayload, ...choice })
+      handleCloseResult(res2)
+      return
+    }
+    handleCloseResult(res)
   } catch (e) {
     message.error('请求异常')
   } finally {

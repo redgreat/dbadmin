@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _group_multi_docs(found_docs: list[dict]) -> tuple[list[dict], list[str]]:
+    """按输入编码分组，返回一对多的分组列表和全部工单Id"""
+    grouped: dict[str, list[dict]] = {}
+    for doc in found_docs:
+        grouped.setdefault(doc["input"], []).append(doc)
+    multi_docs = [{"input": k, "docs": v} for k, v in grouped.items() if len(v) > 1]
+    all_ids = list(dict.fromkeys(str(doc["workorder_id"]) for doc in found_docs))
+    return multi_docs, all_ids
+
+
 @router.post("/workorder-manage/query_status", summary="查询工单状态")
 async def query_workorder_status(body: WorkorderManageQueryIn):
     """查询工单删除状态、工作状态等信息"""
@@ -51,11 +61,7 @@ async def delete_logical_workorder(req: Request, body: WorkorderDeleteIn):
             return Success(msg=f"未找到对应工单: {', '.join(not_found_nos)}", data={"success_count": 0, "failed_ids": not_found_nos})
 
         # 按输入编码分组，识别一对多的工单
-        grouped: dict[str, list[dict]] = {}
-        for doc in found_docs:
-            grouped.setdefault(doc["input"], []).append(doc)
-        multi_docs = [{"input": k, "docs": v} for k, v in grouped.items() if len(v) > 1]
-        all_ids = list(dict.fromkeys(str(doc["workorder_id"]) for doc in found_docs))
+        multi_docs, all_ids = _group_multi_docs(found_docs)
 
         if body.workorder_ids:
             # 用户指定了具体工单Id（不全部删除）
@@ -125,16 +131,47 @@ async def restore_logical_workorder(req: Request, body: WorkorderRestoreIn):
         if not workorder_no:
             return Fail(code=400, msg="工单编码或Id不能为空")
 
-        # 先查询工单Id
+        # 先查询工单Id（同一编码可能对应多条已删除工单）
         id_result = await ehcf_service.fetch_workorder_ids_by_nos([workorder_no])
-        id_map = id_result.get("workorder_id_map", {})
-        if not id_map:
+        found_docs = id_result.get("found_docs", [])
+        if not found_docs:
             return Success(msg=f"未找到工单 {workorder_no}", data={"restored": False})
 
-        workorder_id = id_map[workorder_no]
+        # 只处理已删除的记录
+        deleted_docs = [doc for doc in found_docs if doc.get("deleted")]
+        if not deleted_docs:
+            return Success(msg="该工单无需恢复（无已删除记录）", data={"restored": False})
+
+        multi_docs, all_ids = _group_multi_docs(deleted_docs)
+
+        if body.workorder_ids:
+            # 用户指定了具体工单Id（不全部恢复）
+            valid_ids = set(all_ids)
+            invalid_ids = [wid for wid in body.workorder_ids if wid not in valid_ids]
+            if invalid_ids:
+                return Fail(code=400, msg=f"以下工单Id不在本次查询结果中: {', '.join(invalid_ids)}")
+            workorder_ids = list(dict.fromkeys(body.workorder_ids))
+        elif body.restore_all:
+            # 确认全部恢复
+            workorder_ids = all_ids
+        elif multi_docs:
+            # 同一编码对应多条已删除工单，需要前端弹窗确认恢复范围
+            return Success(
+                msg="该工单编码对应多条已删除工单，请确认是否全部恢复",
+                data={
+                    "need_confirm": True,
+                    "multi_docs": multi_docs,
+                    "all_ids": all_ids,
+                },
+            )
+        else:
+            workorder_ids = all_ids
 
         try:
-            await ehcf_service.restore_logical_workorder(workorder_id, body.operator_id)
+            restored_ids: list[str] = []
+            for wo_id in workorder_ids:
+                await ehcf_service.restore_logical_workorder(wo_id, body.operator_id)
+                restored_ids.append(wo_id)
         except Exception as e:
             logger.error(f"恢复失败: {e}")
             return Fail(code=500, msg=f"执行失败: {e!s}")
@@ -160,12 +197,15 @@ async def restore_logical_workorder(req: Request, body: WorkorderRestoreIn):
                 path="/api/v1/ehcf/workorder-manage/restore_logical",
                 status=200,
                 request_body=body.model_dump(mode="json"),
-                response_body={"workorder_no": workorder_no, "restored": True},
+                response_body={"workorder_no": workorder_no, "restored_ids": restored_ids},
             )
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")
 
-        return Success(msg="恢复成功", data={"workorder_no": workorder_no, "restored": True})
+        return Success(
+            msg=f"恢复成功: {len(restored_ids)} 条",
+            data={"workorder_no": workorder_no, "restored": True, "restored_ids": restored_ids},
+        )
     except Exception as e:
         logger.error(f"工单恢复失败: {e}")
         return Fail(code=500, msg=f"恢复失败: {e!s}")
@@ -179,15 +219,40 @@ async def close_workorder(req: Request, body: WorkorderCloseIn):
         if not workorder_nos:
             return Fail(code=400, msg="工单编码或Id不能为空")
 
-        # 先查询工单Id
+        # 先查询工单Id（同一编码可能对应多条工单，如加装/检修）
         id_result = await ehcf_service.fetch_workorder_ids_by_nos(workorder_nos)
-        id_map = id_result.get("workorder_id_map", {})
+        found_docs = id_result.get("found_docs", [])
         not_found_nos = id_result.get("not_found_docs", [])
 
-        if not id_map:
+        if not found_docs:
             return Success(msg=f"未找到对应工单: {', '.join(not_found_nos)}", data={"success_count": 0, "failed_ids": not_found_nos})
 
-        workorder_ids = list(id_map.values())
+        # 按输入编码分组，识别一对多的工单
+        multi_docs, all_ids = _group_multi_docs(found_docs)
+
+        if body.workorder_ids:
+            # 用户指定了具体工单Id（不全部关闭）
+            valid_ids = set(all_ids)
+            invalid_ids = [wid for wid in body.workorder_ids if wid not in valid_ids]
+            if invalid_ids:
+                return Fail(code=400, msg=f"以下工单Id不在本次查询结果中: {', '.join(invalid_ids)}")
+            workorder_ids = list(dict.fromkeys(body.workorder_ids))
+        elif body.close_all:
+            # 确认全部关闭
+            workorder_ids = all_ids
+        elif multi_docs:
+            # 同一编码对应多条工单，需要前端弹窗确认关闭范围
+            return Success(
+                msg="存在工单编码对应多条记录，请确认是否全部关闭",
+                data={
+                    "need_confirm": True,
+                    "multi_docs": multi_docs,
+                    "all_ids": all_ids,
+                },
+            )
+        else:
+            workorder_ids = all_ids
+
         success_count, failed_ids = await ehcf_service.close_workorder_batch(workorder_ids)
 
         try:

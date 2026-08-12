@@ -37,6 +37,8 @@ class WorkorderRestoreIn(BaseModel):
     workorder_no: str = Field(..., description="工单编码或Id")
     operator_id: str = Field(..., description="操作人Id（GUID格式）")
     remark: str = Field(default="", description="运维备注")
+    workorder_ids: list[str] = Field(default_factory=list, description="指定恢复的工单Id列表（同一编码对应多条已删除记录且不全部恢复时必填）")
+    restore_all: bool = Field(default=False, description="是否全部恢复（同一编码对应多条已删除记录时，确认全部恢复传True）")
 
 
 class WorkorderCloseIn(BaseModel):
@@ -44,3 +46,5 @@ class WorkorderCloseIn(BaseModel):
     workorder_nos: list[str] = Field(default_factory=list, description="工单编码或Id列表")
     operator_id: str = Field(..., description="操作人Id（GUID格式）")
     remark: str = Field(default="", description="运维备注")
+    workorder_ids: list[str] = Field(default_factory=list, description="指定关闭的工单Id列表（同一编码对应多条记录且不全部关闭时必填）")
+    close_all: bool = Field(default=False, description="是否全部关闭（同一编码对应多条记录时，确认全部关闭传True）")
