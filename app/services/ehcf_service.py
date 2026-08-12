@@ -433,7 +433,7 @@ class EhcfService:
         remark: str = "",
         person_name: str = "",
         person_code: str = "",
-    ) -> tuple[int, list[str]]:
+    ) -> tuple[int, list[str], list[str]]:
         """批量逻辑删除工单（调用存储过程 proc_DeleteOrderInfo，并写入 tb_remarkinfo 备注）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
@@ -442,6 +442,7 @@ class EhcfService:
 
         success = 0
         failed: list[str] = []
+        remark_failed: list[str] = []
         for wo_id in workorder_ids:
             try:
                 if isinstance(pool, aiomysql.Pool):
@@ -454,11 +455,12 @@ class EhcfService:
                             try:
                                 await cur.execute(
                                     """INSERT INTO tb_remarkinfo
-                                           (Type, Remark, PersonCode, PersonName, WorkOrderId, RemarkTime)
+                                           (Type, Remark, RemarkPersonCode, RemarkPersonName, WorkOrderId, RemarkTime)
                                        VALUES (5, %s, %s, %s, %s, NOW())""",
                                     (remark or "", person_code or "", person_name or "", wo_id),
                                 )
                             except Exception as insert_e:
+                                remark_failed.append(wo_id)
                                 logger.warning(f"逻辑删除工单 {wo_id} 写入备注失败: {insert_e}")
                 else:
                     raise ValueError("不支持的连接池类型")
@@ -466,7 +468,7 @@ class EhcfService:
             except Exception as e:
                 failed.append(wo_id)
                 logger.error(f"逻辑删除工单失败 {wo_id}: {e}")
-        return success, failed
+        return success, failed, remark_failed
 
     async def restore_logical_workorder(self, workorder_id: str, operator_id: str) -> bool:
         """恢复逻辑删除的工单（调用存储过程 proc_UnDeleteOrderInfo）"""

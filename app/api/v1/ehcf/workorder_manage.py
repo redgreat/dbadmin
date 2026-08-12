@@ -103,7 +103,7 @@ async def delete_logical_workorder(req: Request, body: WorkorderDeleteIn):
         except Exception as e:
             logger.warning(f"获取操作人信息失败: {e}")
 
-        success_count, failed_ids = await ehcf_service.delete_logical_workorder(
+        success_count, failed_ids, remark_failed_ids = await ehcf_service.delete_logical_workorder(
             workorder_ids,
             body.operator_id,
             body.remark,
@@ -132,14 +132,25 @@ async def delete_logical_workorder(req: Request, body: WorkorderDeleteIn):
                 path="/api/v1/ehcf/workorder-manage/delete_logical",
                 status=200,
                 request_body=body.model_dump(mode="json"),
-                response_body={"success_count": success_count, "failed_ids": failed_ids},
+                response_body={
+                    "success_count": success_count,
+                    "failed_ids": failed_ids,
+                    "remark_failed_ids": remark_failed_ids,
+                },
             )
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")
 
+        msg = f"删除完成: 成功 {success_count} 条" + (f", 失败 {len(failed_ids)} 条" if failed_ids else "")
+        if remark_failed_ids:
+            msg += f", 备注写入失败 {len(remark_failed_ids)} 条: {', '.join(remark_failed_ids)}"
         return Success(
-            msg=f"删除完成: 成功 {success_count} 条" + (f", 失败 {len(failed_ids)} 条" if failed_ids else ""),
-            data={"success_count": success_count, "failed_ids": failed_ids},
+            msg=msg,
+            data={
+                "success_count": success_count,
+                "failed_ids": failed_ids,
+                "remark_failed_ids": remark_failed_ids,
+            },
         )
     except Exception as e:
         logger.error(f"工单逻辑删除失败: {e}")

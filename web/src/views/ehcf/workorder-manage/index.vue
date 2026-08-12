@@ -324,8 +324,15 @@ const handleDeleteQuery = async () => {
 
 const handleDeleteResult = (res) => {
   if (res.code === 200 || res.code === 0) {
-    const { success_count = 0, failed_ids = [] } = res.data || {}
-    if (failed_ids.length > 0) {
+    const { success_count = 0, failed_ids = [], remark_failed_ids = [] } = res.data || {}
+    if (remark_failed_ids.length > 0) {
+      message.warning(
+        res.msg ||
+          `删除成功 ${success_count} 条，但备注写入失败 ${
+            remark_failed_ids.length
+          } 条：${remark_failed_ids.join(', ')}`
+      )
+    } else if (failed_ids.length > 0) {
       message.warning(
         res.msg || `逻辑删除完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`
       )
