@@ -86,7 +86,30 @@ async def delete_logical_workorder(req: Request, body: WorkorderDeleteIn):
         else:
             workorder_ids = all_ids
 
-        success_count, failed_ids = await ehcf_service.delete_logical_workorder(workorder_ids, body.operator_id)
+        # 从用户中心获取操作人姓名/编码（用于写入 tb_remarkinfo）
+        person_name = ""
+        person_code = ""
+        try:
+            from app.services.user_service import user_service
+            user_map = await user_service.batch_get_by_user_center_ids([body.operator_id])
+            user_info = user_map.get(body.operator_id)
+            if user_info:
+                person_name = user_info.get("user_name", "")
+                person_code = user_info.get("code", "")
+            else:
+                # 降级：用户中心查不到时尝试本库用户
+                local_map = await user_service.get_local_user_display_names([body.operator_id])
+                person_name = local_map.get(body.operator_id, "")
+        except Exception as e:
+            logger.warning(f"获取操作人信息失败: {e}")
+
+        success_count, failed_ids = await ehcf_service.delete_logical_workorder(
+            workorder_ids,
+            body.operator_id,
+            body.remark,
+            person_name,
+            person_code,
+        )
 
         try:
             token = req.headers.get("token")

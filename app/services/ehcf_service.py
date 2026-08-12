@@ -426,8 +426,15 @@ class EhcfService:
             "message": f"找到 {len(found_docs)} 条，未找到 {len(not_found_docs)} 条",
         }
 
-    async def delete_logical_workorder(self, workorder_ids: list[str], operator_id: str) -> tuple[int, list[str]]:
-        """批量逻辑删除工单（调用存储过程 proc_DeleteOrderInfo）"""
+    async def delete_logical_workorder(
+        self,
+        workorder_ids: list[str],
+        operator_id: str,
+        remark: str = "",
+        person_name: str = "",
+        person_code: str = "",
+    ) -> tuple[int, list[str]]:
+        """批量逻辑删除工单（调用存储过程 proc_DeleteOrderInfo，并写入 tb_remarkinfo 备注）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -444,6 +451,15 @@ class EhcfService:
                                 "CALL proc_DeleteOrderInfo(%s, %s, NOW())",
                                 (wo_id, operator_id),
                             )
+                            try:
+                                await cur.execute(
+                                    """INSERT INTO tb_remarkinfo
+                                           (Type, Remark, PersonCode, PersonName, WorkOrderId, RemarkTime)
+                                       VALUES (5, %s, %s, %s, %s, NOW())""",
+                                    (remark or "", person_code or "", person_name or "", wo_id),
+                                )
+                            except Exception as insert_e:
+                                logger.warning(f"逻辑删除工单 {wo_id} 写入备注失败: {insert_e}")
                 else:
                     raise ValueError("不支持的连接池类型")
                 success += 1
