@@ -42,15 +42,44 @@ async def delete_logical_workorder(req: Request, body: WorkorderDeleteIn):
         if not workorder_nos:
             return Fail(code=400, msg="工单编码或Id不能为空")
 
-        # 先查询工单Id
+        # 先查询工单Id（同一编码可能对应多条工单，如加装/检修）
         id_result = await ehcf_service.fetch_workorder_ids_by_nos(workorder_nos)
-        id_map = id_result.get("workorder_id_map", {})
+        found_docs = id_result.get("found_docs", [])
         not_found_nos = id_result.get("not_found_docs", [])
 
-        if not id_map:
+        if not found_docs:
             return Success(msg=f"未找到对应工单: {', '.join(not_found_nos)}", data={"success_count": 0, "failed_ids": not_found_nos})
 
-        workorder_ids = list(id_map.values())
+        # 按输入编码分组，识别一对多的工单
+        grouped: dict[str, list[dict]] = {}
+        for doc in found_docs:
+            grouped.setdefault(doc["input"], []).append(doc)
+        multi_docs = [{"input": k, "docs": v} for k, v in grouped.items() if len(v) > 1]
+        all_ids = list(dict.fromkeys(str(doc["workorder_id"]) for doc in found_docs))
+
+        if body.workorder_ids:
+            # 用户指定了具体工单Id（不全部删除）
+            valid_ids = set(all_ids)
+            invalid_ids = [wid for wid in body.workorder_ids if wid not in valid_ids]
+            if invalid_ids:
+                return Fail(code=400, msg=f"以下工单Id不在本次查询结果中: {', '.join(invalid_ids)}")
+            workorder_ids = list(dict.fromkeys(body.workorder_ids))
+        elif body.delete_all:
+            # 确认全部删除
+            workorder_ids = all_ids
+        elif multi_docs:
+            # 同一编码对应多条工单，需要前端弹窗确认删除范围
+            return Success(
+                msg="存在工单编码对应多条记录，请确认是否全部删除",
+                data={
+                    "need_confirm": True,
+                    "multi_docs": multi_docs,
+                    "all_ids": all_ids,
+                },
+            )
+        else:
+            workorder_ids = all_ids
+
         success_count, failed_ids = await ehcf_service.delete_logical_workorder(workorder_ids, body.operator_id)
 
         try:

@@ -370,13 +370,14 @@ class EhcfService:
                                       a.WorkStatus, a.CustomerName, a.OrderType,
                                       fn_GetOrderTypeByCode(a.OrderType) AS OrderTypeName
                                FROM tb_workorderinfo a
-                               WHERE (a.Id=%s OR a.AppCode=%s) LIMIT 1""",
+                               WHERE (a.Id=%s OR a.AppCode=%s)""",
                             (wo, wo),
                         )
-                        row = await cur.fetchone()
-                        if not row:
+                        rows = await cur.fetchall()
+                        if not rows:
                             not_found_docs.append(wo)
-                        else:
+                            continue
+                        for row in rows:
                             found_docs.append({
                                 "id": str(row[0]) if row[0] else "",
                                 "app_code": str(row[1]) if row[1] else "",
@@ -439,7 +440,10 @@ class EhcfService:
                 if isinstance(pool, aiomysql.Pool):
                     async with pool.acquire() as conn:
                         async with conn.cursor() as cur:
-                            await cur.execute("CALL proc_DeleteOrderInfo(%s, %s)", (wo_id, operator_id))
+                            await cur.execute(
+                                "CALL proc_DeleteOrderInfo(%s, %s, NOW())",
+                                (wo_id, operator_id),
+                            )
                 else:
                     raise ValueError("不支持的连接池类型")
                 success += 1
@@ -499,7 +503,7 @@ class EhcfService:
         return success, failed
 
     async def fetch_workorder_ids_by_nos(self, workorder_nos: list[str]) -> dict:
-        """根据工单编码或Id获取对应的Id"""
+        """根据工单编码或Id获取对应的Id（同一编码可能对应多条工单，如加装/检修）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -513,20 +517,30 @@ class EhcfService:
                 async with conn.cursor() as cur:
                     for wo in workorder_nos:
                         await cur.execute(
-                            "SELECT Id, AppCode FROM tb_workorderinfo WHERE Id=%s OR AppCode=%s LIMIT 1",
+                            """SELECT a.Id, a.AppCode, a.OrderType,
+                                      fn_GetOrderTypeByCode(a.OrderType) AS OrderTypeName
+                               FROM tb_workorderinfo a
+                               WHERE (a.Id=%s OR a.AppCode=%s)""",
                             (wo, wo),
                         )
-                        row = await cur.fetchone()
-                        if not row:
+                        rows = await cur.fetchall()
+                        if not rows:
                             not_found_docs.append(wo)
-                        else:
+                            continue
+                        for row in rows:
                             found_docs.append({
                                 "workorder_id": str(row[0]),
                                 "app_code": str(row[1]) if row[1] else "",
+                                "order_type": str(row[2]) if row[2] else "",
+                                "order_type_name": str(row[3]) if row[3] else "",
                                 "input": wo,
                             })
         else:
             raise ValueError("不支持的连接池类型")
+
+        workorder_id_map: dict[str, str] = {}
+        for doc in found_docs:
+            workorder_id_map.setdefault(doc["input"], doc["workorder_id"])
 
         return {
             "success": len(not_found_docs) == 0,
@@ -534,7 +548,7 @@ class EhcfService:
             "not_found_count": len(not_found_docs),
             "found_docs": found_docs,
             "not_found_docs": not_found_docs,
-            "workorder_id_map": {doc["input"]: doc["workorder_id"] for doc in found_docs},
+            "workorder_id_map": workorder_id_map,
         }
 
 

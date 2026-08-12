@@ -28,6 +28,8 @@ class WorkorderDeleteIn(BaseModel):
     workorder_nos: list[str] = Field(default_factory=list, description="工单编码或Id列表")
     operator_id: str = Field(..., description="操作人Id（GUID格式）")
     remark: str = Field(default="", description="运维备注")
+    workorder_ids: list[str] = Field(default_factory=list, description="指定删除的工单Id列表（同一编码对应多条记录且不全部删除时必填）")
+    delete_all: bool = Field(default=False, description="是否全部删除（同一编码对应多条记录时，确认全部删除传True）")
 
 
 class WorkorderRestoreIn(BaseModel):

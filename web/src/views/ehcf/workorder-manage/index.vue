@@ -42,6 +42,7 @@
             <tr>
               <th>工单Id</th>
               <th>工单编码</th>
+              <th>工单类型</th>
               <th>客户名称</th>
               <th>工单状态</th>
               <th>删除状态</th>
@@ -53,6 +54,7 @@
             <tr v-for="item in deleteQueryResult" :key="item.id">
               <td>{{ item.id }}</td>
               <td>{{ item.app_code }}</td>
+              <td>{{ item.order_type_name || item.order_type || '-' }}</td>
               <td>{{ item.customer_name || '-' }}</td>
               <td>{{ item.work_status }}</td>
               <td>
@@ -103,6 +105,7 @@
             <tr>
               <th>工单Id</th>
               <th>工单编码</th>
+              <th>工单类型</th>
               <th>客户名称</th>
               <th>工单状态</th>
               <th>删除状态</th>
@@ -114,6 +117,7 @@
             <tr v-for="item in restoreQueryResult" :key="item.id">
               <td>{{ item.id }}</td>
               <td>{{ item.app_code }}</td>
+              <td>{{ item.order_type_name || item.order_type || '-' }}</td>
               <td>{{ item.customer_name || '-' }}</td>
               <td>{{ item.work_status }}</td>
               <td>
@@ -157,6 +161,7 @@
             <tr>
               <th>工单Id</th>
               <th>工单编码</th>
+              <th>工单类型</th>
               <th>客户名称</th>
               <th>工单状态</th>
               <th>删除状态</th>
@@ -166,6 +171,7 @@
             <tr v-for="item in closeQueryResult" :key="item.id">
               <td>{{ item.id }}</td>
               <td>{{ item.app_code }}</td>
+              <td>{{ item.order_type_name || item.order_type || '-' }}</td>
               <td>{{ item.customer_name || '-' }}</td>
               <td>
                 <n-tag :type="item.work_status === 10 ? 'success' : 'default'" size="small">
@@ -186,10 +192,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { h, ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
-import { NCard, NSpace } from 'naive-ui'
+import { NCard, NButton, NInput, NSpace } from 'naive-ui'
 import api from '@/api'
 
 defineOptions({ name: '工单管理' })
@@ -316,6 +322,138 @@ const handleDeleteQuery = async () => {
   }
 }
 
+const handleDeleteResult = (res) => {
+  if (res.code === 200 || res.code === 0) {
+    const { success_count = 0, failed_ids = [] } = res.data || {}
+    if (failed_ids.length > 0) {
+      message.warning(
+        res.msg || `逻辑删除完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`
+      )
+    } else {
+      message.success(res.msg || `逻辑删除成功：${success_count} 条`)
+    }
+  } else {
+    message.error(res.msg || '逻辑删除失败')
+  }
+}
+
+const formatMultiDocs = (multiDocs) =>
+  (multiDocs || [])
+    .map((group) => {
+      const docLines = (group.docs || [])
+        .map(
+          (d) =>
+            `  · ${d.workorder_id || d.id}（${d.order_type_name || d.order_type || '未知类型'}）`
+        )
+        .join('\n')
+      return `工单编码 ${group.input} 对应 ${group.docs.length} 条工单记录：\n${docLines}`
+    })
+    .join('\n\n')
+
+// 不全部删除时，让用户输入具体工单Id
+const askSpecificWorkorderIds = (allIds) =>
+  new Promise((resolve) => {
+    let settled = false
+    const settle = (v) => {
+      if (!settled) {
+        settled = true
+        resolve(v)
+      }
+    }
+    const inputValue = ref(allIds.join(','))
+    const dialog = window.$dialog.warning({
+      title: '请输入要删除的工单Id',
+      content: () =>
+        h(NInput, {
+          value: inputValue.value,
+          'onUpdate:value': (v) => {
+            inputValue.value = v
+          },
+          type: 'textarea',
+          autosize: { minRows: 3, maxRows: 6 },
+          placeholder: '输入要删除的具体工单Id，逗号分隔',
+        }),
+      positiveText: '确认删除',
+      negativeText: '取消',
+      onPositiveClick: () => {
+        const ids = parseIds(inputValue.value)
+        if (!ids.length) {
+          message.warning('请输入至少一个工单Id')
+          settle(null)
+        } else {
+          settle({ workorder_ids: ids })
+        }
+        dialog.destroy()
+      },
+      onNegativeClick: () => {
+        settle(null)
+        dialog.destroy()
+      },
+      onClose: () => settle(null),
+      onMaskClick: () => settle(null),
+    })
+  })
+
+// 同一编码对应多条工单时，确认是否全部删除
+const confirmMultiDelete = (data) =>
+  new Promise((resolve) => {
+    let settled = false
+    const settle = (v) => {
+      if (!settled) {
+        settled = true
+        resolve(v)
+      }
+    }
+    const dialog = window.$dialog.warning({
+      title: '存在多条工单记录，请确认删除范围',
+      content: `${formatMultiDocs(
+        data.multi_docs
+      )}\n\n是否全部删除？如不全部删除，请点击「指定删除」并输入具体工单Id。`,
+      action: () =>
+        h(
+          NSpace,
+          { justify: 'end' },
+          {
+            default: () => [
+              h(
+                NButton,
+                {
+                  onClick: () => {
+                    dialog.destroy()
+                    settle(null)
+                  },
+                },
+                { default: () => '取消' }
+              ),
+              h(
+                NButton,
+                {
+                  onClick: () => {
+                    dialog.destroy()
+                    askSpecificWorkorderIds(data.all_ids || []).then(settle)
+                  },
+                },
+                { default: () => '指定删除' }
+              ),
+              h(
+                NButton,
+                {
+                  type: 'primary',
+                  onClick: () => {
+                    dialog.destroy()
+                    settle({ delete_all: true })
+                  },
+                },
+                { default: () => '全部删除' }
+              ),
+            ],
+          }
+        ),
+      onClose: () => settle(null),
+      onMaskClick: () => settle(null),
+    })
+  })
+
 const handleDeleteExecute = async () => {
   await deleteFormRef.value?.validate()
   const ids = parseIds(deleteForm.value.workorderNos)
@@ -340,17 +478,21 @@ const handleDeleteExecute = async () => {
 
   deleteExecuting.value = true
   try {
-    const res = await api.deleteEhcfWorkorderLogical({ workorder_nos: ids, operator_id: operatorId, remark })
-    if (res.code === 200 || res.code === 0) {
-      const { success_count = 0, failed_ids = [] } = res.data || {}
-      if (failed_ids.length > 0) {
-        message.warning(res.msg || `逻辑删除完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`)
-      } else {
-        message.success(res.msg || `逻辑删除成功：${success_count} 条`)
-      }
-    } else {
+    const basePayload = { workorder_nos: ids, operator_id: operatorId, remark }
+    const res = await api.deleteEhcfWorkorderLogical(basePayload)
+    if (res.code !== 200 && res.code !== 0) {
       message.error(res.msg || '逻辑删除失败')
+      return
     }
+    if (res.data?.need_confirm) {
+      // 存在一对多工单，需要用户确认是否全部删除
+      const choice = await confirmMultiDelete(res.data)
+      if (!choice) return
+      const res2 = await api.deleteEhcfWorkorderLogical({ ...basePayload, ...choice })
+      handleDeleteResult(res2)
+      return
+    }
+    handleDeleteResult(res)
   } catch (e) {
     message.error('请求异常')
   } finally {
