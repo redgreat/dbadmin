@@ -176,7 +176,15 @@ async def restore_logical_workorder(req: Request, body: WorkorderRestoreIn):
         if not deleted_docs:
             return Success(msg="该工单无需恢复（无已删除记录）", data={"restored": False})
 
-        multi_docs, all_ids = _group_multi_docs(deleted_docs)
+        # 验证删除人：只保留删除人与操作人一致的记录
+        matched_docs = [doc for doc in deleted_docs if doc.get("deleted_by_id") == body.operator_id]
+        if not matched_docs:
+            return Success(
+                msg=f"未找到由该操作人删除的工单 {workorder_no}，请确认操作人是否为实际删除人",
+                data={"restored": False},
+            )
+
+        multi_docs, all_ids = _group_multi_docs(matched_docs)
 
         if body.workorder_ids:
             # 用户指定了具体工单Id（不全部恢复）

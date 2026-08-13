@@ -533,7 +533,8 @@ class EhcfService:
                     for wo in workorder_nos:
                         await cur.execute(
                             """SELECT a.Id, a.AppCode, a.OrderType, a.Deleted,
-                                      fn_GetOrderTypeByCode(a.OrderType) AS OrderTypeName
+                                      fn_GetOrderTypeByCode(a.OrderType) AS OrderTypeName,
+                                      a.DeletedById
                                FROM tb_workorderinfo a
                                WHERE (a.Id=%s OR a.AppCode=%s)""",
                             (wo, wo),
@@ -549,6 +550,7 @@ class EhcfService:
                                 "order_type": str(row[2]) if row[2] else "",
                                 "deleted": row[3],
                                 "order_type_name": str(row[4]) if row[4] else "",
+                                "deleted_by_id": str(row[5]) if row[5] else "",
                                 "input": wo,
                             })
         else:
