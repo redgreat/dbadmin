@@ -70,6 +70,10 @@ export default {
   queryGfsStatus: (data) => request.post('/oms/orders/query_gfs_status', data),
   deleteGfsOrder: (data) => request.post('/oms/orders/delete_gfs_order', data),
   deleteCheckRecord: (data) => request.post('/oms/orders/delete_check_record', data),
+  // oms - 退货单原单维护
+  queryReturnOrderOrigin: (data) => request.post('/oms/orders/query_return_order_origin', data),
+  queryOriginOrderInfo: (data) => request.post('/oms/orders/query_origin_order_info', data),
+  updateReturnOrderOrigin: (data) => request.post('/oms/orders/update_return_order_origin', data),
   // simiccid
   simiccidUpload: (formData) =>
     request.post('/sim/simiccid/upload', formData, {

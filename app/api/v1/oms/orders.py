@@ -13,6 +13,8 @@ from app.schemas.oms import (
     GfsQueryIn,
     OrderQueryIn,
     RestoreLogicalIn,
+    ReturnOriginQueryIn,
+    ReturnOriginUpdateIn,
     UpdateAuditTimeBatchIn,
 )
 from app.services.order_service import order_service
@@ -414,3 +416,114 @@ async def delete_check_record(req: Request, body: CheckRecordDeleteIn):
     except Exception as e:
         logger.error(f"删除校验记录失败: {e}")
         return Fail(code=500, msg=f"删除失败: {e!s}")
+
+
+@router.post("/query_return_order_origin", summary="查询退货单原单信息")
+async def query_return_order_origin(body: ReturnOriginQueryIn):
+    """查询退货单原单信息，通过退货单Id或编码关联查询订单和原单信息"""
+    try:
+        return_order_no = body.return_order_no.strip()
+        if not return_order_no:
+            return Fail(code=400, msg="退货单Id或编码不能为空")
+
+        result = await order_service.query_return_order_origin(return_order_no)
+        return Success(data=result, msg=result["message"])
+    except Exception as e:
+        logger.error(f"查询退货单原单信息失败: {e}")
+        return Fail(code=500, msg=f"查询失败: {e!s}")
+
+
+@router.post("/query_origin_order_info", summary="查询原订单信息（用于变更退货单原单）")
+async def query_origin_order_info(body: ReturnOriginQueryIn):
+    """查询原订单信息，用于变更退货单原单时验证目标订单是否存在"""
+    try:
+        origin_order_no = body.return_order_no.strip()
+        if not origin_order_no:
+            return Fail(code=400, msg="原订单Id或编码不能为空")
+
+        result = await order_service.query_origin_order_info(origin_order_no)
+        return Success(data=result, msg=result["message"])
+    except Exception as e:
+        logger.error(f"查询原订单信息失败: {e}")
+        return Fail(code=500, msg=f"查询失败: {e!s}")
+
+
+@router.post("/update_return_order_origin", summary="更新退货单原单信息")
+async def update_return_order_origin(req: Request, body: ReturnOriginUpdateIn):
+    """更新退货单的原单信息，变更tb_orderdetail的OriginOrderId和OriginOrderNo"""
+    try:
+        return_order_no = body.return_order_no.strip()
+        new_origin_order_no = body.new_origin_order_no.strip()
+        if not return_order_no:
+            return Fail(code=400, msg="退货单Id或编码不能为空")
+        if not new_origin_order_no:
+            return Fail(code=400, msg="变更原订单Id或编码不能为空")
+        if not body.updated_by_id:
+            return Fail(code=400, msg="数据更新人不能为空")
+
+        # 1. 查询退货单信息，获取退货单Id
+        return_result = await order_service.query_return_order_origin(return_order_no)
+        if not return_result["found_docs"]:
+            return Fail(code=400, msg=f"未找到退货单: {return_order_no}")
+        return_order_id = return_result["found_docs"][0]["order_id"]
+
+        # 2. 查询目标原订单信息，获取原订单Id和编码
+        origin_result = await order_service.query_origin_order_info(new_origin_order_no)
+        if not origin_result["found_docs"]:
+            return Fail(code=400, msg=f"未找到原订单: {new_origin_order_no}")
+        origin_order_id = origin_result["found_docs"][0]["id"]
+        origin_order_no_actual = origin_result["found_docs"][0]["order_no"]
+
+        # 3. 执行更新
+        updated = await order_service.update_return_order_origin(
+            return_order_id=return_order_id,
+            origin_order_id=origin_order_id,
+            origin_order_no=origin_order_no_actual,
+            updated_by_id=body.updated_by_id,
+        )
+        if not updated:
+            return Fail(code=500, msg="更新失败，未影响任何记录")
+
+        # 4. 记录审计日志
+        try:
+            token = req.headers.get("token")
+            user_obj: User = None
+            if token:
+                user_obj = await AuthControl.is_authed(token)
+            user_id = user_obj.id if user_obj else 0
+            username = user_obj.username if user_obj else ""
+        except Exception:
+            user_id = 0
+            username = ""
+
+        try:
+            await create_operation_audit_log(
+                user_id=user_id,
+                username=username,
+                module="OMS",
+                summary=f"退货单原单更新: 退货单={return_order_no}, 新原单={new_origin_order_no}, 更新人={body.updated_by_id}"
+                + (f", 备注={body.remark}" if body.remark else ""),
+                method="POST",
+                path="/api/v1/oms/orders/update_return_order_origin",
+                status=200,
+                request_body=body.model_dump(mode="json"),
+                response_body={
+                    "return_order_id": return_order_id,
+                    "origin_order_id": origin_order_id,
+                    "origin_order_no": origin_order_no_actual,
+                },
+            )
+        except Exception as e:
+            logger.warning(f"审计日志记录失败: {e}")
+
+        return Success(
+            msg="退货单原单更新成功",
+            data={
+                "return_order_id": return_order_id,
+                "origin_order_id": origin_order_id,
+                "origin_order_no": origin_order_no_actual,
+            },
+        )
+    except Exception as e:
+        logger.error(f"更新退货单原单失败: {e}")
+        return Fail(code=500, msg=f"更新失败: {e!s}")

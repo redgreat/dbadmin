@@ -470,6 +470,122 @@ class OrderService:
         else:
             raise ValueError("不支持的连接池类型")
 
+    async def query_return_order_origin(self, return_order_no: str) -> dict:
+        """查询退货单原单信息，通过退货单Id或编码关联tb_orderinfo和tb_orderdetail"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("连接池不存在")
+
+        found_docs = []
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    is_numeric = return_order_no.isdigit()
+                    if is_numeric:
+                        doc_id = int(return_order_no)
+                        queries = [
+                            ("""SELECT a.Id, a.OrderNo, b.OriginOrderId, b.OriginOrderNo
+                                FROM tb_orderinfo a
+                                JOIN tb_orderdetail b ON b.Id=a.Id AND b.Deleted=0
+                                WHERE a.Deleted=0 AND a.Id=%s LIMIT 1""", (doc_id,)),
+                            ("""SELECT a.Id, a.OrderNo, b.OriginOrderId, b.OriginOrderNo
+                                FROM tb_orderinfo a
+                                JOIN tb_orderdetail b ON b.Id=a.Id AND b.Deleted=0
+                                WHERE a.Deleted=0 AND a.OrderNo=%s LIMIT 1""", (return_order_no,)),
+                        ]
+                    else:
+                        queries = [
+                            ("""SELECT a.Id, a.OrderNo, b.OriginOrderId, b.OriginOrderNo
+                                FROM tb_orderinfo a
+                                JOIN tb_orderdetail b ON b.Id=a.Id AND b.Deleted=0
+                                WHERE a.Deleted=0 AND a.OrderNo=%s LIMIT 1""", (return_order_no,)),
+                            ("""SELECT a.Id, a.OrderNo, b.OriginOrderId, b.OriginOrderNo
+                                FROM tb_orderinfo a
+                                JOIN tb_orderdetail b ON b.Id=a.Id AND b.Deleted=0
+                                WHERE a.Deleted=0 AND a.Id=%s LIMIT 1""", (return_order_no,)),
+                        ]
+
+                    for sql, params in queries:
+                        await cur.execute(sql, params)
+                        row = await cur.fetchone()
+                        if row:
+                            found_docs.append({
+                                "order_id": str(row[0]),
+                                "order_no": str(row[1]) if row[1] else "",
+                                "origin_order_id": str(row[2]) if row[2] else "",
+                                "origin_order_no": str(row[3]) if row[3] else "",
+                            })
+                            break
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        return {
+            "found_docs": found_docs,
+            "message": f"查询到 {len(found_docs)} 条" if found_docs else "未找到该退货单",
+        }
+
+    async def query_origin_order_info(self, origin_order_no: str) -> dict:
+        """查询原订单信息，用于变更退货单原单时验证目标订单是否存在"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("连接池不存在")
+
+        found_docs = []
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    is_numeric = origin_order_no.isdigit()
+                    if is_numeric:
+                        doc_id = int(origin_order_no)
+                        queries = [
+                            ("SELECT Id, OrderNo FROM tb_orderinfo WHERE Id=%s AND Deleted=0 LIMIT 1", (doc_id,)),
+                            ("SELECT Id, OrderNo FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (origin_order_no,)),
+                        ]
+                    else:
+                        queries = [
+                            ("SELECT Id, OrderNo FROM tb_orderinfo WHERE OrderNo=%s AND Deleted=0 LIMIT 1", (origin_order_no,)),
+                            ("SELECT Id, OrderNo FROM tb_orderinfo WHERE Id=%s AND Deleted=0 LIMIT 1", (origin_order_no,)),
+                        ]
+
+                    for sql, params in queries:
+                        await cur.execute(sql, params)
+                        row = await cur.fetchone()
+                        if row:
+                            found_docs.append({
+                                "id": str(row[0]),
+                                "order_no": str(row[1]) if row[1] else "",
+                            })
+                            break
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        return {
+            "found_docs": found_docs,
+            "message": f"查询到 {len(found_docs)} 条" if found_docs else "未找到该原订单",
+        }
+
+    async def update_return_order_origin(
+        self, return_order_id: str, origin_order_id: str, origin_order_no: str, updated_by_id: str
+    ) -> bool:
+        """更新退货单的原单信息（tb_orderdetail的OriginOrderId和OriginOrderNo）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("连接池不存在")
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                await cur.execute(
+                    "UPDATE tb_orderdetail SET OriginOrderId=%s, OriginOrderNo=%s, UpdatedById=%s, UpdatedAt=NOW() WHERE Id=%s AND Deleted=0",
+                    (origin_order_id, origin_order_no, updated_by_id, return_order_id),
+                )
+                return cur.rowcount > 0
+        raise ValueError("不支持的连接池类型")
+
     async def delete_check_record(self, order_id: str) -> bool:
         """删除校验记录"""
         await db_pool.ensure_pool(await _get_mallcenter_conn_id())

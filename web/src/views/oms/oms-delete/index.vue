@@ -150,6 +150,78 @@
           </n-table>
         </n-form>
       </n-card>
+
+      <n-card title="订单退货单原单维护" size="small">
+        <n-form ref="originFormRef" :model="originForm" :rules="originRules" label-placement="left" :label-width="140">
+          <n-form-item label="退货单Id或编码" path="returnOrderNo">
+            <n-input v-model:value="originForm.returnOrderNo" clearable placeholder="输入退货单Id或编码" />
+          </n-form-item>
+          <n-space>
+            <n-button :loading="originQuerying" @click="handleOriginQuery">查询退货单</n-button>
+          </n-space>
+          <n-table v-if="originQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+            <thead>
+              <tr>
+                <th>订单Id</th>
+                <th>订单编码</th>
+                <th>退货单原单Id</th>
+                <th>退货单原单编码</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in originQueryResult" :key="item.order_id">
+                <td>{{ item.order_id }}</td>
+                <td>{{ item.order_no }}</td>
+                <td>{{ item.origin_order_id || '-' }}</td>
+                <td>{{ item.origin_order_no || '-' }}</td>
+              </tr>
+            </tbody>
+          </n-table>
+
+          <n-divider />
+
+          <n-form-item label="变更原订单Id或编码" path="newOriginOrderNo">
+            <n-input v-model:value="originForm.newOriginOrderNo" clearable placeholder="输入新的原订单Id或编码" />
+          </n-form-item>
+          <n-space class="mb-3">
+            <n-button :loading="newOriginQuerying" @click="handleNewOriginQuery">查询原订单</n-button>
+          </n-space>
+          <n-table v-if="newOriginQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+            <thead>
+              <tr>
+                <th>原订单Id</th>
+                <th>原订单编码</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in newOriginQueryResult" :key="item.id">
+                <td>{{ item.id }}</td>
+                <td>{{ item.order_no }}</td>
+              </tr>
+            </tbody>
+          </n-table>
+
+          <n-form-item label="数据更新人" path="updatedById">
+            <n-select
+              v-model:value="originForm.updatedById"
+              filterable
+              remote
+              clearable
+              placeholder="输入姓名搜索用户中心用户"
+              :options="operatorOptions"
+              :loading="operatorLoading"
+              @search="handleSearchOperator"
+            />
+          </n-form-item>
+          <n-form-item label="备注" path="remark">
+            <n-input v-model:value="originForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
+          </n-form-item>
+          <n-space>
+            <n-button type="primary" :loading="originExecuting" @click="handleOriginExecute">执行更新</n-button>
+            <n-button @click="handleOriginReset">重置</n-button>
+          </n-space>
+        </n-form>
+      </n-card>
     </n-space>
   </CommonPage>
 </template>
@@ -168,6 +240,7 @@ const message = useMessage()
 const logicalFormRef = ref(null)
 const physicalFormRef = ref(null)
 const restoreFormRef = ref(null)
+const originFormRef = ref(null)
 
 const logicalForm = ref({ orderNos: '', operatorId: '', remark: '' })
 const physicalForm = ref({ orderNos: '', remark: '' })
@@ -184,6 +257,13 @@ const restoreQuerying = ref(false)
 const logicalQueryResult = ref([])
 const physicalQueryResult = ref([])
 const restoreQueryResult = ref([])
+
+const originForm = ref({ returnOrderNo: '', newOriginOrderNo: '', updatedById: '', remark: '' })
+const originQuerying = ref(false)
+const originExecuting = ref(false)
+const originQueryResult = ref([])
+const newOriginQuerying = ref(false)
+const newOriginQueryResult = ref([])
 
 const rules = {
   orderNos: [
@@ -211,6 +291,18 @@ const restoreRules = {
   ],
   operatorId: [
     { required: true, message: '请选择删除人' },
+  ],
+}
+
+const originRules = {
+  returnOrderNo: [
+    { required: true, message: '请输入退货单Id或编码' },
+  ],
+  newOriginOrderNo: [
+    { required: true, message: '请输入变更原订单Id或编码' },
+  ],
+  updatedById: [
+    { required: true, message: '请选择数据更新人' },
   ],
 }
 
@@ -417,6 +509,97 @@ const handleRestoreExecute = async () => {
     message.error('请求异常')
   } finally {
     restoreExecuting.value = false
+  }
+}
+
+// --- 退货单原单维护 ---
+const handleOriginReset = () => {
+  originForm.value = { returnOrderNo: '', newOriginOrderNo: '', updatedById: '', remark: '' }
+  originQueryResult.value = []
+  newOriginQueryResult.value = []
+}
+
+const handleOriginQuery = async () => {
+  const returnOrderNo = String(originForm.value.returnOrderNo || '').trim()
+  if (!returnOrderNo) {
+    message.warning('请输入退货单Id或编码')
+    return
+  }
+  originQuerying.value = true
+  try {
+    const res = await api.queryReturnOrderOrigin({ return_order_no: returnOrderNo })
+    if (res.code === 200 || res.code === 0) {
+      originQueryResult.value = res.data?.found_docs || []
+      if (!originQueryResult.value.length) {
+        message.warning('未找到该退货单')
+      } else {
+        message.success('查询成功')
+      }
+    } else {
+      message.error(res.msg || '查询失败')
+    }
+  } catch (e) {
+    message.error('请求异常')
+  } finally {
+    originQuerying.value = false
+  }
+}
+
+const handleNewOriginQuery = async () => {
+  const newOriginOrderNo = String(originForm.value.newOriginOrderNo || '').trim()
+  if (!newOriginOrderNo) {
+    message.warning('请输入变更原订单Id或编码')
+    return
+  }
+  newOriginQuerying.value = true
+  try {
+    const res = await api.queryOriginOrderInfo({ return_order_no: newOriginOrderNo })
+    if (res.code === 200 || res.code === 0) {
+      newOriginQueryResult.value = res.data?.found_docs || []
+      if (!newOriginQueryResult.value.length) {
+        message.warning('未找到该原订单')
+      } else {
+        message.success('原订单查询成功')
+      }
+    } else {
+      message.error(res.msg || '查询失败')
+    }
+  } catch (e) {
+    message.error('请求异常')
+  } finally {
+    newOriginQuerying.value = false
+  }
+}
+
+const handleOriginExecute = async () => {
+  await originFormRef.value?.validate()
+  const returnOrderNo = String(originForm.value.returnOrderNo).trim()
+  const newOriginOrderNo = String(originForm.value.newOriginOrderNo).trim()
+  const updatedById = String(originForm.value.updatedById || '').trim()
+  const remark = String(originForm.value.remark || '').trim()
+  if (!updatedById) {
+    message.warning('请选择数据更新人')
+    return
+  }
+  originExecuting.value = true
+  try {
+    const res = await api.updateReturnOrderOrigin({
+      return_order_no: returnOrderNo,
+      new_origin_order_no: newOriginOrderNo,
+      updated_by_id: updatedById,
+      remark,
+    })
+    if (res.code === 200 || res.code === 0) {
+      message.success(res.msg || '退货单原单更新成功')
+      // 更新后重新查询退货单原单信息
+      handleOriginQuery()
+    } else {
+      message.error(res.msg || '退货单原单更新失败')
+    }
+  } catch (e) {
+    message.error('请求异常')
+  } finally {
+    originExecuting.value = false
   }
 }
 </script>

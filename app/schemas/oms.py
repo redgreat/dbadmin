@@ -43,3 +43,16 @@ class GfsDeleteIn(BaseModel):
 class CheckRecordDeleteIn(BaseModel):
     """校验记录删除入参"""
     order_id: str = Field(..., description="订单Id")
+
+
+class ReturnOriginQueryIn(BaseModel):
+    """退货单原单查询入参"""
+    return_order_no: str = Field(..., description="退货单Id或编码")
+
+
+class ReturnOriginUpdateIn(BaseModel):
+    """退货单原单更新入参"""
+    return_order_no: str = Field(..., description="退货单Id或编码")
+    new_origin_order_no: str = Field(..., description="变更原订单Id或订单编码")
+    updated_by_id: str = Field(..., description="数据更新人Id")
+    remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
