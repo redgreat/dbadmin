@@ -121,7 +121,7 @@ class EhcfService:
         }
 
     async def fix_order_detail_ids(self, workorder_id: str) -> Dict:
-        """修复订单明细Id（生成新的OE编号）"""
+        """修复订单明细Id（按原始值分组，每个不同原始值生成一个新的OE编号）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -132,14 +132,6 @@ class EhcfService:
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
-                    # 生成一个新的OE编号
-                    await cur.execute("SELECT fn_nextval('OE');")
-                    oe_row = await cur.fetchone()
-                    new_oe_id = str(oe_row[0]) if oe_row else ""
-
-                    if not new_oe_id:
-                        return {"success": False, "message": "生成OE编号失败"}
-
                     # 处理三张表
                     tables = [
                         ("tb_workgoodsdetail", "WorkOrderId"),
@@ -147,34 +139,53 @@ class EhcfService:
                         ("tb_workfixitemdetail", "WorkOrderId"),
                     ]
 
+                    # 收集所有明细行，按原始 OrderDetailId 分组
+                    all_rows = []
                     for table, where_col in tables:
-                        # tb_workfixitemdetail 的字段名是 NewOrderDetailId
                         detail_field = "NewOrderDetailId" if table == "tb_workfixitemdetail" else "OrderDetailId"
                         await cur.execute(
                             f"SELECT Id, {detail_field} FROM {table} WHERE {where_col}=%s",
                             (workorder_id,),
                         )
-                        rows = await cur.fetchall()
-                        for row in rows:
-                            row_id = row[0]
-                            old_detail_id = str(row[1]) if row[1] else ""
-                            try:
-                                await cur.execute(
-                                    f"UPDATE {table} SET {detail_field}=%s WHERE Id=%s",
-                                    (new_oe_id, row_id),
-                                )
-                                results["updated"].append({
-                                    "table": table,
-                                    "id": str(row_id),
-                                    "old": old_detail_id,
-                                    "new": new_oe_id,
-                                })
-                            except Exception as e:
-                                results["failed"].append({
-                                    "table": table,
-                                    "id": str(row_id),
-                                    "error": str(e),
-                                })
+                        for row in await cur.fetchall():
+                            all_rows.append({
+                                "table": table,
+                                "detail_field": detail_field,
+                                "row_id": row[0],
+                                "old_detail_id": str(row[1]) if row[1] else "",
+                            })
+
+                    # 按原始 OrderDetailId 去重，为每个不同值生成新的 OE 编号
+                    unique_old_ids = list({r["old_detail_id"] for r in all_rows})
+                    oe_mapping = {}
+                    for old_id in unique_old_ids:
+                        await cur.execute("SELECT fn_nextval('OE');")
+                        oe_row = await cur.fetchone()
+                        new_id = str(oe_row[0]) if oe_row else ""
+                        if not new_id:
+                            return {"success": False, "message": "生成OE编号失败"}
+                        oe_mapping[old_id] = new_id
+
+                    # 更新所有明细行
+                    for r in all_rows:
+                        new_oe_id = oe_mapping[r["old_detail_id"]]
+                        try:
+                            await cur.execute(
+                                f"UPDATE {r['table']} SET {r['detail_field']}=%s WHERE Id=%s",
+                                (new_oe_id, r["row_id"]),
+                            )
+                            results["updated"].append({
+                                "table": r["table"],
+                                "id": str(r["row_id"]),
+                                "old": r["old_detail_id"],
+                                "new": new_oe_id,
+                            })
+                        except Exception as e:
+                            results["failed"].append({
+                                "table": r["table"],
+                                "id": str(r["row_id"]),
+                                "error": str(e),
+                            })
         else:
             raise ValueError("不支持的连接池类型")
 
@@ -187,7 +198,7 @@ class EhcfService:
         }
 
     async def regenerate_order_ids(self, workorder_id: str) -> Dict:
-        """重新生成订单Id和明细Id"""
+        """重新生成订单Id和明细Id（按原始值分组，每个不同原始值生成一个新值）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -198,71 +209,90 @@ class EhcfService:
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
-                    # 生成新的OI编号
-                    await cur.execute("SELECT fn_nextval('OI');")
-                    oi_row = await cur.fetchone()
-                    new_oi_id = str(oi_row[0]) if oi_row else ""
-
-                    # 生成新的订单编码
-                    await cur.execute("SELECT fn_GetOrderNoByPrefix('');")
-                    on_row = await cur.fetchone()
-                    new_order_no = str(on_row[0]) if on_row else ""
-
-                    # 生成新的OE编号
-                    await cur.execute("SELECT fn_nextval('OE');")
-                    oe_row = await cur.fetchone()
-                    new_oe_id = str(oe_row[0]) if oe_row else ""
-
-                    if not new_oi_id or not new_order_no:
-                        return {"success": False, "message": "生成OI编号或订单编码失败"}
-                    if not new_oe_id:
-                        new_oe_id = new_oi_id
-
-                    # 1. 更新明细表的 OrderDetailId
+                    # 1. 收集所有明细行，按原始 OrderDetailId 分组并生成新值
                     detail_tables = [
                         ("tb_workgoodsdetail", "WorkOrderId"),
                         ("tb_workgoodsdetail_other", "WorkOrderId"),
                         ("tb_workfixitemdetail", "WorkOrderId"),
                     ]
+
+                    # 收集所有明细行
+                    all_detail_rows = []
                     for table, where_col in detail_tables:
-                        # tb_workfixitemdetail 的字段名是 NewOrderDetailId
                         detail_field = "NewOrderDetailId" if table == "tb_workfixitemdetail" else "OrderDetailId"
                         await cur.execute(
                             f"SELECT Id, {detail_field} FROM {table} WHERE {where_col}=%s",
                             (workorder_id,),
                         )
-                        rows = await cur.fetchall()
-                        for row in rows:
-                            row_id = row[0]
-                            old_detail_id = str(row[1]) if row[1] else ""
-                            try:
-                                await cur.execute(
-                                    f"UPDATE {table} SET {detail_field}=%s WHERE Id=%s",
-                                    (new_oi_id, row_id),
-                                )
-                                results["updated"].append({
-                                    "table": table,
-                                    "id": str(row_id),
-                                    "field": "OrderDetailId",
-                                    "old": old_detail_id,
-                                    "new": new_oi_id,
-                                })
-                            except Exception as e:
-                                results["failed"].append({
-                                    "table": table,
-                                    "id": str(row_id),
-                                    "error": str(e),
-                                })
+                        for row in await cur.fetchall():
+                            all_detail_rows.append({
+                                "table": table,
+                                "detail_field": detail_field,
+                                "row_id": row[0],
+                                "old_detail_id": str(row[1]) if row[1] else "",
+                            })
 
-                    # 2. 更新 tb_workgoodsinfo 的 MallOrderId 和 OrderNo
+                    # 为每个不同的原始 OrderDetailId 生成新的 OI 编号
+                    unique_old_ids = list({r["old_detail_id"] for r in all_detail_rows})
+                    oi_mapping = {}
+                    for old_id in unique_old_ids:
+                        await cur.execute("SELECT fn_nextval('OI');")
+                        oi_row = await cur.fetchone()
+                        new_id = str(oi_row[0]) if oi_row else ""
+                        if not new_id:
+                            return {"success": False, "message": "生成OI编号失败"}
+                        oi_mapping[old_id] = new_id
+
+                    # 更新明细表
+                    for r in all_detail_rows:
+                        new_oi_id = oi_mapping[r["old_detail_id"]]
+                        try:
+                            await cur.execute(
+                                f"UPDATE {r['table']} SET {r['detail_field']}=%s WHERE Id=%s",
+                                (new_oi_id, r["row_id"]),
+                            )
+                            results["updated"].append({
+                                "table": r["table"],
+                                "id": str(r["row_id"]),
+                                "field": "OrderDetailId",
+                                "old": r["old_detail_id"],
+                                "new": new_oi_id,
+                            })
+                        except Exception as e:
+                            results["failed"].append({
+                                "table": r["table"],
+                                "id": str(r["row_id"]),
+                                "error": str(e),
+                            })
+
+                    # 2. 更新 tb_workgoodsinfo 的 MallOrderId 和 OrderNo（按原始值分组）
                     await cur.execute(
                         "SELECT MallOrderId, OrderNo FROM tb_workgoodsinfo WHERE WorkOrderId=%s",
                         (workorder_id,),
                     )
-                    rows = await cur.fetchall()
-                    for row in rows:
+                    goodsinfo_rows = await cur.fetchall()
+                    # 收集所有不同的原始 MallOrderId
+                    unique_mall_ids = list({str(row[0]) if row[0] else "" for row in goodsinfo_rows})
+                    mall_oi_mapping = {}
+                    mall_order_no_mapping = {}
+                    for old_mall_id in unique_mall_ids:
+                        await cur.execute("SELECT fn_nextval('OI');")
+                        oi_row = await cur.fetchone()
+                        new_oi_id = str(oi_row[0]) if oi_row else ""
+                        if not new_oi_id:
+                            return {"success": False, "message": "生成OI编号失败"}
+                        mall_oi_mapping[old_mall_id] = new_oi_id
+
+                        await cur.execute("SELECT fn_GetOrderNoByPrefix('');")
+                        on_row = await cur.fetchone()
+                        new_order_no = str(on_row[0]) if on_row else ""
+                        mall_order_no_mapping[old_mall_id] = new_order_no
+
+                    for row in goodsinfo_rows:
                         old_mall_order_id = str(row[0]) if row[0] else ""
                         old_order_no = str(row[1]) if row[1] else ""
+                        new_oi_id = mall_oi_mapping[old_mall_order_id]
+                        new_order_no = mall_order_no_mapping[old_mall_order_id]
                         try:
                             await cur.execute(
                                 "UPDATE tb_workgoodsinfo SET MallOrderId=%s, OrderNo=%s WHERE WorkOrderId=%s",
@@ -280,15 +310,26 @@ class EhcfService:
                                 "error": str(e),
                             })
 
-                    # 3. 更新 tb_workfixgoodsinfo 的 NewMallOrderId
+                    # 3. 更新 tb_workfixgoodsinfo 的 NewMallOrderId（按原始值分组）
                     await cur.execute(
                         "SELECT Id, NewMallOrderId FROM tb_workfixgoodsinfo WHERE WorkOrderId=%s",
                         (workorder_id,),
                     )
-                    rows = await cur.fetchall()
-                    for row in rows:
+                    fixgoods_rows = await cur.fetchall()
+                    unique_fix_ids = list({str(row[1]) if row[1] else "" for row in fixgoods_rows})
+                    fix_oi_mapping = {}
+                    for old_id in unique_fix_ids:
+                        await cur.execute("SELECT fn_nextval('OI');")
+                        oi_row = await cur.fetchone()
+                        new_oi_id = str(oi_row[0]) if oi_row else ""
+                        if not new_oi_id:
+                            return {"success": False, "message": "生成OI编号失败"}
+                        fix_oi_mapping[old_id] = new_oi_id
+
+                    for row in fixgoods_rows:
                         row_id = row[0]
                         old_val = str(row[1]) if row[1] else ""
+                        new_oi_id = fix_oi_mapping[old_val]
                         try:
                             await cur.execute(
                                 "UPDATE tb_workfixgoodsinfo SET NewMallOrderId=%s WHERE Id=%s",
@@ -308,15 +349,26 @@ class EhcfService:
                                 "error": str(e),
                             })
 
-                    # 4. 更新 tb_workfixiteminfo 的 NewMallOrderId
+                    # 4. 更新 tb_workfixiteminfo 的 NewMallOrderId（按原始值分组）
                     await cur.execute(
                         "SELECT Id, NewMallOrderId FROM tb_workfixiteminfo WHERE WorkOrderId=%s",
                         (workorder_id,),
                     )
-                    rows = await cur.fetchall()
-                    for row in rows:
+                    fixitem_rows = await cur.fetchall()
+                    unique_fixitem_ids = list({str(row[1]) if row[1] else "" for row in fixitem_rows})
+                    fixitem_oi_mapping = {}
+                    for old_id in unique_fixitem_ids:
+                        await cur.execute("SELECT fn_nextval('OI');")
+                        oi_row = await cur.fetchone()
+                        new_oi_id = str(oi_row[0]) if oi_row else ""
+                        if not new_oi_id:
+                            return {"success": False, "message": "生成OI编号失败"}
+                        fixitem_oi_mapping[old_id] = new_oi_id
+
+                    for row in fixitem_rows:
                         row_id = row[0]
                         old_val = str(row[1]) if row[1] else ""
+                        new_oi_id = fixitem_oi_mapping[old_val]
                         try:
                             await cur.execute(
                                 "UPDATE tb_workfixiteminfo SET NewMallOrderId=%s WHERE Id=%s",
@@ -342,11 +394,6 @@ class EhcfService:
             "success": len(results["failed"]) == 0,
             "updated_count": len(results["updated"]),
             "failed_count": len(results["failed"]),
-            "summary": {
-                "new_oi_id": new_oi_id,
-                "new_order_no": new_order_no,
-                "new_oe_id": new_oe_id,
-            },
             "results": results,
             "message": f"重新生成完成: 成功 {len(results['updated'])} 条, 失败 {len(results['failed'])} 条",
         }
