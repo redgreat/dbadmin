@@ -89,7 +89,7 @@ class SIMTransService:
         VALIDATE_SQL = """
         SELECT InStockNo
         FROM tb_instockinfohis
-        WHERE InStockNo = %s AND InStockType = 'IN0' AND Deleted = 0
+        WHERE InStockNo = %s AND InStockType IN ('IN0', 'IN8') AND Deleted = 0
         """
 
         async with pool.acquire() as conn, conn.cursor(aiomysql.cursors.DictCursor) as cur:
