@@ -37,7 +37,7 @@ class ScriptController:
         return PythonScriptList(
             items=[PythonScriptInDB.model_validate(item) for item in items],
             total=total
-        ).model_dump()
+        ).model_dump(mode='json')
 
     async def get_script(self, script_id: int) -> dict:
         """获取单个脚本详情"""
@@ -46,7 +46,7 @@ class ScriptController:
             raise HTTPException(status_code=404, detail=f"脚本 {script_id} 不存在")
 
         from app.schemas.script import PythonScriptInDB
-        return PythonScriptInDB.model_validate(script).model_dump()
+        return PythonScriptInDB.model_validate(script).model_dump(mode='json')
 
     async def create_script(self, script_data: dict) -> dict:
         """创建新脚本"""
@@ -54,7 +54,7 @@ class ScriptController:
             script = await self.model.create(**script_data)
 
         from app.schemas.script import PythonScriptInDB
-        return PythonScriptInDB.model_validate(script).model_dump()
+        return PythonScriptInDB.model_validate(script).model_dump(mode='json')
 
     async def update_script(self, script_id: int, script_data: dict) -> dict:
         """更新脚本"""
@@ -69,7 +69,7 @@ class ScriptController:
 
         script = await self.model.get(id=script_id)
         from app.schemas.script import PythonScriptInDB
-        return PythonScriptInDB.model_validate(script).model_dump()
+        return PythonScriptInDB.model_validate(script).model_dump(mode='json')
 
     async def delete_script(self, script_id: int) -> bool:
         """删除脚本"""
@@ -179,7 +179,7 @@ class ScriptController:
         return ScriptRunLogList(
             items=[ScriptRunLogInDB.model_validate(item) for item in items],
             total=total
-        ).model_dump()
+        ).model_dump(mode='json')
 
     async def get_run_log(self, log_id: int) -> dict:
         """获取单个执行日志详情"""
@@ -188,7 +188,7 @@ class ScriptController:
             raise HTTPException(status_code=404, detail=f"执行日志 {log_id} 不存在")
 
         from app.schemas.script import ScriptRunLogInDB
-        return ScriptRunLogInDB.model_validate(log).model_dump()
+        return ScriptRunLogInDB.model_validate(log).model_dump(mode='json')
 
 
 script_controller = ScriptController()
