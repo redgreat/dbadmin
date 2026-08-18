@@ -156,6 +156,7 @@ class OwingStatusUpdateIn(BaseModel):
     stock_id: str = Field(..., description="出库单ID")
     is_receive: int = Field(default=1, description="应收状态: 0-未收, 1-已收")
     operator_id: str = Field(..., description="修改人Id")
+    source_table: str = Field(default="main", description="数据来源表: main-主表, his-历史表")
     remark: str = Field(default="", description="备注")
 
 

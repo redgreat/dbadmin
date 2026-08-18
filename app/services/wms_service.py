@@ -564,14 +564,14 @@ class WmsService:
 
     async def query_owing_status(self, out_stock_no: str = "", stock_id: str = "") -> dict:
         """
-        查询出库单应收状态
+        查询出库单应收状态，先查tb_outstockinfo，查不到再查tb_outstockinfohis
 
         Args:
             out_stock_no: 出库单号
             stock_id: 出库单ID
 
         Returns:
-            查询结果字典
+            查询结果字典，包含数据来源表名
         """
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
@@ -585,29 +585,38 @@ class WmsService:
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     # 构建查询条件
-                    conditions = []
+                    condition_parts = []
                     params = []
                     if out_stock_no:
-                        conditions.append("OutStockNo=%s")
+                        condition_parts.append("OutStockNo=%s")
                         params.append(out_stock_no)
                     if stock_id:
-                        if conditions:
-                            conditions.append("OR")
-                        conditions.append("Id=%s")
+                        if condition_parts:
+                            condition_parts.append("OR")
+                        condition_parts.append("Id=%s")
                         params.append(stock_id)
+                    where_clause = ' '.join(condition_parts)
 
-                    sql = f"""
-                        SELECT Id, OutStockNo,
-                               fn_GetStockTypeById(OutStockType) AS OutStockType,
-                               WarehouseName, ToWarehousName,
-                               AuditTime, IsReceive
-                        FROM tb_outstockinfo
-                        WHERE ({' '.join(conditions)}) AND Deleted=0
-                        LIMIT 1
-                    """
+                    # 先查tb_outstockinfo，查不到再查tb_outstockinfohis
+                    tables = [("tb_outstockinfo", "main"), ("tb_outstockinfohis", "his")]
+                    row = None
+                    source_table = None
 
-                    await cur.execute(sql, params)
-                    row = await cur.fetchone()
+                    for table_name, table_type in tables:
+                        sql = f"""
+                            SELECT Id, OutStockNo,
+                                   fn_GetStockTypeById(OutStockType) AS OutStockType,
+                                   WarehouseName, ToWarehouseName,
+                                   AuditTime, IsReceive
+                            FROM {table_name}
+                            WHERE ({where_clause}) AND Deleted=0
+                            LIMIT 1
+                        """
+                        await cur.execute(sql, params)
+                        row = await cur.fetchone()
+                        if row:
+                            source_table = table_type
+                            break
 
                     if not row:
                         return {"success": False, "message": "未找到该出库单", "data": None}
@@ -623,12 +632,13 @@ class WmsService:
                             "to_warehouse_name": str(row[4]) if row[4] else "",
                             "audit_time": str(row[5]) if row[5] else "",
                             "is_receive": row[6] if row[6] is not None else 0,
+                            "source_table": source_table,
                         }
                     }
         else:
             raise ValueError("不支持的连接池类型")
 
-    async def update_owing_status(self, stock_id: str, is_receive: int, operator_id: str) -> dict:
+    async def update_receive_status(self, stock_id: str, is_receive: int, operator_id: str, source_table: str = "main") -> dict:
         """
         修改出库单应收状态
 
@@ -636,6 +646,7 @@ class WmsService:
             stock_id: 出库单ID
             is_receive: 应收状态: 0-未收, 1-已收
             operator_id: 修改人Id
+            source_table: 数据来源表 main-主表, his-历史表
 
         Returns:
             修改结果字典
@@ -645,12 +656,15 @@ class WmsService:
         if pool is None:
             raise ValueError("连接池不存在")
 
+        # 根据来源表选择对应的表名
+        table_name = "tb_outstockinfo" if source_table == "main" else "tb_outstockinfohis"
+
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     # 更新IsReceive字段，同时记录修改人和更新时间
-                    sql = """
-                        UPDATE tb_outstockinfo
+                    sql = f"""
+                        UPDATE {table_name}
                         SET IsReceive=%s,
                             ModifiedById=%s,
                             ModifiedTime=NOW()

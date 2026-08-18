@@ -319,10 +319,11 @@ async def owing_status_query(body: OwingStatusQueryIn):
 async def owing_status_update(req: Request, body: OwingStatusUpdateIn):
     """修改出库单IsReceive字段"""
     try:
-        result = await wms_service.update_owing_status(
+        result = await wms_service.update_receive_status(
             stock_id=body.stock_id,
             is_receive=body.is_receive,
-            operator_id=body.operator_id
+            operator_id=body.operator_id,
+            source_table=body.source_table
         )
 
         # 记录审计日志

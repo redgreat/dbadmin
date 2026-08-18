@@ -38,16 +38,25 @@
               {{ queryResult.is_receive === 1 ? '已收' : '未收' }}
             </n-tag>
           </n-descriptions-item>
+          <n-descriptions-item label="数据来源">
+            <n-tag :type="queryResult.source_table === 'main' ? 'info' : 'default'" size="small">
+              {{ queryResult.source_table === 'main' ? '主表' : '历史表' }}
+            </n-tag>
+          </n-descriptions-item>
         </n-descriptions>
 
         <n-divider />
 
         <n-form ref="updateFormRef" :model="updateForm" :rules="updateRules" label-placement="left" :label-width="100">
           <n-form-item label="修改状态" path="is_receive">
-            <n-radio-group v-model:value="updateForm.is_receive">
-              <n-radio :value="0">未收</n-radio>
-              <n-radio :value="1">已收</n-radio>
-            </n-radio-group>
+            <n-input-number
+              v-model:value="updateForm.is_receive"
+              :min="0"
+              :max="999"
+              placeholder="请输入IsReceive值"
+              style="width: 200px"
+            />
+            <span class="ml-2 text-gray-500 text-sm">0-未收, 1-已收</span>
           </n-form-item>
           <n-form-item label="修改人" path="operatorId">
             <n-select
@@ -106,7 +115,7 @@ const queryRules = {
 
 const updateRules = {
   is_receive: [
-    { required: true, message: '请选择修改状态' },
+    { required: true, message: '请输入IsReceive值' },
   ],
   operatorId: [
     { required: true, message: '请选择修改人' },
@@ -161,7 +170,7 @@ const handleQuery = async () => {
     })
     if (res.code === 200 || res.code === 0) {
       queryResult.value = res.data
-      updateForm.value.is_receive = res.data.is_receive === 1 ? 0 : 1
+      updateForm.value.is_receive = 1
       message.success('查询成功')
     } else {
       message.error(res.msg || '查询失败')
@@ -200,6 +209,7 @@ const handleUpdate = async () => {
       stock_id: queryResult.value.id,
       is_receive: updateForm.value.is_receive,
       operator_id: String(updateForm.value.operatorId).trim(),
+      source_table: queryResult.value.source_table || 'main',
       remark: String(updateForm.value.remark || '').trim(),
     })
     if (res.code === 200 || res.code === 0) {
