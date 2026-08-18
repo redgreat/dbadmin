@@ -6,6 +6,8 @@ from app.core.dependency import AuthControl
 from app.models.admin import User
 from app.schemas.base import Fail, Success
 from app.schemas.wms import (
+    OwingStatusQueryIn,
+    OwingStatusUpdateIn,
     OwingValidateIn,
     PriceModifyIn,
     PriceQueryIn,
@@ -294,3 +296,66 @@ async def validate_owing(body: OwingValidateIn):
     except Exception as e:
         logger.error(f"应付单验证失败: {e}")
         return Fail(code=500, msg=f"验证失败: {e!s}")
+
+
+@router.post("/wms_curd/owing_status_query", summary="查询出库单应收状态")
+async def owing_status_query(body: OwingStatusQueryIn):
+    """查询出库单应收状态信息"""
+    try:
+        result = await wms_service.query_owing_status(
+            out_stock_no=body.out_stock_no,
+            stock_id=body.stock_id
+        )
+        if result["success"]:
+            return Success(data=result["data"], msg=result["message"])
+        else:
+            return Fail(code=400, msg=result["message"])
+    except Exception as e:
+        logger.error(f"应收状态查询失败: {e}")
+        return Fail(code=500, msg=f"查询失败: {e!s}")
+
+
+@router.post("/wms_curd/owing_status_update", summary="修改出库单应收状态")
+async def owing_status_update(req: Request, body: OwingStatusUpdateIn):
+    """修改出库单IsReceive字段"""
+    try:
+        result = await wms_service.update_owing_status(
+            stock_id=body.stock_id,
+            is_receive=body.is_receive,
+            operator_id=body.operator_id
+        )
+
+        # 记录审计日志
+        try:
+            token = req.headers.get("token")
+            user_obj: User = None
+            if token:
+                user_obj = await AuthControl.is_authed(token)
+            user_id = user_obj.id if user_obj else 0
+            username = user_obj.username if user_obj else ""
+        except Exception:
+            user_id = 0
+            username = ""
+
+        try:
+            await create_operation_audit_log(
+                user_id=user_id,
+                username=username,
+                module="WMS",
+                summary=f"应收状态修改: stock_id={body.stock_id}, is_receive={body.is_receive}, 操作人={body.operator_id}" + (f", 备注={body.remark}" if body.remark else ""),
+                method="POST",
+                path="/api/v1/wms/wms_curd/owing_status_update",
+                status=200 if result["success"] else 500,
+                request_body=body.model_dump(mode="json"),
+                response_body={"stock_id": body.stock_id, "success": result["success"]},
+            )
+        except Exception as e:
+            logger.warning(f"审计日志记录失败: {e}")
+
+        if result["success"]:
+            return Success(msg=result["message"])
+        else:
+            return Fail(code=400, msg=result["message"])
+    except Exception as e:
+        logger.error(f"应收状态修改失败: {e}")
+        return Fail(code=500, msg=f"修改失败: {e!s}")

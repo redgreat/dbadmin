@@ -168,6 +168,9 @@ export default {
   queryPrice: (data = {}) => request.post('/wms/wms_curd/price_query', data),
   modifyPrice: (data = {}) => request.post('/wms/wms_curd/price_modify', data),
   validateOwing: (data = {}) => request.post('/wms/wms_curd/validate_owing', data),
+  // wms - 应收状态变更
+  queryOwingStatus: (data = {}) => request.post('/wms/wms_curd/owing_status_query', data),
+  updateOwingStatus: (data = {}) => request.post('/wms/wms_curd/owing_status_update', data),
   // wms - FCC关联功能
   fccParse: (data = {}) => request.post('/wms/fcc/parse', data),
   fccValidate: (data = {}) => request.post('/wms/fcc/validate', data),

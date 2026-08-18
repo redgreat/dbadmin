@@ -143,3 +143,28 @@ class TaskStatus(BaseModel):
     result: TaskResult = None  # type: ignore
     created_at: str = Field(..., description="创建时间")
     finished_at: str = None  # type: ignore
+
+
+class OwingStatusQueryIn(BaseModel):
+    """应收状态查询入参"""
+    out_stock_no: str = Field(default="", description="出库单号")
+    stock_id: str = Field(default="", description="出库单ID")
+
+
+class OwingStatusUpdateIn(BaseModel):
+    """应收状态修改入参"""
+    stock_id: str = Field(..., description="出库单ID")
+    is_receive: int = Field(default=1, description="应收状态: 0-未收, 1-已收")
+    operator_id: str = Field(..., description="修改人Id")
+    remark: str = Field(default="", description="备注")
+
+
+class OwingStatusResult(BaseModel):
+    """应收状态查询结果"""
+    id: str = Field(..., description="出库单ID")
+    out_stock_no: str = Field(..., description="出库单号")
+    out_stock_type: str = Field(default="", description="出库类型")
+    warehouse_name: str = Field(default="", description="仓库名称")
+    to_warehouse_name: str = Field(default="", description="目标仓库名称")
+    audit_time: str = Field(default="", description="审核时间")
+    is_receive: int = Field(default=0, description="应收状态")
