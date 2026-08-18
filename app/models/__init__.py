@@ -7,5 +7,6 @@ from .imptask import *
 from .oplog import *
 from .password import *
 from .report import *
+from .script import *
 from .task import *
 from .task_notify import *

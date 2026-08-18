@@ -18,6 +18,7 @@ from .oplog import oplog_router
 from .report import report_router
 from .report.report import download_report_direct, download_report_public
 from .roles import roles_router
+from .script import router as script_router
 from .sim import sim_router
 from .tasks import tasks_router
 from .tool import tool_router
@@ -46,6 +47,7 @@ v1_router.get("/report/generation/download-direct/{generation_id}", summary="直
 v1_router.get("/report/generation/public-download/{generation_id}", summary="公开下载报表文件（签名校验）")(download_report_public)
 # report其他接口 - 需要权限验证
 v1_router.include_router(report_router, prefix="/report", tags=["报表管理"], dependencies=[DependPermisson])
+v1_router.include_router(script_router, prefix="/script", tags=["Python脚本"], dependencies=[DependPermisson])
 v1_router.include_router(wms_router, prefix="/wms", tags=["仓储中心"], dependencies=[DependPermisson])
 v1_router.include_router(ehcf_router, prefix="/ehcf", tags=["壹好车服"], dependencies=[DependPermisson])
 v1_router.include_router(alert_router, prefix="/alert", tags=["预警管理"], dependencies=[DependPermisson])

@@ -171,6 +171,15 @@ export default {
   // wms - 应收状态变更
   queryOwingStatus: (data = {}) => request.post('/wms/wms_curd/owing_status_query', data),
   updateOwingStatus: (data = {}) => request.post('/wms/wms_curd/owing_status_update', data),
+  // script - Python脚本管理
+  getScriptList: (params = {}) => request.get('/script/', { params }),
+  getScriptById: (id) => request.get(`/script/${id}`),
+  createScript: (data = {}) => request.post('/script/', data),
+  updateScript: (id, data = {}) => request.put(`/script/${id}`, data),
+  deleteScript: (id) => request.delete(`/script/${id}`),
+  executeScript: (id) => request.post(`/script/${id}/execute`),
+  getScriptLogs: (params = {}) => request.get('/script/logs', { params }),
+  getScriptLogById: (id) => request.get(`/script/logs/${id}`),
   // wms - FCC关联功能
   fccParse: (data = {}) => request.post('/wms/fcc/parse', data),
   fccValidate: (data = {}) => request.post('/wms/fcc/validate', data),
