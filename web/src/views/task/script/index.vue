@@ -25,21 +25,18 @@
 
     <!-- 脚本编辑弹窗 -->
     <n-modal v-model:show="showModal" :title="modalTitle" preset="card" style="width: 900px; max-width: 90vw">
-      <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="left" :label-width="80">
+      <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="left" :label-width="90">
         <n-form-item label="脚本名称" path="name">
           <n-input v-model:value="formData.name" placeholder="请输入脚本名称" />
         </n-form-item>
         <n-form-item label="描述" path="description">
           <n-input v-model:value="formData.description" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="请输入脚本描述" />
         </n-form-item>
-        <n-form-item label="脚本内容" path="code">
-          <n-input
-            v-model:value="formData.code"
-            type="textarea"
-            :autosize="{ minRows: 20, maxRows: 40 }"
-            placeholder="请输入Python脚本内容"
-            font-family="monospace"
-          />
+        <n-form-item label="Cron表达式" path="cron">
+          <template #label>
+            <span style="white-space: nowrap">Cron表达式</span>
+          </template>
+          <n-input v-model:value="formData.cron" clearable placeholder="示例: 0 9 * * * (留空则不启用定时)" />
         </n-form-item>
         <n-form-item label="状态" path="status">
           <n-switch v-model:value="formData.status">
@@ -47,8 +44,13 @@
             <template #unchecked>禁用</template>
           </n-switch>
         </n-form-item>
-        <n-form-item label="Cron表达式" path="cron">
-          <n-input v-model:value="formData.cron" clearable placeholder="示例: 0 9 * * * (留空则不启用定时)" />
+        <n-form-item label="脚本内容" path="code">
+          <n-input
+            v-model:value="formData.code"
+            type="textarea"
+            placeholder="请输入Python脚本内容"
+            style="height: 400px; font-family: monospace; overflow-y: auto"
+          />
         </n-form-item>
       </n-form>
       <template #footer>
