@@ -263,54 +263,44 @@ class WmsService:
         return success, failed
 
     async def restore_logical(self, stock_no: str, operator_id: str) -> bool:
-        """恢复逻辑删除的单据，支持传入编码或数字Id"""
+        """恢复逻辑删除的单据，支持传入编码或Id"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
             raise ValueError("连接池不存在")
 
         stock_id = None
-        is_numeric = stock_no.isdigit()
+        source_table = None
 
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
-                    # 先根据数字Id查找（不限制删除人）
-                    if is_numeric:
-                        doc_id = int(stock_no)
-                        await cur.execute(
-                            "SELECT Id, DeletedById FROM tb_instockinfohis WHERE Id=%s AND Deleted=1 LIMIT 1",
-                            (doc_id,),
-                        )
-                        row = await cur.fetchone()
-                        if row:
-                            stock_id = row[0]
-                        else:
-                            await cur.execute(
-                                "SELECT Id, DeletedById FROM tb_outstockinfohis WHERE Id=%s AND Deleted=1 LIMIT 1",
-                                (doc_id,),
-                            )
-                            row = await cur.fetchone()
-                            if row:
-                                stock_id = row[0]
+                    # 按优先级查找：先his表后主表，先Id后单据号
+                    search_queries = [
+                        # his表 - 按Id查找
+                        ("tb_instockinfohis", "Id", stock_no),
+                        ("tb_outstockinfohis", "Id", stock_no),
+                        # his表 - 按单据号查找
+                        ("tb_instockinfohis", "InStockNo", stock_no),
+                        ("tb_outstockinfohis", "OutStockNo", stock_no),
+                        # 主表 - 按Id查找
+                        ("tb_instockinfo", "Id", stock_no),
+                        ("tb_outstockinfo", "Id", stock_no),
+                        # 主表 - 按单据号查找
+                        ("tb_instockinfo", "InStockNo", stock_no),
+                        ("tb_outstockinfo", "OutStockNo", stock_no),
+                    ]
 
-                    # 如果数字Id没找到，再根据单据号查找
-                    if not stock_id:
+                    for table_name, field_name, value in search_queries:
                         await cur.execute(
-                            "SELECT Id, DeletedById FROM tb_instockinfohis WHERE InStockNo=%s AND Deleted=1 LIMIT 1",
-                            (stock_no,),
+                            f"SELECT Id, DeletedById FROM {table_name} WHERE {field_name}=%s AND Deleted=1 LIMIT 1",
+                            (value,),
                         )
                         row = await cur.fetchone()
                         if row:
                             stock_id = row[0]
-                        else:
-                            await cur.execute(
-                                "SELECT Id, DeletedById FROM tb_outstockinfohis WHERE OutStockNo=%s AND Deleted=1 LIMIT 1",
-                                (stock_no,),
-                            )
-                            row = await cur.fetchone()
-                            if row:
-                                stock_id = row[0]
+                            source_table = table_name
+                            break
 
                     if not stock_id:
                         raise ValueError(f"未找到已删除的单据 {stock_no}")
