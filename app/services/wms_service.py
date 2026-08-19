@@ -275,44 +275,47 @@ class WmsService:
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
+                    # 先根据数字Id查找（不限制删除人）
                     if is_numeric:
                         doc_id = int(stock_no)
                         await cur.execute(
-                            "SELECT Id FROM tb_instockinfohis WHERE Id=%s AND Deleted=1 AND DeletedById=%s LIMIT 1",
-                            (doc_id, operator_id),
+                            "SELECT Id, DeletedById FROM tb_instockinfohis WHERE Id=%s AND Deleted=1 LIMIT 1",
+                            (doc_id,),
                         )
                         row = await cur.fetchone()
                         if row:
                             stock_id = row[0]
                         else:
                             await cur.execute(
-                                "SELECT Id FROM tb_outstockinfohis WHERE Id=%s AND Deleted=1 AND DeletedById=%s LIMIT 1",
-                                (doc_id, operator_id),
+                                "SELECT Id, DeletedById FROM tb_outstockinfohis WHERE Id=%s AND Deleted=1 LIMIT 1",
+                                (doc_id,),
                             )
                             row = await cur.fetchone()
                             if row:
                                 stock_id = row[0]
 
+                    # 如果数字Id没找到，再根据单据号查找
                     if not stock_id:
                         await cur.execute(
-                            "SELECT Id FROM tb_instockinfohis WHERE InStockNo=%s AND Deleted=1 AND DeletedById=%s LIMIT 1",
-                            (stock_no, operator_id),
+                            "SELECT Id, DeletedById FROM tb_instockinfohis WHERE InStockNo=%s AND Deleted=1 LIMIT 1",
+                            (stock_no,),
                         )
                         row = await cur.fetchone()
                         if row:
                             stock_id = row[0]
                         else:
                             await cur.execute(
-                                "SELECT Id FROM tb_outstockinfohis WHERE OutStockNo=%s AND Deleted=1 AND DeletedById=%s LIMIT 1",
-                                (stock_no, operator_id),
+                                "SELECT Id, DeletedById FROM tb_outstockinfohis WHERE OutStockNo=%s AND Deleted=1 LIMIT 1",
+                                (stock_no,),
                             )
                             row = await cur.fetchone()
                             if row:
                                 stock_id = row[0]
 
                     if not stock_id:
-                        raise ValueError(f"未找到单据 {stock_no} 且删除人为 {operator_id} 的已删除单据")
+                        raise ValueError(f"未找到已删除的单据 {stock_no}")
 
+                    # 调用存储过程恢复单据
                     await cur.execute("CALL proc_ReDeleteStockInfoById(%s, %s)", (stock_id, operator_id))
                     return True
         else:
@@ -666,8 +669,8 @@ class WmsService:
                     sql = f"""
                         UPDATE {table_name}
                         SET IsReceive=%s,
-                            ModifiedById=%s,
-                            ModifiedTime=NOW()
+                            UpdatedById=%s,
+                            UpdatedAt=NOW()
                         WHERE Id=%s AND Deleted=0
                     """
                     await cur.execute(sql, (is_receive, operator_id, stock_id))
