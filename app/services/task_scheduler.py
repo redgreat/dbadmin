@@ -11,6 +11,7 @@ from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from app.models.script import PythonScript
 from app.models.task import Task, TaskLog, TaskStatus, TaskType
 from app.services.celery_dispatcher import (
     dispatch_notify_report_send,
@@ -87,6 +88,13 @@ class TaskScheduler:
                 logger.info(f"已加载 {len(sql_tasks)} 个SQL预警任务")
             except Exception as e:
                 logger.warning(f"加载通知任务失败，可能是表不存在: {e!s}")
+            try:
+                scripts = await PythonScript.filter(status=True).exclude(cron=None).all()
+                for script in scripts:
+                    await self.add_python_script_job(script)
+                logger.info(f"已加载 {len(scripts)} 个Python脚本定时任务")
+            except Exception as e:
+                logger.warning(f"加载Python脚本定时任务失败: {e!s}")
         except Exception as e:
             logger.error(f"加载任务时发生错误: {e!s}")
 
@@ -187,6 +195,38 @@ class TaskScheduler:
         job_id = f"sql_alert_{task_id}"
         if self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
+
+    async def add_python_script_job(self, script: PythonScript):
+        """添加Python脚本定时任务到调度器"""
+        job_id = f"python_script_{script.id}"
+        trigger = self._build_cron_trigger(script.cron)
+        self.scheduler.add_job(
+            self.execute_python_script_task,
+            trigger=trigger,
+            id=job_id,
+            name=script.name,
+            executor="default",
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=60,
+            replace_existing=True,
+            kwargs={"script_id": script.id},
+        )
+        job = self.scheduler.get_job(job_id)
+        if job:
+            script.next_run_time = job.next_run_time
+            await script.save()
+
+    async def remove_python_script_job(self, script_id: int):
+        """从调度器中移除Python脚本定时任务"""
+        job_id = f"python_script_{script_id}"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+    async def execute_python_script_task(self, script_id: int):
+        """执行Python脚本定时任务"""
+        from app.controllers.script import script_controller
+        await script_controller.execute_script(script_id)
 
     async def execute_report_send_task(self, task_id: int):
         celery_task_id = dispatch_notify_report_send(task_id=task_id)

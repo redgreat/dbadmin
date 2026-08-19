@@ -10,6 +10,9 @@ class PythonScript(Model):
     code = fields.TextField(description="脚本内容")
     description = fields.TextField(description="脚本描述", null=True)
     status = fields.BooleanField(default=True, description="是否启用")
+    cron = fields.CharField(max_length=100, description="Cron表达式", null=True)
+    last_run_time = fields.DatetimeField(description="上次执行时间", null=True)
+    next_run_time = fields.DatetimeField(description="下次执行时间", null=True)
     created_at = fields.DatetimeField(auto_now_add=True, description="创建时间")
     updated_at = fields.DatetimeField(auto_now=True, description="更新时间")
 

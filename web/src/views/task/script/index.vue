@@ -47,6 +47,9 @@
             <template #unchecked>禁用</template>
           </n-switch>
         </n-form-item>
+        <n-form-item label="Cron表达式" path="cron">
+          <n-input v-model:value="formData.cron" clearable placeholder="示例: 0 9 * * * (留空则不启用定时)" />
+        </n-form-item>
       </n-form>
       <template #footer>
         <n-space justify="end">
@@ -117,11 +120,22 @@ const statusOptions = [
 const showModal = ref(false)
 const modalTitle = ref('')
 const formRef = ref(null)
-const formData = reactive({ id: null, name: '', code: '', description: '', status: true })
+const formData = reactive({ id: null, name: '', code: '', description: '', status: true, cron: '' })
 
 const formRules = {
   name: [{ required: true, message: '请输入脚本名称' }],
   code: [{ required: true, message: '请输入脚本内容' }],
+  cron: [{
+    validator(_rule, value) {
+      if (!value) return true
+      const parts = value.trim().split(/\s+/)
+      if (parts.length !== 5 && parts.length !== 6) {
+        return new Error('Cron表达式格式错误，请使用5位或6位格式，如: 0 9 * * *')
+      }
+      return true
+    },
+    trigger: 'blur',
+  }],
 }
 
 const showLogModal = ref(false)
@@ -145,6 +159,9 @@ const columns = [
       return h(NTag, { type: row.status ? 'success' : 'default', size: 'small' }, { default: () => (row.status ? '启用' : '禁用') })
     },
   },
+  { title: 'Cron', key: 'cron', width: 140, render(row) { return row.cron || '-' } },
+  { title: '上次执行', key: 'last_run_time', width: 160, render(row) { return row.last_run_time || '-' } },
+  { title: '下次执行', key: 'next_run_time', width: 160, render(row) { return row.next_run_time || '-' } },
   { title: '创建时间', key: 'created_at', width: 160 },
   { title: '更新时间', key: 'updated_at', width: 160 },
   {
@@ -230,6 +247,7 @@ const handleCreate = () => {
   formData.code = ''
   formData.description = ''
   formData.status = true
+  formData.cron = ''
   showModal.value = true
 }
 
@@ -240,6 +258,7 @@ const handleEdit = (row) => {
   formData.code = row.code
   formData.description = row.description
   formData.status = row.status
+  formData.cron = row.cron || ''
   showModal.value = true
 }
 

@@ -13,7 +13,7 @@ class PythonScriptBase(BaseModel):
 
 class PythonScriptCreate(PythonScriptBase):
     """创建脚本请求模型"""
-    pass
+    cron: str | None = Field(None, description="Cron表达式")
 
 
 class PythonScriptUpdate(BaseModel):
@@ -22,11 +22,15 @@ class PythonScriptUpdate(BaseModel):
     code: str | None = Field(None, description="脚本内容")
     description: str | None = Field(None, description="脚本描述")
     status: bool | None = Field(None, description="是否启用")
+    cron: str | None = Field(None, description="Cron表达式")
 
 
 class PythonScriptInDB(PythonScriptBase):
     """数据库中的脚本模型"""
     id: int
+    cron: str | None = None
+    last_run_time: datetime | None = None
+    next_run_time: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

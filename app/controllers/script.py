@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from tortoise.transactions import in_transaction
 
 from app.models.script import PythonScript, ScriptRunLog
+from app.services.task_scheduler import scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,10 @@ class ScriptController:
         async with in_transaction():
             script = await self.model.create(**script_data)
 
+        # 如果脚本启用了定时且有cron表达式，添加到调度器
+        if script.status and script.cron:
+            await scheduler.add_python_script_job(script)
+
         from app.schemas.script import PythonScriptInDB
         return PythonScriptInDB.model_validate(script).model_dump(mode='json')
 
@@ -63,11 +68,26 @@ class ScriptController:
             raise HTTPException(status_code=404, detail=f"脚本 {script_id} 不存在")
 
         update_data = {k: v for k, v in script_data.items() if v is not None}
+        old_status = script.status
+        old_cron = script.cron
 
         async with in_transaction():
             await script.update_from_dict(update_data).save()
 
         script = await self.model.get(id=script_id)
+
+        # 调度器处理：状态或cron变化时更新
+        if "status" in update_data and old_status != script.status:
+            if script.status and script.cron:
+                await scheduler.add_python_script_job(script)
+            else:
+                await scheduler.remove_python_script_job(script.id)
+        elif script.status and "cron" in update_data and old_cron != script.cron:
+            if script.cron:
+                await scheduler.add_python_script_job(script)
+            else:
+                await scheduler.remove_python_script_job(script.id)
+
         from app.schemas.script import PythonScriptInDB
         return PythonScriptInDB.model_validate(script).model_dump(mode='json')
 
@@ -78,6 +98,8 @@ class ScriptController:
             raise HTTPException(status_code=404, detail=f"脚本 {script_id} 不存在")
 
         async with in_transaction():
+            # 从调度器中移除定时任务
+            await scheduler.remove_python_script_job(script_id)
             await script.delete()
 
         return True
@@ -156,6 +178,15 @@ class ScriptController:
             if start_time:
                 run_log.duration = int((end_time - start_time).total_seconds())
             await run_log.save()
+
+            # 更新脚本的上次执行时间和下次执行时间
+            script.last_run_time = run_log.start_time
+            # 从调度器获取下次执行时间
+            if script.cron:
+                job = scheduler.scheduler.get_job(f"python_script_{script.id}")
+                if job:
+                    script.next_run_time = job.next_run_time
+            await script.save(update_fields=["last_run_time", "next_run_time", "updated_at"])
 
     async def get_run_logs(
         self,
