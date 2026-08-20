@@ -13,6 +13,9 @@
         </n-space>
 
         <n-data-table
+          ref="tableRef"
+          v-model:checked-row-keys="checkedRowKeys"
+          :row-key="(row) => row.id"
           :columns="columns"
           :data="tableData"
           :loading="loading"
@@ -20,6 +23,11 @@
           :bordered="false"
           @update:page="handlePageChange"
         />
+
+        <n-space v-if="checkedRowKeys.length > 0" class="mt-3" justify="start">
+          <n-text type="info">已选择 {{ checkedRowKeys.length }} 项</n-text>
+          <n-button type="error" size="small" @click="handleBatchDelete">批量删除</n-button>
+        </n-space>
       </n-card>
     </n-space>
 
@@ -157,6 +165,9 @@ const currentScriptId = ref(null)
 
 const showLogDetailModal = ref(false)
 const currentLog = ref({})
+
+const checkedRowKeys = ref([])
+const tableRef = ref(null)
 
 const columns = [
   { title: 'ID', key: 'id', width: 60 },
@@ -367,6 +378,31 @@ const handleLogPageChange = (page) => {
 const handleViewLogDetail = (row) => {
   currentLog.value = row
   showLogDetailModal.value = true
+}
+
+const handleBatchDelete = () => {
+  if (checkedRowKeys.value.length === 0) {
+    message.warning('请先选择要删除的脚本')
+    return
+  }
+  dialog.warning({
+    title: '确认批量删除',
+    content: `确定要删除选中的 ${checkedRowKeys.value.length} 个脚本吗？`,
+    positiveText: '确定',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        for (const id of checkedRowKeys.value) {
+          await api.deleteScript(id)
+        }
+        message.success('删除成功')
+        checkedRowKeys.value = []
+        fetchData()
+      } catch (e) {
+        message.error('删除失败')
+      }
+    },
+  })
 }
 
 onMounted(() => {
