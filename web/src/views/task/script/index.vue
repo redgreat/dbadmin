@@ -45,11 +45,14 @@
           </n-switch>
         </n-form-item>
         <n-form-item label="脚本内容" path="code">
-          <n-input
-            v-model:value="formData.code"
-            type="textarea"
+          <codemirror
+            v-model="formData.code"
             placeholder="请输入Python脚本内容"
-            style="height: 400px; font-family: monospace; overflow-y: auto"
+            :style="{ height: '400px', width: '100%' }"
+            :autofocus="true"
+            :indent-with-tab="true"
+            :tab-size="4"
+            :extensions="extensions"
           />
         </n-form-item>
       </n-form>
@@ -102,7 +105,13 @@ import { useMessage, useDialog, NButton, NSpace, NTag } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import api from '@/api'
 
+import { Codemirror } from 'vue-codemirror'
+import { python } from '@codemirror/lang-python'
+import { oneDark } from '@codemirror/theme-one-dark'
+
 defineOptions({ name: 'Python脚本管理' })
+
+const extensions = [python(), oneDark]
 
 const message = useMessage()
 const dialog = useDialog()
