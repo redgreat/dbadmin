@@ -63,6 +63,20 @@
             :extensions="extensions"
           />
         </n-form-item>
+        <n-divider>脚本专属环境变量（可选，会覆盖全局变量）</n-divider>
+        <n-form-item label="环境变量">
+          <div style="width: 100%">
+            <n-dynamic-input
+              v-model:value="envConfigList"
+              preset="pair"
+              key-placeholder="变量名"
+              value-placeholder="变量值"
+            />
+            <n-text depth="3" style="font-size: 12px; margin-top: 4px; display: block">
+              在脚本中通过 os.environ.get('变量名') 获取，留空则使用全局环境变量
+            </n-text>
+          </div>
+        </n-form-item>
       </n-form>
       <template #footer>
         <n-space justify="end">
@@ -109,7 +123,7 @@
 
 <script setup>
 import { h, ref, reactive, onMounted } from 'vue'
-import { useMessage, useDialog, NButton, NSpace, NTag } from 'naive-ui'
+import { useMessage, useDialog, NButton, NSpace, NTag, NDynamicInput, NDivider, NText } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import api from '@/api'
 
@@ -140,6 +154,7 @@ const showModal = ref(false)
 const modalTitle = ref('')
 const formRef = ref(null)
 const formData = reactive({ id: null, name: '', code: '', description: '', status: true, cron: '' })
+const envConfigList = ref([])
 
 const formRules = {
   name: [{ required: true, message: '请输入脚本名称' }],
@@ -270,6 +285,7 @@ const handleCreate = () => {
   formData.description = ''
   formData.status = true
   formData.cron = ''
+  envConfigList.value = []
   showModal.value = true
 }
 
@@ -281,6 +297,15 @@ const handleEdit = (row) => {
   formData.description = row.description
   formData.status = row.status
   formData.cron = row.cron || ''
+  // 将env_config对象转换为数组格式
+  if (row.env_config && typeof row.env_config === 'object') {
+    envConfigList.value = Object.entries(row.env_config).map(([key, value]) => ({
+      key,
+      value,
+    }))
+  } else {
+    envConfigList.value = []
+  }
   showModal.value = true
 }
 
@@ -293,11 +318,22 @@ const handleSubmit = async () => {
 
   submitting.value = true
   try {
+    // 将环境变量数组转换为对象格式
+    const envConfig = {}
+    for (const item of envConfigList.value) {
+      if (item.key && item.value) {
+        envConfig[item.key] = item.value
+      }
+    }
+    const submitData = {
+      ...formData,
+      env_config: Object.keys(envConfig).length > 0 ? envConfig : null,
+    }
     if (formData.id) {
-      await api.updateScript(formData.id, formData)
+      await api.updateScript(formData.id, submitData)
       message.success('更新成功')
     } else {
-      await api.createScript(formData)
+      await api.createScript(submitData)
       message.success('创建成功')
     }
     showModal.value = false

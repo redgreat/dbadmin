@@ -180,6 +180,22 @@ export default {
   executeScript: (id) => request.post(`/script/${id}/execute`),
   getScriptLogs: (params = {}) => request.get('/script/logs', { params }),
   getScriptLogById: (id) => request.get(`/script/logs/${id}`),
+  // env - 环境配置管理
+  getEnvConfigs: (params = {}) => request.get('/env/configs', { params }),
+  getEnvConfigById: (id) => request.get(`/env/configs/${id}`),
+  createEnvConfig: (data = {}) => request.post('/env/configs', data),
+  updateEnvConfig: (id, data = {}) => request.put(`/env/configs/${id}`, data),
+  deleteEnvConfig: (id) => request.delete(`/env/configs/${id}`),
+  getAllEnvConfigs: () => request.get('/env/configs/all/get'),
+  // python package - Python包管理
+  getPythonPackages: (params = {}) => request.get('/env/packages', { params }),
+  getPythonPackageById: (id) => request.get(`/env/packages/${id}`),
+  createPythonPackage: (data = {}) => request.post('/env/packages', data),
+  updatePythonPackage: (id, data = {}) => request.put(`/env/packages/${id}`, data),
+  deletePythonPackage: (id) => request.delete(`/env/packages/${id}`),
+  installPythonPackage: (id) => request.post(`/env/packages/${id}/install`),
+  uninstallPythonPackage: (id) => request.post(`/env/packages/${id}/uninstall`),
+  getInstalledPackages: () => request.get('/env/packages/installed/list'),
   // wms - FCC关联功能
   fccParse: (data = {}) => request.post('/wms/fcc/parse', data),
   fccValidate: (data = {}) => request.post('/wms/fcc/validate', data),

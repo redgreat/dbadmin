@@ -34,11 +34,24 @@ class ScriptController:
         total = await query.count()
         items = await query.order_by("-id").offset((page - 1) * limit).limit(limit)
 
-        from app.schemas.script import PythonScriptInDB, PythonScriptList
-        return PythonScriptList(
-            items=[PythonScriptInDB.model_validate(item) for item in items],
-            total=total
-        ).model_dump(mode='json')
+        result = []
+        for item in items:
+            item_data = {
+                "id": item.id,
+                "name": item.name,
+                "code": item.code,
+                "description": item.description,
+                "status": item.status,
+                "cron": item.cron,
+                "env_config": item.env_config,
+                "last_run_time": item.last_run_time.isoformat() if item.last_run_time else None,
+                "next_run_time": item.next_run_time.isoformat() if item.next_run_time else None,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+                "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+            }
+            result.append(item_data)
+
+        return {"total": total, "data": result}
 
     async def get_script(self, script_id: int) -> dict:
         """获取单个脚本详情"""
@@ -46,8 +59,19 @@ class ScriptController:
         if not script:
             raise HTTPException(status_code=404, detail=f"脚本 {script_id} 不存在")
 
-        from app.schemas.script import PythonScriptInDB
-        return PythonScriptInDB.model_validate(script).model_dump(mode='json')
+        return {
+            "id": script.id,
+            "name": script.name,
+            "code": script.code,
+            "description": script.description,
+            "status": script.status,
+            "cron": script.cron,
+            "env_config": script.env_config,
+            "last_run_time": script.last_run_time.isoformat() if script.last_run_time else None,
+            "next_run_time": script.next_run_time.isoformat() if script.next_run_time else None,
+            "created_at": script.created_at.isoformat() if script.created_at else None,
+            "updated_at": script.updated_at.isoformat() if script.updated_at else None,
+        }
 
     async def create_script(self, script_data: dict) -> dict:
         """创建新脚本"""
@@ -58,8 +82,19 @@ class ScriptController:
         if script.status and script.cron:
             await scheduler.add_python_script_job(script)
 
-        from app.schemas.script import PythonScriptInDB
-        return PythonScriptInDB.model_validate(script).model_dump(mode='json')
+        return {
+            "id": script.id,
+            "name": script.name,
+            "code": script.code,
+            "description": script.description,
+            "status": script.status,
+            "cron": script.cron,
+            "env_config": script.env_config,
+            "last_run_time": None,
+            "next_run_time": None,
+            "created_at": script.created_at.isoformat() if script.created_at else None,
+            "updated_at": script.updated_at.isoformat() if script.updated_at else None,
+        }
 
     async def update_script(self, script_id: int, script_data: dict) -> dict:
         """更新脚本"""
@@ -88,8 +123,19 @@ class ScriptController:
             else:
                 await scheduler.remove_python_script_job(script.id)
 
-        from app.schemas.script import PythonScriptInDB
-        return PythonScriptInDB.model_validate(script).model_dump(mode='json')
+        return {
+            "id": script.id,
+            "name": script.name,
+            "code": script.code,
+            "description": script.description,
+            "status": script.status,
+            "cron": script.cron,
+            "env_config": script.env_config,
+            "last_run_time": script.last_run_time.isoformat() if script.last_run_time else None,
+            "next_run_time": script.next_run_time.isoformat() if script.next_run_time else None,
+            "created_at": script.created_at.isoformat() if script.created_at else None,
+            "updated_at": script.updated_at.isoformat() if script.updated_at else None,
+        }
 
     async def delete_script(self, script_id: int) -> bool:
         """删除脚本"""
@@ -138,12 +184,23 @@ class ScriptController:
                 f.write(script.code)
                 temp_file = f.name
 
+            # 获取全局环境变量
+            from app.controllers.env_config import env_config_controller
+            global_env_vars = await env_config_controller.get_all_env_configs()
+
+            # 合并环境变量：全局变量 -> 脚本专属变量（脚本专属优先）
+            run_env = os.environ.copy()
+            run_env.update(global_env_vars)
+            if script.env_config:
+                run_env.update(script.env_config)
+
             # 执行脚本
             process = subprocess.Popen(
                 ['python', temp_file],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                cwd='/home/app'
+                cwd='/home/app',
+                env=run_env
             )
 
             try:

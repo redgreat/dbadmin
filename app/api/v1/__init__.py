@@ -9,6 +9,7 @@ from .base import base_router
 from .conns import conns_router
 from .dicts import dicts_router
 from .ehcf import ehcf_router
+from .env_config import router as env_config_router
 from .imptask import router as imptask_router
 from .imptask.imptask import download_sql_file
 from .menus import menus_router
@@ -48,6 +49,7 @@ v1_router.get("/report/generation/public-download/{generation_id}", summary="公
 # report其他接口 - 需要权限验证
 v1_router.include_router(report_router, prefix="/report", tags=["报表管理"], dependencies=[DependPermisson])
 v1_router.include_router(script_router, prefix="/script", tags=["Python脚本"], dependencies=[DependPermisson])
+v1_router.include_router(env_config_router, prefix="/env", tags=["环境配置"], dependencies=[DependPermisson])
 v1_router.include_router(wms_router, prefix="/wms", tags=["仓储中心"], dependencies=[DependPermisson])
 v1_router.include_router(ehcf_router, prefix="/ehcf", tags=["壹好车服"], dependencies=[DependPermisson])
 v1_router.include_router(alert_router, prefix="/alert", tags=["预警管理"], dependencies=[DependPermisson])
