@@ -20,7 +20,7 @@ async def get_scripts(
 ):
     """获取Python脚本列表"""
     data = await script_controller.get_scripts(page, limit, name, status)
-    return SuccessExtra(data=data["items"], total=data["total"], page=page, page_size=limit)
+    return SuccessExtra(data=data["data"], total=data["total"], page=page, page_size=limit)
 
 
 @router.get("/{script_id:int}", summary="获取脚本详情")
