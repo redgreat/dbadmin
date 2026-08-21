@@ -27,6 +27,7 @@ class WmsService:
     async def validate_stock(self, stock_nos: list[str], validate_type: str, operator_id: str = None) -> dict:
         """
         验证单据状态，支持传入单据编码或数字Id
+        同时查询主表（tb_instockinfo/tb_outstockinfo）和历史表（tb_instockinfohis/tb_outstockinfohis）
 
         Args:
             stock_nos: 单据编码或数字Id列表
@@ -50,29 +51,46 @@ class WmsService:
                 for stock_no in stock_nos:
                     is_numeric = stock_no.isdigit()
 
-                    # 根据输入类型决定主查和备查
+                    # 根据输入类型决定查询顺序：主表和历史表都要查
                     queries = []
                     if is_numeric:
                         doc_id = int(stock_no)
+                        # 先查主表，再查历史表
                         queries = [
-                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type, 'main' AS table_type
+                                    FROM tb_instockinfo WHERE Id=%s""", (doc_id,)),
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type, 'main' AS table_type
+                                    FROM tb_outstockinfo WHERE Id=%s""", (doc_id,)),
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type, 'his' AS table_type
                                     FROM tb_instockinfohis WHERE Id=%s""", (doc_id,)),
-                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type, 'his' AS table_type
                                     FROM tb_outstockinfohis WHERE Id=%s""", (doc_id,)),
-                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type, 'main' AS table_type
+                                    FROM tb_instockinfo WHERE InStockNo=%s""", (stock_no,)),
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type, 'main' AS table_type
+                                    FROM tb_outstockinfo WHERE OutStockNo=%s""", (stock_no,)),
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type, 'his' AS table_type
                                     FROM tb_instockinfohis WHERE InStockNo=%s""", (stock_no,)),
-                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type, 'his' AS table_type
                                     FROM tb_outstockinfohis WHERE OutStockNo=%s""", (stock_no,)),
                         ]
                     else:
                         queries = [
-                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type, 'main' AS table_type
+                                    FROM tb_instockinfo WHERE InStockNo=%s""", (stock_no,)),
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type, 'main' AS table_type
+                                    FROM tb_outstockinfo WHERE OutStockNo=%s""", (stock_no,)),
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type, 'his' AS table_type
                                     FROM tb_instockinfohis WHERE InStockNo=%s""", (stock_no,)),
-                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type, 'his' AS table_type
                                     FROM tb_outstockinfohis WHERE OutStockNo=%s""", (stock_no,)),
-                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type, 'main' AS table_type
+                                    FROM tb_instockinfo WHERE Id=%s""", (stock_no,)),
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type, 'main' AS table_type
+                                    FROM tb_outstockinfo WHERE Id=%s""", (stock_no,)),
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'instock' AS doc_type, 'his' AS table_type
                                     FROM tb_instockinfohis WHERE Id=%s""", (stock_no,)),
-                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type
+                            ("""SELECT Id AS stock_id, Deleted AS deleted, DeletedById, 'outstock' AS doc_type, 'his' AS table_type
                                     FROM tb_outstockinfohis WHERE Id=%s""", (stock_no,)),
                         ]
 
@@ -88,13 +106,14 @@ class WmsService:
                     if not result:
                         not_found_docs.append(stock_no)
                     else:
-                        stock_id, deleted, deleted_by_id, doc_type = result
+                        stock_id, deleted, deleted_by_id, doc_type, table_type = result
                         doc_info = {
                             "stock_id": stock_id,
                             "stock_no": stock_no,
                             "deleted": deleted,
                             "deleted_by_id": deleted_by_id,
-                            "doc_type": doc_type
+                            "doc_type": doc_type,
+                            "table_type": table_type
                         }
 
                         if validate_type == "logical_delete":
@@ -161,7 +180,7 @@ class WmsService:
         return "，".join(parts) if parts else f"所有单据均可{type_name}"
 
     async def fetch_stock_ids_by_nos(self, stock_nos: list[str]) -> dict[str, int]:
-        """根据单据编码或数字Id获取对应的stock_id，优先按输入类型匹配"""
+        """根据单据编码或数字Id获取对应的stock_id，同时查询主表和历史表"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -174,19 +193,28 @@ class WmsService:
                     for stock_no in stock_nos:
                         is_numeric = stock_no.isdigit()
 
+                        # 先查主表，再查历史表
                         queries = []
                         if is_numeric:
                             doc_id = int(stock_no)
                             queries = [
+                                ("SELECT Id FROM tb_instockinfo WHERE Id=%s LIMIT 1", (doc_id,)),
+                                ("SELECT Id FROM tb_outstockinfo WHERE Id=%s LIMIT 1", (doc_id,)),
                                 ("SELECT Id FROM tb_instockinfohis WHERE Id=%s LIMIT 1", (doc_id,)),
                                 ("SELECT Id FROM tb_outstockinfohis WHERE Id=%s LIMIT 1", (doc_id,)),
+                                ("SELECT Id FROM tb_instockinfo WHERE InStockNo=%s LIMIT 1", (stock_no,)),
+                                ("SELECT Id FROM tb_outstockinfo WHERE OutStockNo=%s LIMIT 1", (stock_no,)),
                                 ("SELECT Id FROM tb_instockinfohis WHERE InStockNo=%s LIMIT 1", (stock_no,)),
                                 ("SELECT Id FROM tb_outstockinfohis WHERE OutStockNo=%s LIMIT 1", (stock_no,)),
                             ]
                         else:
                             queries = [
-                                ("SELECT Id FROM tb_instockinfohis WHERE InStockNo=%s AND Deleted=0 LIMIT 1", (stock_no,)),
-                                ("SELECT Id FROM tb_outstockinfohis WHERE OutStockNo=%s AND Deleted=0 LIMIT 1", (stock_no,)),
+                                ("SELECT Id FROM tb_instockinfo WHERE InStockNo=%s LIMIT 1", (stock_no,)),
+                                ("SELECT Id FROM tb_outstockinfo WHERE OutStockNo=%s LIMIT 1", (stock_no,)),
+                                ("SELECT Id FROM tb_instockinfohis WHERE InStockNo=%s LIMIT 1", (stock_no,)),
+                                ("SELECT Id FROM tb_outstockinfohis WHERE OutStockNo=%s LIMIT 1", (stock_no,)),
+                                ("SELECT Id FROM tb_instockinfo WHERE Id=%s LIMIT 1", (stock_no,)),
+                                ("SELECT Id FROM tb_outstockinfo WHERE Id=%s LIMIT 1", (stock_no,)),
                                 ("SELECT Id FROM tb_instockinfohis WHERE Id=%s LIMIT 1", (stock_no,)),
                                 ("SELECT Id FROM tb_outstockinfohis WHERE Id=%s LIMIT 1", (stock_no,)),
                             ]
@@ -203,10 +231,7 @@ class WmsService:
         return result
 
     async def delete_logical_batch(self, stock_nos: list[str], operator_id: str) -> tuple[int, list[str]]:
-        """批量逻辑删除单据（逐行调用存储过程）"""
-        # 先根据单据编码获取Id
-        stock_no_id_map = await self.fetch_stock_ids_by_nos(stock_nos)
-
+        """批量逻辑删除单据，同时删除主表和历史表中的记录"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -214,29 +239,45 @@ class WmsService:
         success = 0
         failed: list[str] = []
 
-        for stock_no in stock_nos:
-            stock_id = stock_no_id_map.get(stock_no)
-            if not stock_id:
-                failed.append(stock_no)
-                continue
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                for stock_no in stock_nos:
+                    try:
+                        # 查找主表和历史表中的所有匹配记录
+                        stock_ids = []
 
-            try:
-                if isinstance(pool, aiomysql.Pool):
-                    async with pool.acquire() as conn, conn.cursor() as cur:
-                        # 调用存储过程：逻辑删除单据，参数：stock_id, operator_id
-                        await cur.execute("CALL proc_DeleteStockInfoById(%s, %s)", (stock_id, operator_id))
-                else:
-                    raise ValueError("不支持的连接池类型")
-                success += 1
-            except Exception:
-                failed.append(stock_no)
+                        # 按Id或单据号查找主表和历史表
+                        search_queries = [
+                            ("SELECT Id FROM tb_instockinfo WHERE Id=%s OR InStockNo=%s", (stock_no, stock_no)),
+                            ("SELECT Id FROM tb_outstockinfo WHERE Id=%s OR OutStockNo=%s", (stock_no, stock_no)),
+                            ("SELECT Id FROM tb_instockinfohis WHERE Id=%s OR InStockNo=%s", (stock_no, stock_no)),
+                            ("SELECT Id FROM tb_outstockinfohis WHERE Id=%s OR OutStockNo=%s", (stock_no, stock_no)),
+                        ]
+
+                        for sql, params in search_queries:
+                            await cur.execute(sql, params)
+                            rows = await cur.fetchall()
+                            for row in rows:
+                                stock_ids.append(row[0])
+
+                        if not stock_ids:
+                            failed.append(stock_no)
+                            continue
+
+                        # 对每条记录都调用存储过程删除
+                        for stock_id in stock_ids:
+                            await cur.execute("CALL proc_DeleteStockInfoById(%s, %s)", (stock_id, operator_id))
+
+                        success += 1
+                    except Exception:
+                        failed.append(stock_no)
+        else:
+            raise ValueError("不支持的连接池类型")
+
         return success, failed
 
     async def delete_physical_batch(self, stock_nos: list[str], operator_id: str) -> tuple[int, list[str]]:
-        """批量物理删除单据（逐行调用存储过程）"""
-        # 先根据单据编码获取Id
-        stock_no_id_map = await self.fetch_stock_ids_by_nos(stock_nos)
-
+        """批量物理删除单据，同时删除主表和历史表中的记录"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -244,22 +285,41 @@ class WmsService:
         success = 0
         failed: list[str] = []
 
-        for stock_no in stock_nos:
-            stock_id = stock_no_id_map.get(stock_no)
-            if not stock_id:
-                failed.append(stock_no)
-                continue
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn, conn.cursor() as cur:
+                for stock_no in stock_nos:
+                    try:
+                        # 查找主表和历史表中的所有匹配记录
+                        stock_ids = []
 
-            try:
-                if isinstance(pool, aiomysql.Pool):
-                    async with pool.acquire() as conn, conn.cursor() as cur:
-                        # 调用存储过程：物理删除单据，参数：stock_id
-                        await cur.execute("CALL proc_TruncateStockInfoById(%s)", (stock_id,))
-                else:
-                    raise ValueError("不支持的连接池类型")
-                success += 1
-            except Exception:
-                failed.append(stock_no)
+                        # 按Id或单据号查找主表和历史表
+                        search_queries = [
+                            ("SELECT Id FROM tb_instockinfo WHERE Id=%s OR InStockNo=%s", (stock_no, stock_no)),
+                            ("SELECT Id FROM tb_outstockinfo WHERE Id=%s OR OutStockNo=%s", (stock_no, stock_no)),
+                            ("SELECT Id FROM tb_instockinfohis WHERE Id=%s OR InStockNo=%s", (stock_no, stock_no)),
+                            ("SELECT Id FROM tb_outstockinfohis WHERE Id=%s OR OutStockNo=%s", (stock_no, stock_no)),
+                        ]
+
+                        for sql, params in search_queries:
+                            await cur.execute(sql, params)
+                            rows = await cur.fetchall()
+                            for row in rows:
+                                stock_ids.append(row[0])
+
+                        if not stock_ids:
+                            failed.append(stock_no)
+                            continue
+
+                        # 对每条记录都调用存储过程删除
+                        for stock_id in stock_ids:
+                            await cur.execute("CALL proc_TruncateStockInfoById(%s)", (stock_id,))
+
+                        success += 1
+                    except Exception:
+                        failed.append(stock_no)
+        else:
+            raise ValueError("不支持的连接池类型")
+
         return success, failed
 
     async def restore_logical(self, stock_no: str, operator_id: str) -> bool:
