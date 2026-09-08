@@ -37,6 +37,21 @@ class WmsService:
         # ("tb_purchase_return_info", "tb_purchase_return_info_his", "PurchaseReturnNo", "purchase_return"),
     ]
 
+    # ------------------------------------------------------------------
+    # 价格查询表配置：主表(进行中) 与 历史表(已完成) 均支持查询与修改
+    # 格式: (主表, 主表明细, 历史表, 历史明细, No字段, 关联字段, 价格字段, 数量字段, doc_type)
+    # ------------------------------------------------------------------
+    PRICE_TABLES: list[tuple[str, str, str, str, str, str, str, str, str]] = [
+        (
+            "tb_instockinfo", "tb_instockdetail", "tb_instockinfohis", "tb_instockdetailhis",
+            "InStockNo", "InStockId", "InStockPrice", "InStockedNum", "instock",
+        ),
+        (
+            "tb_outstockinfo", "tb_outstockdetail", "tb_outstockinfohis", "tb_outstockdetailhis",
+            "OutStockNo", "OutStockId", "OutStockPrice", "OutStockedNum", "outstock",
+        ),
+    ]
+
     async def _ensure_pool(self) -> None:
         """确保连接池已注册"""
         await db_pool.ensure_pool(await _get_conn_id())
@@ -379,9 +394,65 @@ class WmsService:
         else:
             raise ValueError("不支持的连接池类型")
 
+    async def _fetch_owing_status(self, cur, detail_id: str) -> dict:
+        """
+        查询明细对应的应付单对账状态（主表 + 历史表），判断是否允许修改价格。
+        判断逻辑与存储过程 proc_StockPriceChange 保持一致：
+        若存在满足以下任一条件的应付记录，则视为"已对账/部分对账"，不允许修改：
+          ReconcStatus IN (1,2)   —— 部分对账 / 已对账
+          OwingStatus  IN (2,3,4) —— 申请中 / 部分付款 / 已付款
+          UnReconcNum <> StockNum —— 待对账数量不等于数量（已发生部分对账）
+
+        Returns:
+            {"can_modify": bool, "reconc_status": int|None, "owing_status": int|None,
+             "stock_no": str, "material_name": str, "reason": str}
+        """
+        for table_name, label in (("tb_owinginfo", "应付单"), ("tb_owinginfohis", "应付单历史")):
+            sql = f"""
+                SELECT StockNo, MaterialName, ReconcStatus, OwingStatus, UnReconcNum, StockNum
+                FROM {table_name}
+                WHERE StockDetailId=%s AND Deleted=0
+                LIMIT 1
+            """
+            await cur.execute(sql, (detail_id,))
+            row = await cur.fetchone()
+            if row:
+                stock_no, material_name, reconc_status, owing_status, unreconc_num, stock_num = row
+                if (reconc_status in (1, 2)
+                        or owing_status in (2, 3, 4)
+                        or (unreconc_num is not None and stock_num is not None and float(unreconc_num) != float(stock_num))):
+                    return {
+                        "can_modify": False,
+                        "reconc_status": reconc_status,
+                        "owing_status": owing_status,
+                        "stock_no": stock_no,
+                        "material_name": material_name,
+                        "reason": f"单据「{stock_no}」的物料「{material_name}」已对账或部分对账，不再允许价格调整",
+                    }
+                # 存在应付记录但未对账，视为允许修改
+                return {
+                    "can_modify": True,
+                    "reconc_status": reconc_status,
+                    "owing_status": owing_status,
+                    "stock_no": stock_no,
+                    "material_name": material_name,
+                    "reason": "",
+                }
+
+        # 无应付单记录，允许修改
+        return {
+            "can_modify": True,
+            "reconc_status": None,
+            "owing_status": None,
+            "stock_no": "",
+            "material_name": "",
+            "reason": "",
+        }
+
     async def query_price(self, stock_code: str, material_name: str, new_price: str) -> list[dict]:
         """
-        查询价格信息，支持入库单和出库单
+        查询价格信息，支持入库单/出库单，以及进行中(主表)/已完成(历史表) 四类单据。
+        每行结果附带对账状态与是否可修改标记。
 
         Args:
             stock_code: 单据编码（入库单或出库单）
@@ -389,7 +460,8 @@ class WmsService:
             new_price: 修改后价格
 
         Returns:
-            查询结果列表
+            查询结果列表，每项包含 detail_id / material_name / original_price / num /
+            doc_type / table_type / stock_no / new_price / can_modify / 对账状态等
         """
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
@@ -399,66 +471,53 @@ class WmsService:
         results = []
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn, conn.cursor() as cur:
-                # 先尝试查询入库单
-                sql_instock = """
-                        SELECT b.Id AS detail_id,b.MaterialName AS material_name,
-                        b.InStockPrice AS original_price,b.InStockedNum AS instocked_num,
-                        'instock' AS doc_type
-                        FROM tb_instockinfohis a
-                        JOIN tb_instockdetailhis b
-                          ON b.InStockId=a.Id
-                          AND b.MaterialName LIKE %s
-                          AND b.Deleted=0
-                        WHERE a.InStockNo=%s
-                          AND a.Deleted=0;
-                    """
-                params = [f"%{material_name}%", stock_code]
-                await cur.execute(sql_instock, params)
-                rows = await cur.fetchall()
+                for (main_table, main_detail, his_table, his_detail,
+                     no_field, fk_field, price_field, num_field, doc_type) in self.PRICE_TABLES:
 
-                for row in rows:
-                    results.append({
-                        "detail_id": str(row[0]),
-                        "material_name": str(row[1]),
-                        "original_price": str(row[2]),
-                        "instocked_num": str(row[3]) if row[3] is not None else "0",
-                        "doc_type": row[4],
-                        "new_price": new_price
-                    })
-
-                # 如果入库单没查到，尝试查询出库单
-                if not results:
-                    sql_outstock = """
-                            SELECT b.Id AS detail_id,b.MaterialName AS material_name,
-                            b.OutStockPrice AS original_price,b.OutStockedNum AS instocked_num,
-                            'outstock' AS doc_type
-                            FROM tb_outstockinfohis a
-                            JOIN tb_outstockdetailhis b
-                              ON b.OutStockId=a.Id
+                    # 依次查询：历史表(已完成) → 主表(进行中)
+                    for table, detail, table_type in ((his_table, his_detail, "his"),
+                                                      (main_table, main_detail, "main")):
+                        sql = f"""
+                            SELECT b.Id, b.MaterialName, b.{price_field}, b.{num_field},
+                                   a.{no_field}, '{doc_type}', '{table_type}'
+                            FROM {table} a
+                            JOIN {detail} b
+                              ON b.{fk_field}=a.Id
                               AND b.MaterialName LIKE %s
                               AND b.Deleted=0
-                            WHERE a.OutStockNo=%s
-                              AND a.Deleted=0;
+                            WHERE a.{no_field}=%s
+                              AND a.Deleted=0
                         """
-                    await cur.execute(sql_outstock, params)
-                    rows = await cur.fetchall()
-
-                    for row in rows:
-                        results.append({
-                            "detail_id": str(row[0]),
-                            "material_name": str(row[1]),
-                            "original_price": str(row[2]),
-                            "instocked_num": str(row[3]) if row[3] is not None else "0",
-                            "doc_type": row[4],
-                            "new_price": new_price
-                        })
+                        await cur.execute(sql, (f"%{material_name}%", stock_code))
+                        rows = await cur.fetchall()
+                        for row in rows:
+                            detail_id = str(row[0])
+                            owing = await self._fetch_owing_status(cur, detail_id)
+                            results.append({
+                                "detail_id": detail_id,
+                                "material_name": str(row[1]),
+                                "original_price": str(row[2]),
+                                "num": str(row[3]) if row[3] is not None else "0",
+                                "instocked_num": str(row[3]) if row[3] is not None else "0",
+                                "stock_no": str(row[4]) if row[4] else stock_code,
+                                "doc_type": row[5],
+                                "table_type": row[6],
+                                "new_price": new_price,
+                                "can_modify": owing["can_modify"],
+                                "reconc_status": owing["reconc_status"],
+                                "owing_status": owing["owing_status"],
+                                "reason": owing["reason"],
+                            })
         else:
             raise ValueError("不支持的连接池类型")
 
         return results
 
     async def validate_owing_status(self, stock_id: str) -> dict:
-        """验证应付单是否对账，有记录时ReconcStatus必须为0"""
+        """
+        验证应付单是否对账（stock_id 实为出入库明细 Id，对应 tb_owinginfo.StockDetailId）。
+        判断逻辑与存储过程 proc_StockPriceChange 一致。
+        """
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -466,48 +525,35 @@ class WmsService:
 
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn, conn.cursor() as cur:
-                # 查询应付单
-                sql_owing = "SELECT ReconcStatus FROM whcenter.tb_owinginfo WHERE StockId=%s LIMIT 1"
-                await cur.execute(sql_owing, (stock_id,))
-                row = await cur.fetchone()
-                if row:
-                    reconc_status = row[0]
-                    if reconc_status != 0:
-                        return {
-                            "success": False,
-                            "message": f"应付单已对账，ReconcStatus={ReconcStatus}（需为0未对账）",
-                            "reconc_status": reconc_status,
-                        }
-                    return {"success": True, "message": "应付单未对账，允许修改", "reconc_status": reconc_status}
-
-                # 查询应付单历史
-                sql_owing_his = "SELECT ReconcStatus FROM whcenter.tb_owinginfohis WHERE StockId=%s LIMIT 1"
-                await cur.execute(sql_owing_his, (stock_id,))
-                row = await cur.fetchone()
-                if row:
-                    reconc_status = row[0]
-                    if reconc_status != 0:
-                        return {
-                            "success": False,
-                            "message": f"应付单历史已对账，ReconcStatus={ReconcStatus}（需为0未对账）",
-                            "reconc_status": reconc_status,
-                        }
-                    return {"success": True, "message": "应付单历史未对账，允许修改", "reconc_status": reconc_status}
-
-                return {"success": True, "message": "无应付单记录，允许修改", "reconc_status": None}
+                owing = await self._fetch_owing_status(cur, stock_id)
+                if owing["can_modify"]:
+                    return {
+                        "success": True,
+                        "message": "应付单未对账，允许修改",
+                        "reconc_status": owing["reconc_status"],
+                        "owing_status": owing["owing_status"],
+                    }
+                return {
+                    "success": False,
+                    "message": owing["reason"] or "应付单已对账，不允许修改价格",
+                    "reconc_status": owing["reconc_status"],
+                    "owing_status": owing["owing_status"],
+                }
         else:
             raise ValueError("不支持的连接池类型")
 
-    async def modify_price(self, detail_id: str, new_price: str) -> bool:
+    async def modify_price(self, detail_id: str, new_price: str) -> dict:
         """
-        修改价格
+        修改价格：调用存储过程 proc_StockPriceChange(InDetailId, NewPrice)。
+        存储过程返回结果集 (Result AS ErType, sys_ErrMessage AS ErMessage)，
+        其中 Result=-1 表示单据已对账或部分对账，不允许修改。
 
         Args:
-            detail_id: 明细Id
+            detail_id: 明细Id（入库明细或出库明细）
             new_price: 修改后价格
 
         Returns:
-            是否修改成功
+            {"success": bool, "message": str}
         """
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
@@ -516,10 +562,19 @@ class WmsService:
 
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn, conn.cursor() as cur:
-                # TODO: 请根据实际业务需求修改存储过程名称和参数
-                # 调用存储过程：修改价格，参数：detail_id, new_price
                 await cur.execute("CALL proc_StockPriceChange(%s, %s)", (detail_id, new_price))
-                return True
+
+                # 存储过程末尾 SELECT Result AS ErType, sys_ErrMessage AS ErMessage
+                row = await cur.fetchone()
+                if row:
+                    result_code = row[0]
+                    err_message = row[1] if len(row) > 1 and row[1] else ""
+                    if result_code is not None and int(result_code) == -1:
+                        return {
+                            "success": False,
+                            "message": err_message or "单据已对账或部分对账，不允许修改价格",
+                        }
+                return {"success": True, "message": "价格修改成功"}
         else:
             raise ValueError("不支持的连接池类型")
 

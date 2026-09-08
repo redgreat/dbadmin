@@ -66,7 +66,7 @@ class PriceModifyIn(BaseModel):
 
 class OwingValidateIn(BaseModel):
     """应付单验证入参"""
-    stock_id: str = Field(..., description="出入库单Id")
+    stock_id: str = Field(..., description="出入库明细Id（对应 tb_owinginfo.StockDetailId）")
 
 
 class PriceQueryResult(BaseModel):
@@ -74,7 +74,15 @@ class PriceQueryResult(BaseModel):
     detail_id: str = Field(..., description="明细Id")
     material_name: str = Field(..., description="物料名称")
     original_price: str = Field(..., description="原价格")
-    new_price: str = Field(..., description="新价格")
+    num: str = Field(default="", description="数量")
+    stock_no: str = Field(default="", description="单据编码")
+    doc_type: str = Field(default="", description="单据类型: instock-入库 outstock-出库")
+    table_type: str = Field(default="", description="数据来源: main-进行中 his-已完成")
+    new_price: str = Field(default="", description="修改后价格")
+    can_modify: bool = Field(default=False, description="是否允许修改价格")
+    reconc_status: int | None = Field(default=None, description="对账状态")
+    owing_status: int | None = Field(default=None, description="付款状态")
+    reason: str = Field(default="", description="不可修改原因")
 
 
 # FCC关联功能相关模型

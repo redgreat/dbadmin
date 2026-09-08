@@ -247,13 +247,17 @@ async def price_modify(req: Request, body: PriceModifyIn):
     """修改价格"""
     try:
         try:
-            await wms_service.modify_price(
+            result = await wms_service.modify_price(
                 detail_id=body.detail_id,
                 new_price=body.new_price
             )
         except Exception as e:
             logger.error(f"价格修改失败: {e}")
             return Fail(code=500, msg=f"执行失败: {e!s}")
+
+        if not result.get("success"):
+            # 单据已对账或部分对账，不允许修改
+            return Fail(code=400, msg=result.get("message", "价格修改失败"))
 
         try:
             token = req.headers.get("token")
@@ -281,7 +285,7 @@ async def price_modify(req: Request, body: PriceModifyIn):
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")
 
-        return Success(msg="价格修改成功")
+        return Success(msg=result.get("message", "价格修改成功"))
     except Exception as e:
         logger.error(f"接口异常: {e}")
         return Fail(code=500, msg="服务异常")

@@ -21,14 +21,6 @@
         </n-space>
       </n-form>
 
-      <!-- 应付单验证结果 -->
-      <n-divider />
-      <n-card v-if="owingResult" title="应付单验证" size="small" class="mt-4">
-        <n-alert :type="owingResult.success ? 'success' : 'error'">
-          {{ owingResult.message }}
-        </n-alert>
-      </n-card>
-      
       <n-divider />
       
       <n-data-table
@@ -59,7 +51,6 @@ const priceForm = ref({ stock_code: '', material_name: '', new_price: '', remark
 const priceResults = ref([])
 const priceQuerying = ref(false)
 const priceModifying = ref(false)
-const owingResult = ref(null)
 
 const priceRules = {
   new_price: [
@@ -74,20 +65,26 @@ const priceRules = {
   ],
 }
 
+const docTypeMap = { instock: '入库单', outstock: '出库单' }
+const tableTypeMap = { main: '进行中', his: '已完成' }
+
 const priceColumns = [
   { title: '明细Id', key: 'detail_id' },
+  { title: '单据编码', key: 'stock_no' },
   { title: '物料名称', key: 'material_name' },
-  { title: '单据类型', key: 'doc_type' },
+  { title: '单据类型', key: 'doc_type', render: (row) => docTypeMap[row.doc_type] || row.doc_type },
+  { title: '单据状态', key: 'table_type', render: (row) => tableTypeMap[row.table_type] || row.table_type },
   { title: '原价格', key: 'original_price' },
   { title: '数量', key: 'instocked_num' },
   { title: '新价格', key: 'new_price' },
+  { title: '对账状态', key: 'can_modify', render: (row) => row.can_modify ? '可修改' : '已对账' },
+  { title: '说明', key: 'reason' },
 ]
 
-const canModify = computed(() => priceResults.value.length === 1)
+const canModify = computed(() => priceResults.value.length === 1 && priceResults.value[0].can_modify === true)
 
 const handlePriceQuery = async () => {
   priceQuerying.value = true
-  owingResult.value = null
   try {
     const res = await api.queryPrice({
       stock_code: priceForm.value.stock_code,
@@ -102,9 +99,12 @@ const handlePriceQuery = async () => {
       } else if (priceResults.value.length > 1) {
         message.warning('查询到多条记录，请缩小查询范围')
       } else {
-        message.success('查询成功')
-        // 验证应付单状态
-        await handleValidateOwing(priceResults.value[0].detail_id)
+        const row = priceResults.value[0]
+        if (row.can_modify === false) {
+          message.warning(row.reason || '单据已对账，不允许修改价格')
+        } else {
+          message.success('查询成功')
+        }
       }
     } else {
       message.error(res.msg || '查询失败')
@@ -116,37 +116,19 @@ const handlePriceQuery = async () => {
   }
 }
 
-const handleValidateOwing = async (stockId) => {
-  if (!stockId) return
-  try {
-    const res = await api.validateOwing({ stock_id: stockId })
-    if (res.code === 200) {
-      owingResult.value = res.data
-      if (!res.data.success) {
-        message.error('应付单验证不通过：' + res.data.message)
-      }
-    } else {
-      message.error('应付单验证失败：' + (res.msg || '未知错误'))
-    }
-  } catch (e) {
-    message.error('应付单验证异常')
-  }
-}
-
 const handlePriceModify = async () => {
   if (priceResults.value.length !== 1) {
     message.error('请先查询出唯一一条记录')
     return
   }
 
-  // 先验证应付单状态
   const detail = priceResults.value[0]
-  await handleValidateOwing(detail.detail_id)
-  if (owingResult.value && !owingResult.value.success) {
-    message.error('应付单验证不通过，无法修改价格')
+  // 查询结果已附带对账状态，直接拦截已对账单据
+  if (detail.can_modify === false) {
+    message.error(detail.reason || '单据已对账，不允许修改价格')
     return
   }
-  
+
   priceModifying.value = true
   try {
     const res = await api.modifyPrice({
