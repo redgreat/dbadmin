@@ -471,12 +471,16 @@ class WmsService:
         results = []
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn, conn.cursor() as cur:
+                # 同一明细 Id 可能同时存在于主表(进行中)和历史表(已完成)，
+                # 存储过程会同时更新两张表，故按 detail_id 去重，主表优先。
+                seen_detail_ids: set[str] = set()
+
                 for (main_table, main_detail, his_table, his_detail,
                      no_field, fk_field, price_field, num_field, doc_type) in self.PRICE_TABLES:
 
-                    # 依次查询：历史表(已完成) → 主表(进行中)
-                    for table, detail, table_type in ((his_table, his_detail, "his"),
-                                                      (main_table, main_detail, "main")):
+                    # 依次查询：主表(进行中) → 历史表(已完成)
+                    for table, detail, table_type in ((main_table, main_detail, "main"),
+                                                      (his_table, his_detail, "his")):
                         sql = f"""
                             SELECT b.Id, b.MaterialName, b.{price_field}, b.{num_field},
                                    a.{no_field}, '{doc_type}', '{table_type}'
@@ -492,6 +496,9 @@ class WmsService:
                         rows = await cur.fetchall()
                         for row in rows:
                             detail_id = str(row[0])
+                            if detail_id in seen_detail_ids:
+                                continue
+                            seen_detail_ids.add(detail_id)
                             owing = await self._fetch_owing_status(cur, detail_id)
                             results.append({
                                 "detail_id": detail_id,

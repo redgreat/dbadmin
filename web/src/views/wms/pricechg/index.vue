@@ -16,7 +16,7 @@
         </n-form-item>
         <n-space>
           <n-button type="primary" :loading="priceQuerying" @click="handlePriceQuery">查询</n-button>
-          <n-button type="warning" :loading="priceModifying" :disabled="!canModify" @click="handlePriceModify">修改</n-button>
+          <n-button type="warning" :loading="priceModifying" :disabled="!canModify" @click="handlePriceModify">{{ modifyButtonText }}</n-button>
           <n-button @click="handlePriceReset">重置</n-button>
         </n-space>
       </n-form>
@@ -81,7 +81,12 @@ const priceColumns = [
   { title: '说明', key: 'reason' },
 ]
 
-const canModify = computed(() => priceResults.value.length === 1 && priceResults.value[0].can_modify === true)
+const canModify = computed(() => priceResults.value.some((r) => r.can_modify === true))
+
+const modifyButtonText = computed(() => {
+  const count = priceResults.value.filter((r) => r.can_modify === true).length
+  return count > 1 ? `批量修改(${count})` : '修改'
+})
 
 const handlePriceQuery = async () => {
   priceQuerying.value = true
@@ -96,14 +101,12 @@ const handlePriceQuery = async () => {
       priceResults.value = res.data || []
       if (priceResults.value.length === 0) {
         message.warning('未查询到符合条件的记录')
-      } else if (priceResults.value.length > 1) {
-        message.warning('查询到多条记录，请缩小查询范围')
       } else {
-        const row = priceResults.value[0]
-        if (row.can_modify === false) {
-          message.warning(row.reason || '单据已对账，不允许修改价格')
+        const cannot = priceResults.value.filter((r) => r.can_modify === false)
+        if (cannot.length > 0) {
+          message.warning(`查询到 ${priceResults.value.length} 条记录，其中 ${cannot.length} 条已对账不可修改`)
         } else {
-          message.success('查询成功')
+          message.success(`查询到 ${priceResults.value.length} 条记录，可批量修改`)
         }
       }
     } else {
@@ -117,34 +120,45 @@ const handlePriceQuery = async () => {
 }
 
 const handlePriceModify = async () => {
-  if (priceResults.value.length !== 1) {
-    message.error('请先查询出唯一一条记录')
+  if (priceResults.value.length === 0) {
+    message.error('请先查询出记录')
     return
   }
 
-  const detail = priceResults.value[0]
-  // 查询结果已附带对账状态，直接拦截已对账单据
-  if (detail.can_modify === false) {
-    message.error(detail.reason || '单据已对账，不允许修改价格')
+  // 过滤出可修改的记录，循环调用存储过程更新
+  const modifiable = priceResults.value.filter((r) => r.can_modify === true)
+  if (modifiable.length === 0) {
+    message.error('查询到的记录均已对账，不允许修改价格')
     return
   }
 
   priceModifying.value = true
+  let successCount = 0
+  const failList = []
   try {
-    const res = await api.modifyPrice({
-      detail_id: detail.detail_id,
-      new_price: priceForm.value.new_price,
-      remark: priceForm.value.remark,
-    })
-    if (res.code === 200) {
-      message.success('价格修改成功')
-      // 重新查询以更新结果
-      await handlePriceQuery()
-    } else {
-      message.error(res.msg || '价格修改失败')
+    for (const detail of modifiable) {
+      try {
+        const res = await api.modifyPrice({
+          detail_id: detail.detail_id,
+          new_price: priceForm.value.new_price,
+          remark: priceForm.value.remark,
+        })
+        if (res.code === 200) {
+          successCount++
+        } else {
+          failList.push(`${detail.material_name}：${res.msg || '失败'}`)
+        }
+      } catch (e) {
+        failList.push(detail.material_name)
+      }
     }
-  } catch (e) {
-    message.error('请求异常')
+    if (failList.length === 0) {
+      message.success(`价格修改成功，共 ${successCount} 条`)
+    } else {
+      message.warning(`修改完成：成功 ${successCount} 条，失败 ${failList.length} 条`)
+    }
+    // 重新查询以更新结果
+    await handlePriceQuery()
   } finally {
     priceModifying.value = false
   }
