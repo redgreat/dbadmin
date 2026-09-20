@@ -289,25 +289,58 @@ class WmsService:
         failed: list[str] = []
 
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn, conn.cursor() as cur:
-                for stock_no in stock_nos:
-                    try:
-                        # 使用统一查询方法查找所有匹配记录（含扩展表）
-                        all_rows = await self._find_all_stock_docs(cur, stock_no, select_cols="Id")
+            for stock_no in stock_nos:
+                try:
+                    # 为每个单据使用独立的连接，确保存储过程失败不影响其他单据
+                    async with pool.acquire() as conn:
+                        async with conn.cursor() as cur:
+                            # 使用统一查询方法查找所有匹配记录（含扩展表）
+                            all_rows = await self._find_all_stock_docs(cur, stock_no, select_cols="Id, Deleted")
 
-                        if not all_rows:
-                            failed.append(stock_no)
-                            continue
+                            if not all_rows:
+                                logger.warning(f"[delete_logical_batch] 未找到单据 stock_no={stock_no}")
+                                failed.append(stock_no)
+                                continue
 
-                        # 对每条记录都调用存储过程删除
-                        for row in all_rows:
-                            stock_id = row[0]
-                            await cur.execute("CALL proc_DeleteStockInfoById(%s, %s)", (stock_id, operator_id))
+                            logger.info(f"[delete_logical_batch] 找到单据 stock_no={stock_no}, 记录数={len(all_rows)}, 详情={all_rows}")
 
-                        success += 1
-                    except Exception as e:
-                        logger.error(f"[delete_logical_batch] 删除失败 stock_no={stock_no}: {e}")
-                        failed.append(stock_no)
+                            # 检查是否有可删除的记录（Deleted=0）
+                            deletable_rows = [row for row in all_rows if row[1] == 0]
+                            if not deletable_rows:
+                                logger.warning(f"[delete_logical_batch] 单据 stock_no={stock_no} 已全部被逻辑删除或无有效记录，共找到 {len(all_rows)} 条记录")
+                                failed.append(stock_no)
+                                continue
+
+                            # 对每条可删除的记录调用存储过程
+                            delete_success = 0
+                            last_error = ""
+                            for row in deletable_rows:
+                                stock_id = row[0]
+                                try:
+                                    await cur.execute("CALL proc_DeleteStockInfoById(%s, %s)", (stock_id, operator_id))
+                                    # 检查存储过程是否有返回结果
+                                    try:
+                                        result = await cur.fetchone()
+                                        if result:
+                                            logger.info(f"[delete_logical_batch] 存储过程返回: stock_id={stock_id}, result={result}")
+                                    except Exception:
+                                        pass  # 存储过程可能没有返回结果集
+                                    delete_success += 1
+                                except Exception as proc_e:
+                                    error_msg = str(proc_e)
+                                    last_error = error_msg
+                                    logger.error(f"[delete_logical_batch] 存储过程删除失败 stock_no={stock_no}, stock_id={stock_id}: {error_msg}")
+
+                            if delete_success > 0:
+                                success += 1
+                                logger.info(f"[delete_logical_batch] 删除成功 stock_no={stock_no}, 成功删除 {delete_success} 条")
+                            else:
+                                failed.append(stock_no)
+                                logger.warning(f"[delete_logical_batch] 删除失败 stock_no={stock_no}, 最后错误: {last_error}")
+
+                except Exception as e:
+                    logger.error(f"[delete_logical_batch] 删除失败 stock_no={stock_no}: {e}")
+                    failed.append(stock_no)
         else:
             raise ValueError("不支持的连接池类型")
 

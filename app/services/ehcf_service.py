@@ -556,6 +556,46 @@ class EhcfService:
                                 "UPDATE tb_workorderstatus SET WorkStatus=10 WHERE WorkOrderId=%s",
                                 (wo_id,),
                             )
+
+                            # 查询 ServiceProviderCode，根据不同服务商调用对应的存储过程
+                            await cur.execute(
+                                "SELECT ServiceProviderCode FROM tb_workorderinfo WHERE Id=%s",
+                                (wo_id,),
+                            )
+                            sp_row = await cur.fetchone()
+                            sp_code = str(sp_row[0]) if sp_row and sp_row[0] else ""
+
+                            if sp_code == "1067":
+                                # 壹好车服：调用 proc_ChpCompletedWorkOrderById
+                                try:
+                                    await cur.execute(
+                                        "CALL proc_ChpCompletedWorkOrderById(%s)",
+                                        (wo_id,),
+                                    )
+                                    logger.info(f"工单 {wo_id} 调用 proc_ChpCompletedWorkOrderById 成功")
+                                except Exception as sp_e:
+                                    logger.warning(f"工单 {wo_id} 调用 proc_ChpCompletedWorkOrderById 失败: {sp_e}")
+
+                            elif sp_code == "1003":
+                                # 服务商1003：调用 proc_VhsCompletedWorkOrderById 和 proc_VhsCompletedWorkOrderInfoById
+                                try:
+                                    await cur.execute(
+                                        "CALL proc_VhsCompletedWorkOrderById(%s)",
+                                        (wo_id,),
+                                    )
+                                    logger.info(f"工单 {wo_id} 调用 proc_VhsCompletedWorkOrderById 成功")
+                                except Exception as sp_e:
+                                    logger.warning(f"工单 {wo_id} 调用 proc_VhsCompletedWorkOrderById 失败: {sp_e}")
+
+                                try:
+                                    await cur.execute(
+                                        "CALL proc_VhsCompletedWorkOrderInfoById(%s)",
+                                        (wo_id,),
+                                    )
+                                    logger.info(f"工单 {wo_id} 调用 proc_VhsCompletedWorkOrderInfoById 成功")
+                                except Exception as sp_e:
+                                    logger.warning(f"工单 {wo_id} 调用 proc_VhsCompletedWorkOrderInfoById 失败: {sp_e}")
+
                 else:
                     raise ValueError("不支持的连接池类型")
                 success += 1

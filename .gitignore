@@ -26,3 +26,5 @@ docs
 
 # 固定文件夹
 !web/src/views/alert/log/
+
+.zed/

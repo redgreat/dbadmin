@@ -77,8 +77,11 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
                 }
             )
 
+        logger.info(f"[delete_logical_batch] 验证通过，开始删除: found_docs={validation['found_docs']}")
+
         try:
             success_count, failed_ids = await wms_service.delete_logical_batch(nos, body.operator_id)
+            logger.info(f"[delete_logical_batch] 删除结果: success_count={success_count}, failed_ids={failed_ids}")
         except Exception as e:
             logger.error(f"逻辑删除失败: {e}")
             return Fail(code=500, msg=f"执行失败: {e!s}")
