@@ -11,6 +11,8 @@ from app.schemas.ehcf import (
     WorkorderDeleteIn,
     WorkorderRestoreIn,
     WorkorderCloseIn,
+    WorkorderCreateTypeQueryIn,
+    WorkorderCreateTypeUpdateIn,
 )
 from app.services.ehcf_service import ehcf_service
 
@@ -330,3 +332,64 @@ async def close_workorder(req: Request, body: WorkorderCloseIn):
     except Exception as e:
         logger.error(f"工单关闭失败: {e}")
         return Fail(code=500, msg=f"关闭失败: {e!s}")
+
+
+@router.post("/workorder-manage/query_create_type", summary="查询工单单据来源(CreateType)")
+async def query_create_type(body: WorkorderCreateTypeQueryIn):
+    """查询工单单据来源"""
+    try:
+        workorder_nos: list[str] = [s.strip() for s in body.workorder_nos if s and s.strip()]
+        if not workorder_nos:
+            return Fail(code=400, msg="工单编码或Id不能为空")
+
+        result = await ehcf_service.query_create_type(workorder_nos)
+        return Success(data=result, msg=result["message"])
+    except Exception as e:
+        logger.error(f"查询工单单据来源失败: {e}")
+        return Fail(code=500, msg=f"查询失败: {e!s}")
+
+
+@router.post("/workorder-manage/update_create_type", summary="修改工单单据来源(CreateType)")
+async def update_create_type(req: Request, body: WorkorderCreateTypeUpdateIn):
+    """修改工单单据来源"""
+    try:
+        workorder_no = body.workorder_no.strip()
+        if not workorder_no:
+            return Fail(code=400, msg="工单编码或Id不能为空")
+
+        result = await ehcf_service.update_create_type(workorder_no, body.create_type)
+
+        if not result["success"]:
+            return Fail(code=400, msg=result["message"])
+
+        # 记录审计日志
+        try:
+            token = req.headers.get("token")
+            user_obj: User = None
+            if token:
+                user_obj = await AuthControl.is_authed(token)
+            user_id = user_obj.id if user_obj else 0
+            username = user_obj.username if user_obj else ""
+        except Exception:
+            user_id = 0
+            username = ""
+
+        try:
+            await create_operation_audit_log(
+                user_id=user_id,
+                username=username,
+                module="EHCF",
+                summary=f"修改工单单据来源: {workorder_no}, CreateType {result['old_create_type']} -> {result['new_create_type']}" + (f", 备注={body.remark}" if body.remark else ""),
+                method="POST",
+                path="/api/v1/ehcf/workorder-manage/update_create_type",
+                status=200,
+                request_body=body.model_dump(mode="json"),
+                response_body=result,
+            )
+        except Exception as e:
+            logger.warning(f"审计日志记录失败: {e}")
+
+        return Success(msg=result["message"], data=result)
+    except Exception as e:
+        logger.error(f"修改工单单据来源失败: {e}")
+        return Fail(code=500, msg=f"修改失败: {e!s}")

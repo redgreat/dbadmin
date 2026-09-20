@@ -48,3 +48,15 @@ class WorkorderCloseIn(BaseModel):
     remark: str = Field(default="", description="运维备注")
     workorder_ids: list[str] = Field(default_factory=list, description="指定关闭的工单Id列表（同一编码对应多条记录且不全部关闭时必填）")
     close_all: bool = Field(default=False, description="是否全部关闭（同一编码对应多条记录时，确认全部关闭传True）")
+
+
+class WorkorderCreateTypeQueryIn(BaseModel):
+    """查询工单CreateType入参"""
+    workorder_nos: list[str] = Field(default_factory=list, description="工单Id或申请编码列表")
+
+
+class WorkorderCreateTypeUpdateIn(BaseModel):
+    """修改工单CreateType入参"""
+    workorder_no: str = Field(..., description="工单Id或申请编码")
+    create_type: int = Field(..., description="单据来源类型值")
+    remark: str = Field(default="", description="运维备注")

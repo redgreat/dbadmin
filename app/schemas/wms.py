@@ -177,3 +177,15 @@ class OwingStatusResult(BaseModel):
     to_warehouse_name: str = Field(default="", description="目标仓库名称")
     audit_time: str = Field(default="", description="审核时间")
     is_receive: int = Field(default=0, description="应收状态")
+
+
+class InsideDealStateQueryIn(BaseModel):
+    """查询出入库内部交易状态入参"""
+    stock_nos: list[str] = Field(default_factory=list, description="出入库单Id或编码列表")
+
+
+class InsideDealStateUpdateIn(BaseModel):
+    """修改出入库内部交易状态入参"""
+    stock_no: str = Field(..., description="出入库单Id或编码")
+    inside_deal_state: int = Field(default=1, description="内部交易状态值，默认1")
+    remark: str = Field(default="", description="运维备注")

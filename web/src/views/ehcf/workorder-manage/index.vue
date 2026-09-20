@@ -1,6 +1,51 @@
 <template>
   <CommonPage show-footer>
     <n-space vertical size="large">
+      <n-card title="修改单据来源(CreateType)" size="small">
+        <n-form ref="createTypeFormRef" :model="createTypeForm" label-placement="left" :label-width="100">
+          <n-form-item label="工单编码/Id" path="workorderNos">
+            <n-input
+              v-model:value="createTypeForm.workorderNos"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 6 }"
+              placeholder="输入单个或多个工单编码或Id，逗号分隔"
+            />
+          </n-form-item>
+          <n-space>
+            <n-button :loading="createTypeQuerying" @click="handleCreateTypeQuery">查询</n-button>
+            <n-button @click="handleCreateTypeReset">重置</n-button>
+          </n-space>
+        </n-form>
+        <n-table v-if="createTypeQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+          <thead>
+            <tr>
+              <th>工单Id</th>
+              <th>申请编码</th>
+              <th>客户名称</th>
+              <th>工单类型</th>
+              <th>当前CreateType</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in createTypeQueryResult" :key="item.workorder_id">
+              <td>{{ item.workorder_id }}</td>
+              <td>{{ item.app_code }}</td>
+              <td>{{ item.customer_name || '-' }}</td>
+              <td>{{ item.order_type_name || item.order_type || '-' }}</td>
+              <td>
+                <n-tag :type="item.create_type !== '' ? 'info' : 'default'" size="small">
+                  {{ item.create_type !== '' ? item.create_type : '-' }}
+                </n-tag>
+              </td>
+              <td>
+                <n-button size="small" type="primary" @click="handleOpenCreateTypeEdit(item)">修改</n-button>
+              </td>
+            </tr>
+          </tbody>
+        </n-table>
+      </n-card>
+
       <n-card title="工单逻辑删除" size="small">
         <n-form ref="deleteFormRef" :model="deleteForm" :rules="deleteRules" label-placement="left" :label-width="100">
           <n-form-item label="工单编码/Id" path="workorderNos">
@@ -193,19 +238,22 @@
 
 <script setup>
 import { h, ref } from 'vue'
-import { useMessage } from 'naive-ui'
+import { useMessage, useDialog } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
-import { NCard, NButton, NInput, NSpace } from 'naive-ui'
+import { NCard, NButton, NInput, NSpace, NInputNumber } from 'naive-ui'
 import api from '@/api'
 
 defineOptions({ name: '工单管理' })
 
 const message = useMessage()
+const dialog = useDialog()
 
+const createTypeFormRef = ref(null)
 const deleteFormRef = ref(null)
 const restoreFormRef = ref(null)
 const closeFormRef = ref(null)
 
+const createTypeForm = ref({ workorderNos: '' })
 const deleteForm = ref({ workorderNos: '', operatorId: '', remark: '' })
 const restoreForm = ref({ workorderNo: '', operatorId: '', remark: '' })
 const closeForm = ref({ workorderNos: '', remark: '' })
@@ -214,10 +262,12 @@ const deleteExecuting = ref(false)
 const restoreExecuting = ref(false)
 const closeExecuting = ref(false)
 
+const createTypeQuerying = ref(false)
 const deleteQuerying = ref(false)
 const restoreQuerying = ref(false)
 const closeQuerying = ref(false)
 
+const createTypeQueryResult = ref([])
 const deleteQueryResult = ref([])
 const restoreQueryResult = ref([])
 const closeQueryResult = ref([])
@@ -288,6 +338,86 @@ const handleSearchOperator = (query) => {
 }
 
 const parseIds = (text) => text.split(',').map((s) => s.trim()).filter((s) => s.length)
+
+// --- 修改单据来源 ---
+const handleCreateTypeReset = () => {
+  createTypeForm.value = { workorderNos: '' }
+  createTypeQueryResult.value = []
+}
+
+const handleCreateTypeQuery = async () => {
+  const ids = parseIds(createTypeForm.value.workorderNos)
+  if (!ids.length) {
+    message.warning('请输入工单编码或Id')
+    return
+  }
+  createTypeQuerying.value = true
+  try {
+    const res = await api.queryEhcfCreateType({ workorder_nos: ids })
+    if (res.code === 200 || res.code === 0) {
+      createTypeQueryResult.value = res.data?.found_docs || []
+      const notFound = res.data?.not_found_docs || []
+      if (notFound.length) {
+        message.warning(`查询完成，未找到 ${notFound.length} 条：${notFound.join(', ')}`)
+      } else {
+        message.success(`查询到 ${createTypeQueryResult.value.length} 条`)
+      }
+    } else {
+      message.error(res.msg || '查询失败')
+    }
+  } catch (e) {
+    message.error('请求异常')
+  } finally {
+    createTypeQuerying.value = false
+  }
+}
+
+const handleOpenCreateTypeEdit = (item) => {
+  const newCreateType = ref(item.create_type !== '' ? Number(item.create_type) : 0)
+  const dialogInstance = dialog.create({
+    title: '修改单据来源(CreateType)',
+    content: () =>
+      h('div', { style: 'display: flex; align-items: center; gap: 12px;' }, [
+        h('span', {}, `工单 ${item.workorder_id} 当前 CreateType: ${item.create_type}`),
+        h(NInputNumber, {
+          value: newCreateType.value,
+          'onUpdate:value': (v) => {
+            newCreateType.value = v
+          },
+          min: 0,
+          max: 999,
+          style: 'width: 120px;',
+          placeholder: '输入新值',
+        }),
+      ]),
+    positiveText: '确认修改',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      if (newCreateType.value === null || newCreateType.value === undefined) {
+        message.warning('请输入CreateType值')
+        return false
+      }
+      try {
+        const res = await api.updateEhcfCreateType({
+          workorder_no: item.workorder_id,
+          create_type: Number(newCreateType.value),
+          remark: '',
+        })
+        if (res.code === 200 || res.code === 0) {
+          message.success(res.msg || '修改成功')
+          // 刷新查询结果
+          handleCreateTypeQuery()
+        } else {
+          message.error(res.msg || '修改失败')
+          return false
+        }
+      } catch (e) {
+        message.error('请求异常')
+        return false
+      }
+    },
+  })
+}
 
 // --- 逻辑删除 ---
 const handleDeleteReset = () => {

@@ -842,5 +842,252 @@ class WmsService:
         else:
             raise ValueError("不支持的连接池类型")
 
+    async def query_inside_deal_state(self, stock_nos: list[str]) -> dict:
+        """查询出入库内部交易状态（InSideDealState）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("连接池不存在")
+
+        found_docs = []
+        not_found_docs = []
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    for stock_no in stock_nos:
+                        stock_no = stock_no.strip()
+                        if not stock_no:
+                            continue
+
+                        is_numeric = stock_no.isdigit()
+                        numeric_id = int(stock_no) if is_numeric else None
+
+                        result = None
+                        doc_type = ""
+                        table_type = ""
+
+                        # 查询入库单主表
+                        for main_table, his_table, no_field, dtype in self.STOCK_TABLES:
+                            if dtype != "instock":
+                                continue
+
+                            search_targets = [
+                                (main_table, "Id", numeric_id if is_numeric else stock_no, "main"),
+                                (main_table, no_field, stock_no, "main"),
+                                (his_table, "Id", numeric_id if is_numeric else stock_no, "his"),
+                                (his_table, no_field, stock_no, "his"),
+                            ]
+
+                            for table, field, value, ttype in search_targets:
+                                extra_table = "tb_instockextra"
+                                fk_field = "InStockId"
+                                try:
+                                    sql = f"""
+                                        SELECT a.Id, a.{no_field}, b.InSideDealState, '{dtype}' AS doc_type, '{ttype}' AS table_type
+                                        FROM {table} a
+                                        JOIN {extra_table} b ON b.{fk_field}=a.Id AND b.Deleted=0
+                                        WHERE {field}=%s
+                                        LIMIT 1
+                                    """
+                                    await cur.execute(sql, (value,))
+                                    row = await cur.fetchone()
+                                    if row:
+                                        result = row
+                                        doc_type = dtype
+                                        table_type = ttype
+                                        break
+                                except Exception as e:
+                                    logger.debug(f"[query_inside_deal_state] 查询入库单异常: {e}")
+                                    continue
+                            if result:
+                                break
+
+                        # 查询出库单主表
+                        if not result:
+                            for main_table, his_table, no_field, dtype in self.STOCK_TABLES:
+                                if dtype != "outstock":
+                                    continue
+
+                                search_targets = [
+                                    (main_table, "Id", numeric_id if is_numeric else stock_no, "main"),
+                                    (main_table, no_field, stock_no, "main"),
+                                    (his_table, "Id", numeric_id if is_numeric else stock_no, "his"),
+                                    (his_table, no_field, stock_no, "his"),
+                                ]
+
+                                for table, field, value, ttype in search_targets:
+                                    extra_table = "tb_outstockextra"
+                                    fk_field = "OutStockId"
+                                    try:
+                                        sql = f"""
+                                            SELECT a.Id, a.{no_field}, b.InSideDealState, '{dtype}' AS doc_type, '{ttype}' AS table_type
+                                            FROM {table} a
+                                            JOIN {extra_table} b ON b.{fk_field}=a.Id AND b.Deleted=0
+                                            WHERE {field}=%s
+                                            LIMIT 1
+                                        """
+                                        await cur.execute(sql, (value,))
+                                        row = await cur.fetchone()
+                                        if row:
+                                            result = row
+                                            doc_type = dtype
+                                            table_type = ttype
+                                            break
+                                    except Exception as e:
+                                        logger.debug(f"[query_inside_deal_state] 查询出库单异常: {e}")
+                                        continue
+                                if result:
+                                    break
+
+                        if not result:
+                            not_found_docs.append(stock_no)
+                        else:
+                            found_docs.append({
+                                "stock_id": str(result[0]),
+                                "stock_no": str(result[1]) if result[1] else stock_no,
+                                "inside_deal_state": result[2] if result[2] is not None else "",
+                                "doc_type": result[3],
+                                "table_type": result[4],
+                                "input": stock_no,
+                            })
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        return {
+            "success": len(not_found_docs) == 0,
+            "found_count": len(found_docs),
+            "not_found_count": len(not_found_docs),
+            "found_docs": found_docs,
+            "not_found_docs": not_found_docs,
+            "message": f"找到 {len(found_docs)} 条，未找到 {len(not_found_docs)} 条",
+        }
+
+    async def update_inside_deal_state(self, stock_no: str, inside_deal_state: int) -> dict:
+        """修改出入库内部交易状态（InSideDealState）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("连接池不存在")
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    is_numeric = stock_no.isdigit()
+                    numeric_id = int(stock_no) if is_numeric else None
+
+                    # 尝试在入库单表中查找
+                    for main_table, his_table, no_field, dtype in self.STOCK_TABLES:
+                        if dtype != "instock":
+                            continue
+
+                        search_targets = [
+                            (main_table, "Id", numeric_id if is_numeric else stock_no, "main"),
+                            (main_table, no_field, stock_no, "main"),
+                            (his_table, "Id", numeric_id if is_numeric else stock_no, "his"),
+                            (his_table, no_field, stock_no, "his"),
+                        ]
+
+                        for table, field, value, ttype in search_targets:
+                            extra_table = "tb_instockextra"
+                            fk_field = "InStockId"
+                            try:
+                                # 先查询是否存在
+                                check_sql = f"""
+                                    SELECT a.Id, a.{no_field}, b.InSideDealState
+                                    FROM {table} a
+                                    JOIN {extra_table} b ON b.{fk_field}=a.Id AND b.Deleted=0
+                                    WHERE {field}=%s
+                                    LIMIT 1
+                                """
+                                await cur.execute(check_sql, (value,))
+                                row = await cur.fetchone()
+                                if row:
+                                    stock_id = row[0]
+                                    stock_no_actual = str(row[1]) if row[1] else stock_no
+                                    old_state = row[2]
+
+                                    # 执行更新
+                                    update_sql = f"""
+                                        UPDATE {extra_table}
+                                        SET InSideDealState=%s
+                                        WHERE {fk_field}=%s AND Deleted=0
+                                    """
+                                    await cur.execute(update_sql, (inside_deal_state, stock_id))
+
+                                    return {
+                                        "success": True,
+                                        "stock_id": str(stock_id),
+                                        "stock_no": stock_no_actual,
+                                        "doc_type": dtype,
+                                        "table_type": ttype,
+                                        "old_inside_deal_state": old_state,
+                                        "new_inside_deal_state": inside_deal_state,
+                                        "message": f"修改成功: 入库单 {stock_no_actual} 的 InSideDealState 从 {old_state} 修改为 {inside_deal_state}",
+                                    }
+                            except Exception as e:
+                                logger.debug(f"[update_inside_deal_state] 查询入库单异常: {e}")
+                                continue
+
+                    # 尝试在出库单表中查找
+                    for main_table, his_table, no_field, dtype in self.STOCK_TABLES:
+                        if dtype != "outstock":
+                            continue
+
+                        search_targets = [
+                            (main_table, "Id", numeric_id if is_numeric else stock_no, "main"),
+                            (main_table, no_field, stock_no, "main"),
+                            (his_table, "Id", numeric_id if is_numeric else stock_no, "his"),
+                            (his_table, no_field, stock_no, "his"),
+                        ]
+
+                        for table, field, value, ttype in search_targets:
+                            extra_table = "tb_outstockextra"
+                            fk_field = "OutStockId"
+                            try:
+                                # 先查询是否存在
+                                check_sql = f"""
+                                    SELECT a.Id, a.{no_field}, b.InSideDealState
+                                    FROM {table} a
+                                    JOIN {extra_table} b ON b.{fk_field}=a.Id AND b.Deleted=0
+                                    WHERE {field}=%s
+                                    LIMIT 1
+                                """
+                                await cur.execute(check_sql, (value,))
+                                row = await cur.fetchone()
+                                if row:
+                                    stock_id = row[0]
+                                    stock_no_actual = str(row[1]) if row[1] else stock_no
+                                    old_state = row[2]
+
+                                    # 执行更新
+                                    update_sql = f"""
+                                        UPDATE {extra_table}
+                                        SET InSideDealState=%s
+                                        WHERE {fk_field}=%s AND Deleted=0
+                                    """
+                                    await cur.execute(update_sql, (inside_deal_state, stock_id))
+
+                                    return {
+                                        "success": True,
+                                        "stock_id": str(stock_id),
+                                        "stock_no": stock_no_actual,
+                                        "doc_type": dtype,
+                                        "table_type": ttype,
+                                        "old_inside_deal_state": old_state,
+                                        "new_inside_deal_state": inside_deal_state,
+                                        "message": f"修改成功: 出库单 {stock_no_actual} 的 InSideDealState 从 {old_state} 修改为 {inside_deal_state}",
+                                    }
+                            except Exception as e:
+                                logger.debug(f"[update_inside_deal_state] 查询出库单异常: {e}")
+                                continue
+
+                    return {
+                        "success": False,
+                        "message": f"未找到单据: {stock_no}",
+                    }
+        else:
+            raise ValueError("不支持的连接池类型")
+
 
 wms_service = WmsService()

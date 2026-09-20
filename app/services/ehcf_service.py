@@ -656,5 +656,96 @@ class EhcfService:
             "workorder_id_map": workorder_id_map,
         }
 
+    async def query_create_type(self, workorder_nos: list[str]) -> dict:
+        """查询工单CreateType（单据来源）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("EHCF连接池不存在")
+
+        found_docs = []
+        not_found_docs = []
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    for wo in workorder_nos:
+                        await cur.execute(
+                            """SELECT a.Id, a.AppCode, a.CreateType, a.CustomerName, a.OrderType,
+                                      fn_GetOrderTypeByCode(a.OrderType) AS OrderTypeName
+                               FROM tb_workorderinfo a
+                               WHERE (a.Id=%s OR a.AppCode=%s) AND a.Deleted=0""",
+                            (wo, wo),
+                        )
+                        rows = await cur.fetchall()
+                        if not rows:
+                            not_found_docs.append(wo)
+                            continue
+                        for row in rows:
+                            found_docs.append({
+                                "workorder_id": str(row[0]),
+                                "app_code": str(row[1]) if row[1] else "",
+                                "create_type": row[2] if row[2] is not None else "",
+                                "customer_name": str(row[3]) if row[3] else "",
+                                "order_type": str(row[4]) if row[4] else "",
+                                "order_type_name": str(row[5]) if row[5] else "",
+                                "input": wo,
+                            })
+        else:
+            raise ValueError("不支持的连接池类型")
+
+        return {
+            "success": len(not_found_docs) == 0,
+            "found_count": len(found_docs),
+            "not_found_count": len(not_found_docs),
+            "found_docs": found_docs,
+            "not_found_docs": not_found_docs,
+            "message": f"找到 {len(found_docs)} 条，未找到 {len(not_found_docs)} 条",
+        }
+
+    async def update_create_type(self, workorder_no: str, create_type: int) -> dict:
+        """修改工单CreateType（单据来源）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("EHCF连接池不存在")
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    # 先查询工单是否存在
+                    await cur.execute(
+                        """SELECT Id, AppCode, CreateType FROM tb_workorderinfo
+                           WHERE (Id=%s OR AppCode=%s) AND Deleted=0""",
+                        (workorder_no, workorder_no),
+                    )
+                    row = await cur.fetchone()
+                    if not row:
+                        return {
+                            "success": False,
+                            "message": f"未找到工单: {workorder_no}",
+                        }
+
+                    workorder_id = str(row[0])
+                    app_code = str(row[1]) if row[1] else ""
+                    old_create_type = row[2]
+
+                    # 执行更新
+                    await cur.execute(
+                        "UPDATE tb_workorderinfo SET CreateType=%s WHERE Id=%s",
+                        (create_type, workorder_id),
+                    )
+
+                    return {
+                        "success": True,
+                        "workorder_id": workorder_id,
+                        "app_code": app_code,
+                        "old_create_type": old_create_type,
+                        "new_create_type": create_type,
+                        "message": f"修改成功: 工单 {workorder_id} 的 CreateType 从 {old_create_type} 修改为 {create_type}",
+                    }
+        else:
+            raise ValueError("不支持的连接池类型")
+
 
 ehcf_service = EhcfService()

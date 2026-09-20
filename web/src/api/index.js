@@ -213,4 +213,10 @@ export default {
   deleteEhcfWorkorderLogical: (data = {}) => request.post('/ehcf/workorder-manage/delete_logical', data),
   restoreEhcfWorkorderLogical: (data = {}) => request.post('/ehcf/workorder-manage/restore_logical', data),
   closeEhcfWorkorder: (data = {}) => request.post('/ehcf/workorder-manage/close', data),
+  // ehcf - 工单管理（修改单据来源）
+  queryEhcfCreateType: (data = {}) => request.post('/ehcf/workorder-manage/query_create_type', data),
+  updateEhcfCreateType: (data = {}) => request.post('/ehcf/workorder-manage/update_create_type', data),
+  // wms - 出入库内部交易状态
+  queryWmsInsideDealState: (data = {}) => request.post('/wms/wms_curd/query_inside_deal_state', data),
+  updateWmsInsideDealState: (data = {}) => request.post('/wms/wms_curd/update_inside_deal_state', data),
 }
