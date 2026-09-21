@@ -5,6 +5,8 @@ export default {
   getUserInfo: () => request.get('/base/userinfo'),
   getUserMenu: () => request.get('/base/usermenu'),
   getUserApi: () => request.get('/base/userapi'),
+  // workbench
+  getWorkbenchSummary: () => request.get('/base/workbench/summary'),
   // profile
   updatePassword: (data = {}) => request.post('/base/update_password', data),
   // users
@@ -51,7 +53,8 @@ export default {
   deleteConn: (params = {}) => request.delete('/conn/delete', { params }),
   testConn: (data = {}) => request.post('/conn/test', data),
   // oms
-  updateOrdersAuditTimeBatch: (data = {}) => request.post('/oms/orders/update_audit_time_batch', data),
+  updateOrdersAuditTimeBatch: (data = {}) =>
+    request.post('/oms/orders/update_audit_time_batch', data),
   deleteOrdersLogicalBatch: (data = {}) => request.post('/oms/orders/delete_logical_batch', data),
   deleteOrdersPhysicalBatch: (data = {}) => request.post('/oms/orders/delete_physical_batch', data),
   restoreOrderLogical: (data = {}) => request.post('/oms/orders/restore_logical', data),
@@ -63,7 +66,7 @@ export default {
   executeOaPositiveTime: (data = {}) => request.post('/oa/positive-time/execute', data),
   validateOaEntryTime: (data = {}) => request.post('/oa/entry-time/validate', data),
   executeOaEntryTime: (data = {}) => request.post('/oa/entry-time/execute', data),
-  
+
   // oms 订单删除相关API
   validateOrdersForDelete: (data) => request.post('/oms/validate-orders-for-delete', data),
   batchDeleteOrders: (data) => request.post('/oms/batch-delete-orders', data),
@@ -124,7 +127,8 @@ export default {
   getSystemNameOptions: (params = {}) => request.get('/report/options/systems', { params }),
   generateReport: (data = {}) => request.post('/report/generate', data),
   getReportGenerationList: (params = {}) => request.get('/report/generation/list', { params }),
-  downloadReport: (params = {}) => request.get('/report/generation/download', { params, responseType: 'blob' }),
+  downloadReport: (params = {}) =>
+    request.get('/report/generation/download', { params, responseType: 'blob' }),
   stopReportGeneration: (params = {}) => request.post('/report/generation/stop', null, { params }),
   deleteReportGeneration: (params = {}) => request.delete('/report/generation/delete', { params }),
   // dict - 字典管理
@@ -150,7 +154,8 @@ export default {
   createReportSendTask: (data = {}) => request.post('/task/report-send/create', data),
   updateReportSendTask: (data = {}) => request.post('/task/report-send/update', data),
   deleteReportSendTask: (params = {}) => request.delete('/task/report-send/delete', { params }),
-  executeReportSendTask: (params = {}) => request.post('/task/report-send/execute', null, { params }),
+  executeReportSendTask: (params = {}) =>
+    request.post('/task/report-send/execute', null, { params }),
   // task - SQL预警
   getSqlAlertTaskList: (params = {}) => request.get('/task/sql-alert/list', { params }),
   createSqlAlertTask: (data = {}) => request.post('/task/sql-alert/create', data),
@@ -159,8 +164,10 @@ export default {
   executeSqlAlertTask: (params = {}) => request.post('/task/sql-alert/execute', null, { params }),
   getNotifyTaskLogList: (params = {}) => request.get('/task/notify-log/list', { params }),
   // wms - 仓储中心
-  deleteWmsDocumentsLogicalBatch: (data = {}) => request.post('/wms/wms_curd/delete_logical_batch', data),
-  deleteWmsDocumentsPhysicalBatch: (data = {}) => request.post('/wms/wms_curd/delete_physical_batch', data),
+  deleteWmsDocumentsLogicalBatch: (data = {}) =>
+    request.post('/wms/wms_curd/delete_logical_batch', data),
+  deleteWmsDocumentsPhysicalBatch: (data = {}) =>
+    request.post('/wms/wms_curd/delete_physical_batch', data),
   restoreWmsDocumentLogical: (data = {}) => request.post('/wms/wms_curd/restore_logical', data),
   validateWmsDocuments: (data = {}) => request.post('/wms/wms_curd/validate_stock', data),
   queryWmsStockStatus: (data = {}) => request.post('/wms/wms_curd/query_status', data),
@@ -207,16 +214,24 @@ export default {
   queryEhcfWorkorder: (data = {}) => request.post('/ehcf/order-regenerate/query_workorder', data),
   queryEhcfDetails: (data = {}) => request.post('/ehcf/order-regenerate/query_details', data),
   fixEhcfDetailId: (data = {}) => request.post('/ehcf/order-regenerate/fix_detail', data),
-  regenerateEhcfOrderId: (data = {}) => request.post('/ehcf/order-regenerate/regenerate_order', data),
+  regenerateEhcfOrderId: (data = {}) =>
+    request.post('/ehcf/order-regenerate/regenerate_order', data),
   // ehcf - 工单管理（逻辑删除/恢复/关闭）
-  queryEhcfWorkorderStatus: (data = {}) => request.post('/ehcf/workorder-manage/query_status', data),
-  deleteEhcfWorkorderLogical: (data = {}) => request.post('/ehcf/workorder-manage/delete_logical', data),
-  restoreEhcfWorkorderLogical: (data = {}) => request.post('/ehcf/workorder-manage/restore_logical', data),
+  queryEhcfWorkorderStatus: (data = {}) =>
+    request.post('/ehcf/workorder-manage/query_status', data),
+  deleteEhcfWorkorderLogical: (data = {}) =>
+    request.post('/ehcf/workorder-manage/delete_logical', data),
+  restoreEhcfWorkorderLogical: (data = {}) =>
+    request.post('/ehcf/workorder-manage/restore_logical', data),
   closeEhcfWorkorder: (data = {}) => request.post('/ehcf/workorder-manage/close', data),
   // ehcf - 工单管理（修改单据来源）
-  queryEhcfCreateType: (data = {}) => request.post('/ehcf/workorder-manage/query_create_type', data),
-  updateEhcfCreateType: (data = {}) => request.post('/ehcf/workorder-manage/update_create_type', data),
+  queryEhcfCreateType: (data = {}) =>
+    request.post('/ehcf/workorder-manage/query_create_type', data),
+  updateEhcfCreateType: (data = {}) =>
+    request.post('/ehcf/workorder-manage/update_create_type', data),
   // wms - 出入库内部交易状态
-  queryWmsInsideDealState: (data = {}) => request.post('/wms/wms_curd/query_inside_deal_state', data),
-  updateWmsInsideDealState: (data = {}) => request.post('/wms/wms_curd/update_inside_deal_state', data),
+  queryWmsInsideDealState: (data = {}) =>
+    request.post('/wms/wms_curd/query_inside_deal_state', data),
+  updateWmsInsideDealState: (data = {}) =>
+    request.post('/wms/wms_curd/update_inside_deal_state', data),
 }

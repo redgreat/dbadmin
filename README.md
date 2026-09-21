@@ -30,6 +30,15 @@ docker run -d --restart=always --name=dbadmin -p 8090:80 dbadmin
 
 访问 http://localhost:8090，默认账号：admin / 123456
 
+## 开发文档
+
+- **AI 开发入口与规范**：[`AGENTS.md`](AGENTS.md) —— AI 编码助手必读，含硬性规则、项目结构、常用命令
+- **开发文档目录**：[`docs/`](docs/README.md)
+  - 后端开发规范：[`docs/backend-standards.md`](docs/backend-standards.md)
+  - 前端开发规范：[`docs/frontend-standards.md`](docs/frontend-standards.md)
+  - 数据库开发规范：[`docs/database-standards.md`](docs/database-standards.md)
+  - 新增模块标准流程：[`docs/module-addition-guide.md`](docs/module-addition-guide.md)
+
 ## 本地开发
 
 ### 后端

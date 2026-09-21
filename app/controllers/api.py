@@ -66,7 +66,8 @@ class ApiController(CRUDBase[Api, ApiCreate, ApiUpdate]):
         for route in api_routes:
             method = sorted(route.methods)[0]
             path = route.path_format
-            summary = route.summary
+            # FastAPI 路由未声明 summary 时为 None，Api.summary 不允许空
+            summary = route.summary or ""
             tags = list(route.tags)[0] if route.tags else "未分类"
             api_obj = await Api.filter(method=method, path=path).first()
             if api_obj:
