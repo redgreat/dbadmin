@@ -4,17 +4,17 @@ from fastapi import APIRouter, Request
 
 from app.core.dependency import AuthControl
 from app.models.admin import User
-from app.utils.audit_log import create_operation_audit_log
 from app.schemas.base import Fail, Success
 from app.schemas.ehcf import (
-    WorkorderManageQueryIn,
-    WorkorderDeleteIn,
-    WorkorderRestoreIn,
     WorkorderCloseIn,
     WorkorderCreateTypeQueryIn,
     WorkorderCreateTypeUpdateIn,
+    WorkorderDeleteIn,
+    WorkorderManageQueryIn,
+    WorkorderRestoreIn,
 )
 from app.services.ehcf_service import ehcf_service
+from app.utils.audit_log import create_operation_audit_log
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,9 @@ def _group_multi_docs(found_docs: list[dict]) -> tuple[list[dict], list[str]]:
 async def query_workorder_status(body: WorkorderManageQueryIn):
     """查询工单删除状态、工作状态等信息"""
     try:
-        workorder_nos: list[str] = [s.strip() for s in body.workorder_nos if s and s.strip()]
+        workorder_nos: list[str] = [
+            s.strip() for s in body.workorder_nos if s and s.strip()
+        ]
         if not workorder_nos:
             return Fail(code=400, msg="工单编码或Id不能为空")
 
@@ -50,7 +52,9 @@ async def query_workorder_status(body: WorkorderManageQueryIn):
 async def delete_logical_workorder(req: Request, body: WorkorderDeleteIn):
     """批量逻辑删除工单"""
     try:
-        workorder_nos: list[str] = [s.strip() for s in body.workorder_nos if s and s.strip()]
+        workorder_nos: list[str] = [
+            s.strip() for s in body.workorder_nos if s and s.strip()
+        ]
         if not workorder_nos:
             return Fail(code=400, msg="工单编码或Id不能为空")
 
@@ -60,7 +64,10 @@ async def delete_logical_workorder(req: Request, body: WorkorderDeleteIn):
         not_found_nos = id_result.get("not_found_docs", [])
 
         if not found_docs:
-            return Success(msg=f"未找到对应工单: {', '.join(not_found_nos)}", data={"success_count": 0, "failed_ids": not_found_nos})
+            return Success(
+                msg=f"未找到对应工单: {', '.join(not_found_nos)}",
+                data={"success_count": 0, "failed_ids": not_found_nos},
+            )
 
         # 按输入编码分组，识别一对多的工单
         multi_docs, all_ids = _group_multi_docs(found_docs)
@@ -93,19 +100,28 @@ async def delete_logical_workorder(req: Request, body: WorkorderDeleteIn):
         person_code = ""
         try:
             from app.services.user_service import user_service
-            user_map = await user_service.batch_get_by_user_center_ids([body.operator_id])
+
+            user_map = await user_service.batch_get_by_user_center_ids(
+                [body.operator_id]
+            )
             user_info = user_map.get(body.operator_id)
             if user_info:
                 person_name = user_info.get("user_name", "")
                 person_code = user_info.get("code", "")
             else:
                 # 降级：用户中心查不到时尝试本库用户
-                local_map = await user_service.get_local_user_display_names([body.operator_id])
+                local_map = await user_service.get_local_user_display_names(
+                    [body.operator_id]
+                )
                 person_name = local_map.get(body.operator_id, "")
         except Exception as e:
             logger.warning(f"获取操作人信息失败: {e}")
 
-        success_count, failed_ids, remark_failed_ids = await ehcf_service.delete_logical_workorder(
+        (
+            success_count,
+            failed_ids,
+            remark_failed_ids,
+        ) = await ehcf_service.delete_logical_workorder(
             workorder_ids,
             body.operator_id,
             body.remark,
@@ -129,7 +145,8 @@ async def delete_logical_workorder(req: Request, body: WorkorderDeleteIn):
                 user_id=user_id,
                 username=username,
                 module="EHCF",
-                summary=f"工单逻辑删除: {', '.join(workorder_nos)}" + (f", 备注={body.remark}" if body.remark else ""),
+                summary=f"工单逻辑删除: {', '.join(workorder_nos)}"
+                + (f", 备注={body.remark}" if body.remark else ""),
                 method="POST",
                 path="/api/v1/ehcf/workorder-manage/delete_logical",
                 status=200,
@@ -143,9 +160,13 @@ async def delete_logical_workorder(req: Request, body: WorkorderDeleteIn):
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")
 
-        msg = f"删除完成: 成功 {success_count} 条" + (f", 失败 {len(failed_ids)} 条" if failed_ids else "")
+        msg = f"删除完成: 成功 {success_count} 条" + (
+            f", 失败 {len(failed_ids)} 条" if failed_ids else ""
+        )
         if remark_failed_ids:
-            msg += f", 备注写入失败 {len(remark_failed_ids)} 条: {', '.join(remark_failed_ids)}"
+            msg += (
+                f", 备注写入失败 {len(remark_failed_ids)} 条: {', '.join(remark_failed_ids)}"
+            )
         return Success(
             msg=msg,
             data={
@@ -179,7 +200,9 @@ async def restore_logical_workorder(req: Request, body: WorkorderRestoreIn):
             return Success(msg="该工单无需恢复（无已删除记录）", data={"restored": False})
 
         # 验证删除人：只保留删除人与操作人一致的记录
-        matched_docs = [doc for doc in deleted_docs if doc.get("deleted_by_id") == body.operator_id]
+        matched_docs = [
+            doc for doc in deleted_docs if doc.get("deleted_by_id") == body.operator_id
+        ]
         if not matched_docs:
             return Success(
                 msg=f"未找到由该操作人删除的工单 {workorder_no}，请确认操作人是否为实际删除人",
@@ -236,19 +259,27 @@ async def restore_logical_workorder(req: Request, body: WorkorderRestoreIn):
                 user_id=user_id,
                 username=username,
                 module="EHCF",
-                summary=f"工单逻辑删除恢复: {workorder_no}" + (f", 备注={body.remark}" if body.remark else ""),
+                summary=f"工单逻辑删除恢复: {workorder_no}"
+                + (f", 备注={body.remark}" if body.remark else ""),
                 method="POST",
                 path="/api/v1/ehcf/workorder-manage/restore_logical",
                 status=200,
                 request_body=body.model_dump(mode="json"),
-                response_body={"workorder_no": workorder_no, "restored_ids": restored_ids},
+                response_body={
+                    "workorder_no": workorder_no,
+                    "restored_ids": restored_ids,
+                },
             )
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")
 
         return Success(
             msg=f"恢复成功: {len(restored_ids)} 条",
-            data={"workorder_no": workorder_no, "restored": True, "restored_ids": restored_ids},
+            data={
+                "workorder_no": workorder_no,
+                "restored": True,
+                "restored_ids": restored_ids,
+            },
         )
     except Exception as e:
         logger.error(f"工单恢复失败: {e}")
@@ -259,7 +290,9 @@ async def restore_logical_workorder(req: Request, body: WorkorderRestoreIn):
 async def close_workorder(req: Request, body: WorkorderCloseIn):
     """批量关闭工单，设置 WorkStatus=10"""
     try:
-        workorder_nos: list[str] = [s.strip() for s in body.workorder_nos if s and s.strip()]
+        workorder_nos: list[str] = [
+            s.strip() for s in body.workorder_nos if s and s.strip()
+        ]
         if not workorder_nos:
             return Fail(code=400, msg="工单编码或Id不能为空")
 
@@ -269,7 +302,10 @@ async def close_workorder(req: Request, body: WorkorderCloseIn):
         not_found_nos = id_result.get("not_found_docs", [])
 
         if not found_docs:
-            return Success(msg=f"未找到对应工单: {', '.join(not_found_nos)}", data={"success_count": 0, "failed_ids": not_found_nos})
+            return Success(
+                msg=f"未找到对应工单: {', '.join(not_found_nos)}",
+                data={"success_count": 0, "failed_ids": not_found_nos},
+            )
 
         # 按输入编码分组，识别一对多的工单
         multi_docs, all_ids = _group_multi_docs(found_docs)
@@ -297,7 +333,9 @@ async def close_workorder(req: Request, body: WorkorderCloseIn):
         else:
             workorder_ids = all_ids
 
-        success_count, failed_ids = await ehcf_service.close_workorder_batch(workorder_ids)
+        success_count, failed_ids = await ehcf_service.close_workorder_batch(
+            workorder_ids
+        )
 
         try:
             token = req.headers.get("token")
@@ -315,18 +353,23 @@ async def close_workorder(req: Request, body: WorkorderCloseIn):
                 user_id=user_id,
                 username=username,
                 module="EHCF",
-                summary=f"工单关闭: {', '.join(workorder_nos)}" + (f", 备注={body.remark}" if body.remark else ""),
+                summary=f"工单关闭: {', '.join(workorder_nos)}"
+                + (f", 备注={body.remark}" if body.remark else ""),
                 method="POST",
                 path="/api/v1/ehcf/workorder-manage/close",
                 status=200,
                 request_body=body.model_dump(mode="json"),
-                response_body={"success_count": success_count, "failed_ids": failed_ids},
+                response_body={
+                    "success_count": success_count,
+                    "failed_ids": failed_ids,
+                },
             )
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")
 
         return Success(
-            msg=f"关闭完成: 成功 {success_count} 条" + (f", 失败 {len(failed_ids)} 条" if failed_ids else ""),
+            msg=f"关闭完成: 成功 {success_count} 条"
+            + (f", 失败 {len(failed_ids)} 条" if failed_ids else ""),
             data={"success_count": success_count, "failed_ids": failed_ids},
         )
     except Exception as e:
@@ -338,7 +381,9 @@ async def close_workorder(req: Request, body: WorkorderCloseIn):
 async def query_create_type(body: WorkorderCreateTypeQueryIn):
     """查询工单单据来源"""
     try:
-        workorder_nos: list[str] = [s.strip() for s in body.workorder_nos if s and s.strip()]
+        workorder_nos: list[str] = [
+            s.strip() for s in body.workorder_nos if s and s.strip()
+        ]
         if not workorder_nos:
             return Fail(code=400, msg="工单编码或Id不能为空")
 
@@ -379,7 +424,11 @@ async def update_create_type(req: Request, body: WorkorderCreateTypeUpdateIn):
                 user_id=user_id,
                 username=username,
                 module="EHCF",
-                summary=f"修改工单单据来源: {workorder_no}, CreateType {result['old_create_type']} -> {result['new_create_type']}" + (f", 备注={body.remark}" if body.remark else ""),
+                summary=(
+                    f"修改工单单据来源: {workorder_no}, CreateType {result['old_create_type']} -> {result['new_create_type']}"
+                    + (f", 操作人={body.operator_id}" if body.operator_id else "")
+                    + (f", 备注={body.remark}" if body.remark else "")
+                ),
                 method="POST",
                 path="/api/v1/ehcf/workorder-manage/update_create_type",
                 status=200,

@@ -34,14 +34,19 @@ async def validate_stock(body: WmsValidateRequest):
         if not nos:
             return Fail(code=400, msg="单据编码或单据Id不能为空")
 
-        result = await wms_service.validate_stock(nos, body.validate_type, body.operator_id)
+        result = await wms_service.validate_stock(
+            nos, body.validate_type, body.operator_id
+        )
         return Success(data=result, msg=result["message"])
     except Exception as e:
         logger.error(f"验证单据失败: {e}")
         return Fail(code=500, msg=f"验证失败: {e!s}")
 
 
-@router.post("/wms_curd/query_status", summary="查询单据状态（Id、单号、AuditTime、Deleted、DeletedById、DeletedAt、删除人姓名）")
+@router.post(
+    "/wms_curd/query_status",
+    summary="查询单据状态（Id、单号、AuditTime、Deleted、DeletedById、DeletedAt、删除人姓名）",
+)
 async def query_stock_status(body: WmsQueryIn):
     """查询单据状态信息，支持传入单据编码或单据Id
 
@@ -75,15 +80,22 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
                 msg=f"验证失败: {validation['message']}",
                 data={
                     "success_count": 0,
-                    "failed_ids": validation["not_found_docs"] + [d["stock_no"] for d in validation["invalid_docs"]]
-                }
+                    "failed_ids": validation["not_found_docs"]
+                    + [d["stock_no"] for d in validation["invalid_docs"]],
+                },
             )
 
-        logger.info(f"[delete_logical_batch] 验证通过，开始删除: found_docs={validation['found_docs']}")
+        logger.info(
+            f"[delete_logical_batch] 验证通过，开始删除: found_docs={validation['found_docs']}"
+        )
 
         try:
-            success_count, failed_ids = await wms_service.delete_logical_batch(nos, body.operator_id)
-            logger.info(f"[delete_logical_batch] 删除结果: success_count={success_count}, failed_ids={failed_ids}")
+            success_count, failed_ids = await wms_service.delete_logical_batch(
+                nos, body.operator_id
+            )
+            logger.info(
+                f"[delete_logical_batch] 删除结果: success_count={success_count}, failed_ids={failed_ids}"
+            )
         except Exception as e:
             logger.error(f"逻辑删除失败: {e}")
             return Fail(code=500, msg=f"执行失败: {e!s}")
@@ -106,7 +118,8 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
                     user_id=user_id,
                     username=username,
                     module="WMS",
-                    summary=f"单据逻辑删除: stock_no={dno}" + (f", 备注={body.remark}" if body.remark else ""),
+                    summary=f"单据逻辑删除: stock_no={dno}"
+                    + (f", 备注={body.remark}" if body.remark else ""),
                     method="POST",
                     path="/api/v1/wms/wms_curd/delete_logical_batch",
                     status=status,
@@ -117,8 +130,14 @@ async def delete_logical_batch(req: Request, body: WmsDeleteBatchIn):
                 logger.warning(f"审计日志记录失败: {e}")
 
         if failed_ids:
-            return Success(msg=f"部分删除失败，成功 {success_count} 条，失败 {len(failed_ids)} 条", data={"success_count": success_count, "failed_ids": failed_ids})
-        return Success(msg=f"删除成功，共 {success_count} 条", data={"success_count": success_count, "failed_ids": []})
+            return Success(
+                msg=f"部分删除失败，成功 {success_count} 条，失败 {len(failed_ids)} 条",
+                data={"success_count": success_count, "failed_ids": failed_ids},
+            )
+        return Success(
+            msg=f"删除成功，共 {success_count} 条",
+            data={"success_count": success_count, "failed_ids": []},
+        )
     except Exception as e:
         logger.error(f"接口异常: {e}")
         return Fail(code=500, msg="服务异常")
@@ -137,14 +156,13 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
         if not validation["success"]:
             return Success(
                 msg=f"验证失败: {validation['message']}",
-                data={
-                    "success_count": 0,
-                    "failed_ids": validation["not_found_docs"]
-                }
+                data={"success_count": 0, "failed_ids": validation["not_found_docs"]},
             )
 
         try:
-            success_count, failed_ids = await wms_service.delete_physical_batch(nos, body.operator_id)
+            success_count, failed_ids = await wms_service.delete_physical_batch(
+                nos, body.operator_id
+            )
         except Exception as e:
             logger.error(f"物理删除失败: {e}")
             return Fail(code=500, msg=f"执行失败: {e!s}")
@@ -167,7 +185,8 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
                     user_id=user_id,
                     username=username,
                     module="WMS",
-                    summary=f"单据物理删除: stock_no={dno}" + (f", 备注={body.remark}" if body.remark else ""),
+                    summary=f"单据物理删除: stock_no={dno}"
+                    + (f", 备注={body.remark}" if body.remark else ""),
                     method="POST",
                     path="/api/v1/wms/wms_curd/delete_physical_batch",
                     status=status,
@@ -178,8 +197,14 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
                 logger.warning(f"审计日志记录失败: {e}")
 
         if failed_ids:
-            return Success(msg=f"部分删除失败，成功 {success_count} 条，失败 {len(failed_ids)} 条", data={"success_count": success_count, "failed_ids": failed_ids})
-        return Success(msg=f"删除成功，共 {success_count} 条", data={"success_count": success_count, "failed_ids": []})
+            return Success(
+                msg=f"部分删除失败，成功 {success_count} 条，失败 {len(failed_ids)} 条",
+                data={"success_count": success_count, "failed_ids": failed_ids},
+            )
+        return Success(
+            msg=f"删除成功，共 {success_count} 条",
+            data={"success_count": success_count, "failed_ids": []},
+        )
     except Exception as e:
         logger.error(f"接口异常: {e}")
         return Fail(code=500, msg="服务异常")
@@ -190,12 +215,19 @@ async def restore_logical(req: Request, body: WmsRestoreLogicalIn):
     """恢复被逻辑删除的单据，支持传入单据编码或单据Id"""
     try:
         # 先验证单据状态
-        validation = await wms_service.validate_stock([body.stock_no], "restore", body.operator_id)
+        validation = await wms_service.validate_stock(
+            [body.stock_no], "restore", body.operator_id
+        )
         if not validation["success"]:
-            return Success(msg=validation["message"], data={"stock_no": body.stock_no, "restored": False})
+            return Success(
+                msg=validation["message"],
+                data={"stock_no": body.stock_no, "restored": False},
+            )
 
         try:
-            await wms_service.restore_logical(stock_no=body.stock_no, operator_id=body.operator_id)
+            await wms_service.restore_logical(
+                stock_no=body.stock_no, operator_id=body.operator_id
+            )
         except Exception as e:
             logger.error(f"恢复失败: {e}")
             return Fail(code=500, msg=f"执行失败: {e!s}")
@@ -216,7 +248,8 @@ async def restore_logical(req: Request, body: WmsRestoreLogicalIn):
                 user_id=user_id,
                 username=username,
                 module="WMS",
-                summary=f"单据逻辑删除恢复: stock_no={body.stock_no}, 操作人={body.operator_id}" + (f", 备注={body.remark}" if body.remark else ""),
+                summary=f"单据逻辑删除恢复: stock_no={body.stock_no}, 操作人={body.operator_id}"
+                + (f", 备注={body.remark}" if body.remark else ""),
                 method="POST",
                 path="/api/v1/wms/wms_curd/restore_logical",
                 status=200,
@@ -239,7 +272,7 @@ async def price_query(body: PriceQueryIn):
         results = await wms_service.query_price(
             stock_code=body.stock_code,
             material_name=body.material_name,
-            new_price=body.new_price
+            new_price=body.new_price,
         )
         return Success(data=results, msg=f"查询到 {len(results)} 条记录")
     except Exception as e:
@@ -253,8 +286,7 @@ async def price_modify(req: Request, body: PriceModifyIn):
     try:
         try:
             result = await wms_service.modify_price(
-                detail_id=body.detail_id,
-                new_price=body.new_price
+                detail_id=body.detail_id, new_price=body.new_price
             )
         except Exception as e:
             logger.error(f"价格修改失败: {e}")
@@ -280,12 +312,16 @@ async def price_modify(req: Request, body: PriceModifyIn):
                 user_id=user_id,
                 username=username,
                 module="WMS",
-                summary=f"价格修改: detail_id={body.detail_id}, new_price={body.new_price}" + (f", 备注={body.remark}" if body.remark else ""),
+                summary=f"价格修改: detail_id={body.detail_id}, new_price={body.new_price}"
+                + (f", 备注={body.remark}" if body.remark else ""),
                 method="POST",
                 path="/api/v1/wms/wms_curd/price_modify",
                 status=200,
                 request_body=body.model_dump(mode="json"),
-                response_body={"detail_id": body.detail_id, "new_price": body.new_price},
+                response_body={
+                    "detail_id": body.detail_id,
+                    "new_price": body.new_price,
+                },
             )
         except Exception as e:
             logger.warning(f"审计日志记录失败: {e}")
@@ -312,8 +348,7 @@ async def owing_status_query(body: OwingStatusQueryIn):
     """查询出库单应收状态信息"""
     try:
         result = await wms_service.query_owing_status(
-            out_stock_no=body.out_stock_no,
-            stock_id=body.stock_id
+            out_stock_no=body.out_stock_no, stock_id=body.stock_id
         )
         if result["success"]:
             return Success(data=result["data"], msg=result["message"])
@@ -332,7 +367,7 @@ async def owing_status_update(req: Request, body: OwingStatusUpdateIn):
             stock_id=body.stock_id,
             is_receive=body.is_receive,
             operator_id=body.operator_id,
-            source_table=body.source_table
+            source_table=body.source_table,
         )
 
         # 记录审计日志
@@ -352,7 +387,8 @@ async def owing_status_update(req: Request, body: OwingStatusUpdateIn):
                 user_id=user_id,
                 username=username,
                 module="WMS",
-                summary=f"应收状态修改: stock_id={body.stock_id}, is_receive={body.is_receive}, 操作人={body.operator_id}" + (f", 备注={body.remark}" if body.remark else ""),
+                summary=f"应收状态修改: stock_id={body.stock_id}, is_receive={body.is_receive}, 操作人={body.operator_id}"
+                + (f", 备注={body.remark}" if body.remark else ""),
                 method="POST",
                 path="/api/v1/wms/wms_curd/owing_status_update",
                 status=200 if result["success"] else 500,
@@ -371,7 +407,9 @@ async def owing_status_update(req: Request, body: OwingStatusUpdateIn):
         return Fail(code=500, msg=f"修改失败: {e!s}")
 
 
-@router.post("/wms_curd/query_inside_deal_state", summary="查询出入库内部交易状态(InSideDealState)")
+@router.post(
+    "/wms_curd/query_inside_deal_state", summary="查询出入库内部交易状态(InSideDealState)"
+)
 async def query_inside_deal_state(body: InsideDealStateQueryIn):
     """查询出入库内部交易状态"""
     try:
@@ -386,7 +424,9 @@ async def query_inside_deal_state(body: InsideDealStateQueryIn):
         return Fail(code=500, msg=f"查询失败: {e!s}")
 
 
-@router.post("/wms_curd/update_inside_deal_state", summary="修改出入库内部交易状态(InSideDealState)")
+@router.post(
+    "/wms_curd/update_inside_deal_state", summary="修改出入库内部交易状态(InSideDealState)"
+)
 async def update_inside_deal_state(req: Request, body: InsideDealStateUpdateIn):
     """修改出入库内部交易状态"""
     try:
@@ -394,7 +434,9 @@ async def update_inside_deal_state(req: Request, body: InsideDealStateUpdateIn):
         if not stock_no:
             return Fail(code=400, msg="出入库单编码或Id不能为空")
 
-        result = await wms_service.update_inside_deal_state(stock_no, body.inside_deal_state)
+        result = await wms_service.update_inside_deal_state(
+            stock_no, body.inside_deal_state
+        )
 
         if not result["success"]:
             return Fail(code=400, msg=result["message"])
@@ -416,7 +458,11 @@ async def update_inside_deal_state(req: Request, body: InsideDealStateUpdateIn):
                 user_id=user_id,
                 username=username,
                 module="WMS",
-                summary=f"修改出入库内部交易状态: {stock_no}, InSideDealState {result['old_inside_deal_state']} -> {result['new_inside_deal_state']}" + (f", 备注={body.remark}" if body.remark else ""),
+                summary=(
+                    f"修改出入库内部交易状态: {stock_no}, InSideDealState {result['old_inside_deal_state']} -> {result['new_inside_deal_state']}"
+                    + (f", 修改人={body.operator_id}" if body.operator_id else "")
+                    + (f", 备注={body.remark}" if body.remark else "")
+                ),
                 method="POST",
                 path="/api/v1/wms/wms_curd/update_inside_deal_state",
                 status=200,

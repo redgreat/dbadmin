@@ -2,7 +2,13 @@
   <CommonPage show-footer>
     <n-space vertical size="large">
       <n-card title="修改单据来源(CreateType)" size="small">
-        <n-form ref="createTypeFormRef" :model="createTypeForm" label-placement="left" :label-width="100">
+        <n-form
+          ref="createTypeFormRef"
+          :model="createTypeForm"
+          :rules="createTypeRules"
+          label-placement="left"
+          :label-width="100"
+        >
           <n-form-item label="工单编码/Id" path="workorderNos">
             <n-input
               v-model:value="createTypeForm.workorderNos"
@@ -11,12 +17,55 @@
               placeholder="输入单个或多个工单编码或Id，逗号分隔"
             />
           </n-form-item>
+          <n-form-item label="目标CreateType" path="newCreateType">
+            <n-input-number
+              v-model:value="createTypeForm.newCreateType"
+              :min="0"
+              :max="999"
+              placeholder="默认 3"
+              style="width: 200px"
+            />
+          </n-form-item>
+          <n-form-item label="操作人" path="operatorId">
+            <n-select
+              v-model:value="createTypeForm.operatorId"
+              filterable
+              remote
+              clearable
+              placeholder="输入姓名搜索用户中心用户"
+              :options="operatorOptions"
+              :loading="operatorLoading"
+              @search="handleSearchOperator"
+            />
+          </n-form-item>
+          <n-form-item label="备注" path="remark">
+            <n-input
+              v-model:value="createTypeForm.remark"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              placeholder="非必填，记录运维日志使用"
+            />
+          </n-form-item>
           <n-space>
             <n-button :loading="createTypeQuerying" @click="handleCreateTypeQuery">查询</n-button>
+            <n-button
+              type="primary"
+              :loading="createTypeExecuting"
+              :disabled="!createTypeQueryResult.length"
+              @click="handleCreateTypeBatchUpdate"
+            >
+              执行修改
+            </n-button>
             <n-button @click="handleCreateTypeReset">重置</n-button>
           </n-space>
         </n-form>
-        <n-table v-if="createTypeQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+        <n-table
+          v-if="createTypeQueryResult.length"
+          :bordered="false"
+          :single-line="false"
+          size="small"
+          class="mt-3"
+        >
           <thead>
             <tr>
               <th>工单Id</th>
@@ -24,7 +73,6 @@
               <th>客户名称</th>
               <th>工单类型</th>
               <th>当前CreateType</th>
-              <th>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -38,16 +86,19 @@
                   {{ item.create_type !== '' ? item.create_type : '-' }}
                 </n-tag>
               </td>
-              <td>
-                <n-button size="small" type="primary" @click="handleOpenCreateTypeEdit(item)">修改</n-button>
-              </td>
             </tr>
           </tbody>
         </n-table>
       </n-card>
 
       <n-card title="工单逻辑删除" size="small">
-        <n-form ref="deleteFormRef" :model="deleteForm" :rules="deleteRules" label-placement="left" :label-width="100">
+        <n-form
+          ref="deleteFormRef"
+          :model="deleteForm"
+          :rules="deleteRules"
+          label-placement="left"
+          :label-width="100"
+        >
           <n-form-item label="工单编码/Id" path="workorderNos">
             <n-input
               v-model:value="deleteForm.workorderNos"
@@ -78,11 +129,19 @@
           </n-form-item>
           <n-space>
             <n-button :loading="deleteQuerying" @click="handleDeleteQuery">查询</n-button>
-            <n-button type="primary" :loading="deleteExecuting" @click="handleDeleteExecute">执行逻辑删除</n-button>
+            <n-button type="primary" :loading="deleteExecuting" @click="handleDeleteExecute"
+              >执行逻辑删除</n-button
+            >
             <n-button @click="handleDeleteReset">重置</n-button>
           </n-space>
         </n-form>
-        <n-table v-if="deleteQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+        <n-table
+          v-if="deleteQueryResult.length"
+          :bordered="false"
+          :single-line="false"
+          size="small"
+          class="mt-3"
+        >
           <thead>
             <tr>
               <th>工单Id</th>
@@ -107,7 +166,18 @@
                   {{ item.deleted ? '已删除' : '正常' }}
                 </n-tag>
               </td>
-              <td>{{ item.deleted_by_name ? item.deleted_by_name + '-' + (item.deleted_by_code || '') + '-(' + item.deleted_by_id + ')' : (item.deleted_by_id || '-') }}</td>
+              <td>
+                {{
+                  item.deleted_by_name
+                    ? item.deleted_by_name +
+                      '-' +
+                      (item.deleted_by_code || '') +
+                      '-(' +
+                      item.deleted_by_id +
+                      ')'
+                    : item.deleted_by_id || '-'
+                }}
+              </td>
               <td>{{ item.deleted_at || '-' }}</td>
             </tr>
           </tbody>
@@ -115,9 +185,19 @@
       </n-card>
 
       <n-card title="工单逻辑删除恢复" size="small">
-        <n-form ref="restoreFormRef" :model="restoreForm" :rules="restoreRules" label-placement="left" :label-width="100">
+        <n-form
+          ref="restoreFormRef"
+          :model="restoreForm"
+          :rules="restoreRules"
+          label-placement="left"
+          :label-width="100"
+        >
           <n-form-item label="工单编码/Id" path="workorderNo">
-            <n-input v-model:value="restoreForm.workorderNo" clearable placeholder="输入单个工单编码或Id" />
+            <n-input
+              v-model:value="restoreForm.workorderNo"
+              clearable
+              placeholder="输入单个工单编码或Id"
+            />
           </n-form-item>
           <n-form-item label="操作人" path="operatorId">
             <n-select
@@ -141,11 +221,19 @@
           </n-form-item>
           <n-space>
             <n-button :loading="restoreQuerying" @click="handleRestoreQuery">查询</n-button>
-            <n-button type="primary" :loading="restoreExecuting" @click="handleRestoreExecute">执行恢复</n-button>
+            <n-button type="primary" :loading="restoreExecuting" @click="handleRestoreExecute"
+              >执行恢复</n-button
+            >
             <n-button @click="handleRestoreReset">重置</n-button>
           </n-space>
         </n-form>
-        <n-table v-if="restoreQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+        <n-table
+          v-if="restoreQueryResult.length"
+          :bordered="false"
+          :single-line="false"
+          size="small"
+          class="mt-3"
+        >
           <thead>
             <tr>
               <th>工单Id</th>
@@ -170,7 +258,18 @@
                   {{ item.deleted ? '已删除' : '正常' }}
                 </n-tag>
               </td>
-              <td>{{ item.deleted_by_name ? item.deleted_by_name + '-' + (item.deleted_by_code || '') + '-(' + item.deleted_by_id + ')' : (item.deleted_by_id || '-') }}</td>
+              <td>
+                {{
+                  item.deleted_by_name
+                    ? item.deleted_by_name +
+                      '-' +
+                      (item.deleted_by_code || '') +
+                      '-(' +
+                      item.deleted_by_id +
+                      ')'
+                    : item.deleted_by_id || '-'
+                }}
+              </td>
               <td>{{ item.deleted_at || '-' }}</td>
             </tr>
           </tbody>
@@ -178,7 +277,13 @@
       </n-card>
 
       <n-card title="关闭工单" size="small">
-        <n-form ref="closeFormRef" :model="closeForm" :rules="closeRules" label-placement="left" :label-width="100">
+        <n-form
+          ref="closeFormRef"
+          :model="closeForm"
+          :rules="closeRules"
+          label-placement="left"
+          :label-width="100"
+        >
           <n-form-item label="工单编码/Id" path="workorderNos">
             <n-input
               v-model:value="closeForm.workorderNos"
@@ -197,11 +302,19 @@
           </n-form-item>
           <n-space>
             <n-button :loading="closeQuerying" @click="handleCloseQuery">查询</n-button>
-            <n-button type="error" :loading="closeExecuting" @click="handleCloseExecute">执行关闭</n-button>
+            <n-button type="error" :loading="closeExecuting" @click="handleCloseExecute"
+              >执行关闭</n-button
+            >
             <n-button @click="handleCloseReset">重置</n-button>
           </n-space>
         </n-form>
-        <n-table v-if="closeQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+        <n-table
+          v-if="closeQueryResult.length"
+          :bordered="false"
+          :single-line="false"
+          size="small"
+          class="mt-3"
+        >
           <thead>
             <tr>
               <th>工单Id</th>
@@ -238,7 +351,7 @@
 
 <script setup>
 import { h, ref } from 'vue'
-import { useMessage, useDialog } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import { NCard, NButton, NInput, NSpace, NInputNumber } from 'naive-ui'
 import api from '@/api'
@@ -246,14 +359,13 @@ import api from '@/api'
 defineOptions({ name: '工单管理' })
 
 const message = useMessage()
-const dialog = useDialog()
 
 const createTypeFormRef = ref(null)
 const deleteFormRef = ref(null)
 const restoreFormRef = ref(null)
 const closeFormRef = ref(null)
 
-const createTypeForm = ref({ workorderNos: '' })
+const createTypeForm = ref({ workorderNos: '', newCreateType: 3, operatorId: '', remark: '' })
 const deleteForm = ref({ workorderNos: '', operatorId: '', remark: '' })
 const restoreForm = ref({ workorderNo: '', operatorId: '', remark: '' })
 const closeForm = ref({ workorderNos: '', remark: '' })
@@ -261,6 +373,7 @@ const closeForm = ref({ workorderNos: '', remark: '' })
 const deleteExecuting = ref(false)
 const restoreExecuting = ref(false)
 const closeExecuting = ref(false)
+const createTypeExecuting = ref(false)
 
 const createTypeQuerying = ref(false)
 const deleteQuerying = ref(false)
@@ -272,13 +385,35 @@ const deleteQueryResult = ref([])
 const restoreQueryResult = ref([])
 const closeQueryResult = ref([])
 
+const createTypeRules = {
+  workorderNos: [
+    { required: true, message: '请输入工单编码或Id' },
+    {
+      validator: (_, value) => {
+        if (!value) return new Error('请输入工单编码或Id')
+        const ids = value
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length)
+        if (!ids.length) return new Error('请输入工单编码或Id')
+        return true
+      },
+    },
+  ],
+  newCreateType: [{ required: true, message: '请输入目标CreateType值' }],
+  operatorId: [{ required: true, message: '请选择操作人' }],
+}
+
 const deleteRules = {
   workorderNos: [
     { required: true, message: '请输入工单编码或Id' },
     {
       validator: (_, value) => {
         if (!value) return new Error('请输入工单编码或Id')
-        const ids = value.split(',').map((s) => s.trim()).filter((s) => s.length)
+        const ids = value
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length)
         if (!ids.length) return new Error('请输入工单编码或Id')
         return true
       },
@@ -298,7 +433,10 @@ const closeRules = {
     {
       validator: (_, value) => {
         if (!value) return new Error('请输入工单编码或Id')
-        const ids = value.split(',').map((s) => s.trim()).filter((s) => s.length)
+        const ids = value
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length)
         if (!ids.length) return new Error('请输入工单编码或Id')
         return true
       },
@@ -337,11 +475,15 @@ const handleSearchOperator = (query) => {
   }, 300)
 }
 
-const parseIds = (text) => text.split(',').map((s) => s.trim()).filter((s) => s.length)
+const parseIds = (text) =>
+  text
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length)
 
 // --- 修改单据来源 ---
 const handleCreateTypeReset = () => {
-  createTypeForm.value = { workorderNos: '' }
+  createTypeForm.value = { workorderNos: '', newCreateType: 3, operatorId: '', remark: '' }
   createTypeQueryResult.value = []
 }
 
@@ -372,51 +514,36 @@ const handleCreateTypeQuery = async () => {
   }
 }
 
-const handleOpenCreateTypeEdit = (item) => {
-  const newCreateType = ref(item.create_type !== '' ? Number(item.create_type) : 0)
-  const dialogInstance = dialog.create({
-    title: '修改单据来源(CreateType)',
-    content: () =>
-      h('div', { style: 'display: flex; align-items: center; gap: 12px;' }, [
-        h('span', {}, `工单 ${item.workorder_id} 当前 CreateType: ${item.create_type}`),
-        h(NInputNumber, {
-          value: newCreateType.value,
-          'onUpdate:value': (v) => {
-            newCreateType.value = v
-          },
-          min: 0,
-          max: 999,
-          style: 'width: 120px;',
-          placeholder: '输入新值',
-        }),
-      ]),
-    positiveText: '确认修改',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      if (newCreateType.value === null || newCreateType.value === undefined) {
-        message.warning('请输入CreateType值')
-        return false
-      }
-      try {
-        const res = await api.updateEhcfCreateType({
-          workorder_no: item.workorder_id,
-          create_type: Number(newCreateType.value),
-          remark: '',
-        })
-        if (res.code === 200 || res.code === 0) {
-          message.success(res.msg || '修改成功')
-          // 刷新查询结果
-          handleCreateTypeQuery()
-        } else {
-          message.error(res.msg || '修改失败')
-          return false
-        }
-      } catch (e) {
-        message.error('请求异常')
-        return false
-      }
-    },
-  })
+const handleCreateTypeBatchUpdate = async () => {
+  if (!createTypeQueryResult.value?.length) {
+    message.warning('请先查询出可修改的工单')
+    return
+  }
+  try {
+    await createTypeFormRef.value?.validate()
+  } catch {
+    message.warning('请填写完整：工单编码、目标来源、操作人')
+    return
+  }
+  createTypeExecuting.value = true
+  let ok = 0
+  let fail = 0
+  for (const item of createTypeQueryResult.value) {
+    try {
+      await api.updateEhcfCreateType({
+        workorder_no: item.workorder_id,
+        create_type: Number(createTypeForm.value.newCreateType),
+        operator_id: createTypeForm.value.operatorId || '',
+        remark: createTypeForm.value.remark || '',
+      })
+      ok += 1
+    } catch {
+      fail += 1
+    }
+  }
+  createTypeExecuting.value = false
+  message.success(`修改完成：成功 ${ok} 条，失败 ${fail} 条`)
+  handleCreateTypeQuery()
 }
 
 // --- 逻辑删除 ---
@@ -617,7 +744,7 @@ const handleDeleteExecute = async () => {
   const remark = String(deleteForm.value.remark || '').trim()
 
   const confirmed = await new Promise((resolve) => {
-    const dialog = window.$dialog.warning({
+    window.$dialog.warning({
       title: '确认逻辑删除',
       content: '确定要逻辑删除这些工单吗？',
       positiveText: '确认',
@@ -799,7 +926,7 @@ const handleCloseExecute = async () => {
   const remark = String(closeForm.value.remark || '').trim()
 
   const confirmed = await new Promise((resolve) => {
-    const dialog = window.$dialog.warning({
+    window.$dialog.warning({
       title: '确认关闭工单',
       content: '确定要关闭这些工单吗？将设置 WorkStatus=10',
       positiveText: '确认',

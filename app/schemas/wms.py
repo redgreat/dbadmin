@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class WmsDeleteBatchIn(BaseModel):
     """批量删除入参"""
+
     stock_nos: list[str] = Field(default_factory=list, description="单据编码或单据Id列表")
     operator_id: str = Field(default="", description="操作人Id（GUID格式）")
     remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
@@ -12,6 +13,7 @@ class WmsDeleteBatchIn(BaseModel):
 
 class WmsRestoreLogicalIn(BaseModel):
     """逻辑删除恢复入参"""
+
     stock_no: str = Field(..., description="单据编码或单据Id")
     operator_id: str = Field(..., description="删除人Id（GUID格式）")
     remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
@@ -19,58 +21,66 @@ class WmsRestoreLogicalIn(BaseModel):
 
 class WmsQueryIn(BaseModel):
     """查询单据状态入参"""
+
     stock_nos: list[str] = Field(default_factory=list, description="单据编码或单据Id列表")
 
 
 class WmsValidateRequest(BaseModel):
     """单据验证请求"""
+
     stock_nos: list[str] = Field(default_factory=list, description="单据编码或单据Id列表")
-    validate_type: str = Field(..., description="验证类型: logical_delete, physical_delete, restore")
+    validate_type: str = Field(
+        ..., description="验证类型: logical_delete, physical_delete, restore"
+    )
     operator_id: str = Field(default="", description="删除人Id（恢复时需要）")
     remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
 
 
 class PriceQueryIn(BaseModel):
     """价格查询入参"""
+
     stock_code: str = Field(default="", description="入库单编码")
     material_name: str = Field(default="", description="物料名称")
     new_price: str = Field(default="", description="修改后价格")
     remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
 
-    @field_validator('new_price')
+    @field_validator("new_price")
     @classmethod
     def validate_price(cls, v):
         if v:  # 非空时验证格式
             try:
                 Decimal(v)  # 验证是否为有效数字
             except Exception:
-                raise ValueError('价格格式不正确，应为有效的数字')
+                raise ValueError("价格格式不正确，应为有效的数字")
         return v
 
 
 class PriceModifyIn(BaseModel):
     """价格修改入参"""
+
     detail_id: str = Field(..., description="明细Id")
     new_price: str = Field(..., description="修改后价格")
     remark: str = Field(default="", description="运维备注（非必填，用于审计日志）")
 
-    @field_validator('new_price')
+    @field_validator("new_price")
     @classmethod
     def validate_price(cls, v):
         try:
             Decimal(v)  # 验证是否为有效数字
         except Exception:
-            raise ValueError('价格格式不正确，应为有效的数字')
+            raise ValueError("价格格式不正确，应为有效的数字")
         return v
 
 
 class OwingValidateIn(BaseModel):
     """应付单验证入参"""
+
     stock_id: str = Field(..., description="出入库明细Id（对应 tb_owinginfo.StockDetailId）")
 
 
 class PriceQueryResult(BaseModel):
     """价格查询结果"""
+
     detail_id: str = Field(..., description="明细Id")
     material_name: str = Field(..., description="物料名称")
     original_price: str = Field(..., description="原价格")
@@ -88,27 +98,32 @@ class PriceQueryResult(BaseModel):
 # FCC关联功能相关模型
 class RelationItem(BaseModel):
     """FCC报销单与仓储对账单对应关系"""
+
     fcc_no: str = Field(..., description="FCC报销单号")
     wms_nos: list[str] = Field(..., description="仓储对账单号列表")
 
 
 class FccParseIn(BaseModel):
     """解析请求模型"""
+
     input_text: str = Field(..., description="批量输入文本")
 
 
 class FccValidateIn(BaseModel):
     """验证请求模型"""
+
     relations: list[RelationItem] = Field(..., description="对应关系列表")
 
 
 class FccSubmitIn(BaseModel):
     """提交请求模型"""
+
     relations: list[RelationItem] = Field(..., description="对应关系列表")
 
 
 class ParseResult(BaseModel):
     """解析结果模型"""
+
     relations: list[RelationItem] = Field(..., description="对应关系列表")
     total_fcc: int = Field(..., description="FCC报销单总数")
     total_wms: int = Field(..., description="仓储对账单总数")
@@ -116,6 +131,7 @@ class ParseResult(BaseModel):
 
 class ValidateResult(BaseModel):
     """验证结果模型"""
+
     valid: bool = Field(..., description="是否验证通过")
     not_found_fcc: list[str] = Field(default_factory=list, description="不存在的FCC报销单列表")
     not_found_wms: list[str] = Field(default_factory=list, description="不存在的仓储对账单列表")
@@ -124,6 +140,7 @@ class ValidateResult(BaseModel):
 
 class TaskProgress(BaseModel):
     """任务进度模型"""
+
     total: int = Field(..., description="总数")
     processed: int = Field(..., description="已处理数")
     success: int = Field(..., description="成功数")
@@ -132,6 +149,7 @@ class TaskProgress(BaseModel):
 
 class FailedItem(BaseModel):
     """失败项模型"""
+
     fcc_no: str = Field(..., description="FCC报销单号")
     wms_no: str = Field(..., description="仓储对账单号")
     reason: str = Field(..., description="失败原因")
@@ -139,12 +157,14 @@ class FailedItem(BaseModel):
 
 class TaskResult(BaseModel):
     """任务结果模型"""
+
     success_count: int = Field(..., description="成功数量")
     failed_items: list[FailedItem] = Field(default_factory=list, description="失败项列表")
 
 
 class TaskStatus(BaseModel):
     """任务状态模型"""
+
     task_id: str = Field(..., description="任务ID")
     status: str = Field(..., description="任务状态: pending, processing, completed, failed")
     progress: TaskProgress = Field(..., description="任务进度")
@@ -155,12 +175,14 @@ class TaskStatus(BaseModel):
 
 class OwingStatusQueryIn(BaseModel):
     """应收状态查询入参"""
+
     out_stock_no: str = Field(default="", description="出库单号")
     stock_id: str = Field(default="", description="出库单ID")
 
 
 class OwingStatusUpdateIn(BaseModel):
     """应收状态修改入参"""
+
     stock_id: str = Field(..., description="出库单ID")
     is_receive: int = Field(default=1, description="应收状态: 0-未收, 1-已收")
     operator_id: str = Field(..., description="修改人Id")
@@ -170,6 +192,7 @@ class OwingStatusUpdateIn(BaseModel):
 
 class OwingStatusResult(BaseModel):
     """应收状态查询结果"""
+
     id: str = Field(..., description="出库单ID")
     out_stock_no: str = Field(..., description="出库单号")
     out_stock_type: str = Field(default="", description="出库类型")
@@ -181,11 +204,14 @@ class OwingStatusResult(BaseModel):
 
 class InsideDealStateQueryIn(BaseModel):
     """查询出入库内部交易状态入参"""
+
     stock_nos: list[str] = Field(default_factory=list, description="出入库单Id或编码列表")
 
 
 class InsideDealStateUpdateIn(BaseModel):
     """修改出入库内部交易状态入参"""
+
     stock_no: str = Field(..., description="出入库单Id或编码")
     inside_deal_state: int = Field(default=1, description="内部交易状态值，默认1")
+    operator_id: str = Field(default="", description="修改人Id")
     remark: str = Field(default="", description="运维备注")
