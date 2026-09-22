@@ -27,24 +27,31 @@
       </section>
     </article>
 
-    <!-- AI 运维助手悬浮按钮 -->
-    <AiChatButton />
+    <!-- AI 运维助手悬浮按钮（仅对有 AI 运维助手菜单权限的用户显示） -->
+    <AiChatButton v-if="hasAiMenuPermission" />
   </n-layout>
 </template>
 
 <script setup>
+import { computed, reactive, watchEffect } from 'vue'
 import AppHeader from './components/header/index.vue'
 import SideBar from './components/sidebar/index.vue'
 import AppMain from './components/AppMain.vue'
 import AppTags from './components/tags/index.vue'
 import AiChatButton from '@/components/AiChat/AiChatButton.vue'
-import { useAppStore } from '@/store'
+import { useAppStore, usePermissionStore } from '@/store'
 import { header, tags } from '~/settings'
-
 // 移动端适配
 import { useBreakpoints } from '@vueuse/core'
 
 const appStore = useAppStore()
+const permissionStore = usePermissionStore()
+
+/** 是否拥有 "AI 运维助手" 菜单权限（该菜单名由后端 usermenu 接口下发，未授权用户不出现） */
+const hasAiMenuPermission = computed(() => {
+  return permissionStore.menus.some((m) => m.name === 'AI 运维助手')
+})
+
 const breakpointsEnum = {
   xl: 1600,
   lg: 1199,

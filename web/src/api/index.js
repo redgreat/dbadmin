@@ -229,6 +229,29 @@ export default {
     request.post('/ehcf/workorder-manage/query_create_type', data),
   updateEhcfCreateType: (data = {}) =>
     request.post('/ehcf/workorder-manage/update_create_type', data),
+  // ehcf - 车务待办人刷新（Excel上传+临时表 tm_newaccept+存储过程 proc_VhsAcceptRefesh）
+  downloadEhcfNewAcceptTemplate: () =>
+    request.get('/ehcf/newaccept-refresh/template', { responseType: 'blob' }),
+  previewEhcfNewAccept: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request.post('/ehcf/newaccept-refresh/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  executeEhcfNewAccept: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request.post('/ehcf/newaccept-refresh/execute', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  refreshEhcfNewAcceptByBatch: (batchId) =>
+    request.post('/ehcf/newaccept-refresh/refresh-by-batch', { batch_id: batchId }),
+  cleanupEhcfNewAccept: (batchId = '') =>
+    batchId
+      ? request.post('/ehcf/newaccept-refresh/cleanup', { batch_id: batchId })
+      : request.post('/ehcf/newaccept-refresh/cleanup', {}),
   // wms - 出入库内部交易状态
   queryWmsInsideDealState: (data = {}) =>
     request.post('/wms/wms_curd/query_inside_deal_state', data),

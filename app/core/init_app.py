@@ -141,6 +141,7 @@ async def init_menus():
             )
             return False
         await ensure_oa_menus()
+        await ensure_ehcf_newaccept_menu()
         return True
     except Exception as e:
         logger.error(f"检查菜单表失败: {e}", exc_info=True)
@@ -208,6 +209,53 @@ async def ensure_oa_menus():
         relation_exists = await MenuApi.filter(menu_id=menu_id, api_id=api_obj.id).exists()
         if not relation_exists:
             await MenuApi.create(menu_id=menu_id, api_id=api_obj.id)
+
+async def ensure_ehcf_newaccept_menu():
+    """确保壹好车服-车务待办人刷新菜单存在"""
+    parent = await Menu.get_or_none(path="/ehcf", parent_id=0)
+    if not parent:
+        return  # 壹好车服一级菜单不存在时跳过
+
+    child = await Menu.get_or_none(path="newaccept-refresh", parent_id=parent.id)
+    if not child:
+        child = await Menu.create(
+            name="车务待办人刷新",
+            menu_type=MenuType.MENU.value,
+            icon="mdi:refresh",
+            path="newaccept-refresh",
+            order=4,
+            parent_id=parent.id,
+            is_hidden=False,
+            component="/ehcf/newaccept-refresh",
+            keepalive=True,
+        )
+
+    admin_role = await Role.get_or_none(name="管理员")
+    if admin_role:
+        await admin_role.menus.add(child)
+
+    ehcf_role = await Role.get_or_none(name="壹好车服运维")
+    if ehcf_role:
+        await ehcf_role.menus.add(child)
+
+    api_specs = [
+        ("GET", "/api/v1/ehcf/newaccept-refresh/template", "下载固定Excel模板"),
+        ("POST", "/api/v1/ehcf/newaccept-refresh/preview", "上传预览-车务待办人刷新"),
+        ("POST", "/api/v1/ehcf/newaccept-refresh/execute", "执行车务待办人刷新"),
+        ("POST", "/api/v1/ehcf/newaccept-refresh/cleanup", "清理临时表"),
+    ]
+    for method, path, summary in api_specs:
+        api_obj = await Api.filter(method=method, path=path).first()
+        if not api_obj:
+            api_obj = await Api.create(
+                method=method, path=path, summary=summary, tags="壹好车服"
+            )
+        relation_exists = await MenuApi.filter(
+            menu_id=child.id, api_id=api_obj.id
+        ).exists()
+        if not relation_exists:
+            await MenuApi.create(menu_id=child.id, api_id=api_obj.id)
+
 
 async def init_apis():
     apis = await api_controller.model.exists()
