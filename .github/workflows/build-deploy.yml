@@ -16,19 +16,19 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Aliyun Container Registry
-        uses: docker/login-action@v3
+        # 跨洋链路偶发 connection reset，用 try 模式重试3次（间隔5s）
+        uses: nick-fields/retry@v2
         with:
-          registry: registry.cn-hangzhou.aliyuncs.com
-          username: ${{ secrets.ALIYUN_USERNAME }}
-          password: ${{ secrets.ALIYUN_PASSWORD }}
+          attempts: 3
+          delay: 5
+          timeout_minutes: 3
+          command: sh -c 'echo "${{ secrets.ALIYUN_PASSWORD }}" | docker login registry.cn-hangzhou.aliyuncs.com -u "${{ secrets.ALIYUN_USERNAME }}" --password-stdin'
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        # push 步骤同样偶发 reset，单独重试（登录成功后重试的是整个步骤，幂等安全）
+        uses: nick-fields/retry@v2
         with:
-          context: .
-          push: true
-          tags: |
-            registry.cn-hangzhou.aliyuncs.com/${{ secrets.ALIYUN_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}
-            registry.cn-hangzhou.aliyuncs.com/${{ secrets.ALIYUN_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:latest
-          provenance: false
-          sbom: false
+          attempts: 3
+          delay: 10
+          timeout_minutes: 30
+          command: sh -c 'docker buildx build --push -t "registry.cn-hangzhou.aliyuncs.com/${{ secrets.ALIYUN_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}" -t "registry.cn-hangzhou.aliyuncs.com/${{ secrets.ALIYUN_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:latest" .'
