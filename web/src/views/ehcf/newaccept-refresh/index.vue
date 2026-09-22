@@ -7,11 +7,12 @@
           <n-form-item label="Excel文件">
             <n-space vertical>
               <n-upload
-                :file-list="fileList"
+                v-model:file-list="fileList"
                 :max="1"
+                :default-upload="false"
                 accept=".xlsx,.xls"
-                :custom-request="handleUpload"
-                @update:file-list="handleFileListUpdate"
+                @before-upload="handleBeforeUpload"
+                @change="handleUploadChange"
               >
                 <n-button type="primary">
                   <TheIcon icon="mdi:file-upload-outline" :size="16" class="mr-2" />
@@ -108,19 +109,24 @@ const cleaning = ref(false)
 const previewResult = ref(null)
 const executeResult = ref(null)
 
-const handleUpload = ({ file, onFinish }) => {
-  // 阻止n-upload自动上传，仅记录文件
-  currentFile.value = file.file
-  fileList.value = [{ name: file.name, status: 'finished' }]
-  onFinish()
+const handleBeforeUpload = ({ file }) => {
+  const ext = file?.name?.split('.').pop()?.toLowerCase()
+  if (!['xlsx', 'xls'].includes(ext)) {
+    message.error('仅支持 .xlsx 和 .xls 文件')
+    return false
+  }
+  return true
 }
 
-const handleFileListUpdate = (list) => {
-  if (list.length === 0) {
+const handleUploadChange = ({ fileList: fl, file }) => {
+  if (fl && fl.length === 0) {
     currentFile.value = null
     previewResult.value = null
     executeResult.value = null
+    return
   }
+  const fileItem = file || fl?.[0]
+  currentFile.value = fileItem?.file || fileItem
 }
 
 const handleDownloadTemplate = async () => {
