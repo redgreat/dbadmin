@@ -15,20 +15,33 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Aliyun Container Registry
-        # 跨洋链路偶发 connection reset，用 try 模式重试3次（间隔5s）
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Log in to Tencent Cloud Container Registry
+        # 腾讯云个人版 TCR；偶发 connection reset 时用 retry 重试
         uses: nick-fields/retry@v2
         with:
           attempts: 3
           delay: 5
           timeout_minutes: 3
-          command: sh -c 'echo "${{ secrets.ALIYUN_PASSWORD }}" | docker login registry.cn-hangzhou.aliyuncs.com -u "${{ secrets.ALIYUN_USERNAME }}" --password-stdin'
+          command: sh -c 'echo "${{ secrets.TENCENT_PASSWORD }}" | docker login ccr.ccs.tencentyun.com -u "${{ secrets.TENCENT_USERNAME }}" --password-stdin'
 
-      - name: Build and push
-        # push 步骤同样偶发 reset，单独重试（登录成功后重试的是整个步骤，幂等安全）
+      - name: Build and push to GHCR + Tencent (multi-arch OCI)
+        # 一次 buildx 同时推 GHCR 与腾讯云（namespace/仓名走 secrets）；
+        # 仅 amd64（只部署 x86，避开多架构 OCI 的兼容坑，更快更稳）
         uses: nick-fields/retry@v2
         with:
           attempts: 3
           delay: 10
           timeout_minutes: 30
-          command: sh -c 'docker buildx build --push -t "registry.cn-hangzhou.aliyuncs.com/${{ secrets.ALIYUN_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}" -t "registry.cn-hangzhou.aliyuncs.com/${{ secrets.ALIYUN_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:latest" .'
+          command: |
+            sh -c "docker buildx build --push --platform linux/amd64 \
+              -t "ghcr.io/${{ toLower(github.repository) }}:${{ github.ref_name }}" \
+              -t "ghcr.io/${{ toLower(github.repository) }}:latest" \
+              -t "ccr.ccs.tencentyun.com/${{ secrets.TENCENT_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}" \
+              -t "ccr.ccs.tencentyun.com/${{ secrets.TENCENT_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:latest" ."

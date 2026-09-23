@@ -1,6 +1,6 @@
 services:
   dbadmin:
-    image: registry.cn-hangzhou.aliyuncs.com/redgreat/dbadmin:latest
+    image: ccr.ccs.tencentyun.com/dbadmin/dbadmin:latest
     container_name: dbadmin
     hostname: dbadmin
     restart: unless-stopped
@@ -47,7 +47,7 @@ services:
         max-file: "3"
 
   celery-worker:
-    image: registry.cn-hangzhou.aliyuncs.com/redgreat/dbadmin:latest
+    image: ccr.ccs.tencentyun.com/dbadmin/dbadmin:latest
     container_name: dbadmin-celery-worker
     hostname: dbadmin-celery-worker
     restart: unless-stopped
