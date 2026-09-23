@@ -23,7 +23,6 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Log in to Tencent Cloud Container Registry
-        # 腾讯云个人版 TCR；偶发 connection reset 时用 retry 重试
         uses: nick-fields/retry@v2
         with:
           attempts: 3
@@ -32,16 +31,16 @@ jobs:
           command: sh -c 'echo "${{ secrets.TENCENT_PASSWORD }}" | docker login ccr.ccs.tencentyun.com -u "${{ secrets.TENCENT_USERNAME }}" --password-stdin'
 
       - name: Build and push to GHCR + Tencent (multi-arch OCI)
-        # 一次 buildx 同时推 GHCR 与腾讯云（namespace/仓名走 secrets）；
-        # 仅 amd64（只部署 x86，避开多架构 OCI 的兼容坑，更快更稳）
         uses: nick-fields/retry@v2
         with:
           attempts: 3
           delay: 10
           timeout_minutes: 30
           command: |
-            sh -c "docker buildx build --push --platform linux/amd64 \
-              -t "ghcr.io/${{ toLower(github.repository) }}:${{ github.ref_name }}" \
-              -t "ghcr.io/${{ toLower(github.repository) }}:latest" \
+            REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+            docker buildx build --push --platform linux/amd64 \
+              -t "ghcr.io/${REPO_LOWER}:${{ github.ref_name }}" \
+              -t "ghcr.io/${REPO_LOWER}:latest" \
               -t "ccr.ccs.tencentyun.com/${{ secrets.TENCENT_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}" \
-              -t "ccr.ccs.tencentyun.com/${{ secrets.TENCENT_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:latest" ."
+              -t "ccr.ccs.tencentyun.com/${{ secrets.TENCENT_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}:latest" \
+              .
