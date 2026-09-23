@@ -142,6 +142,7 @@ async def init_menus():
             return False
         await ensure_oa_menus()
         await ensure_ehcf_newaccept_menu()
+        await ensure_wms_simdup_menu()
         return True
     except Exception as e:
         logger.error(f"检查菜单表失败: {e}", exc_info=True)
@@ -209,6 +210,48 @@ async def ensure_oa_menus():
         relation_exists = await MenuApi.filter(menu_id=menu_id, api_id=api_obj.id).exists()
         if not relation_exists:
             await MenuApi.create(menu_id=menu_id, api_id=api_obj.id)
+
+async def ensure_wms_simdup_menu():
+    """确保仓储中心-SIM卡重复入库验证菜单存在"""
+    parent = await Menu.get_or_none(path="/wms", parent_id=0)
+    if not parent:
+        return  # 仓储中心一级菜单不存在时跳过
+
+    child = await Menu.get_or_none(path="simdup", parent_id=parent.id)
+    if not child:
+        child = await Menu.create(
+            name="SIM卡重复入库验证",
+            menu_type=MenuType.MENU.value,
+            icon="mdi:sim-card",
+            path="simdup",
+            order=99,
+            parent_id=parent.id,
+            is_hidden=False,
+            component="/wms/simdup",
+            keepalive=True,
+        )
+
+    admin_role = await Role.get_or_none(name="管理员")
+    if admin_role:
+        await admin_role.menus.add(child)
+
+    api_specs = [
+        ("GET", "/api/v1/wms/simdup/template", "下载SIM卡重复入库验证Excel模板"),
+        ("POST", "/api/v1/wms/simdup/verify", "上传Excel验证SIM卡重复入库"),
+        ("GET", "/api/v1/wms/simdup/record/{record_id}/export", "下载某次验证记录的重复编码Excel"),
+        ("POST", "/api/v1/wms/simdup/record/list", "SIM卡重复入库验证记录列表"),
+        ("GET", "/api/v1/wms/simdup/record/{record_id}", "查看某次验证记录的详情"),
+        ("GET", "/api/v1/wms/simdup/record/{record_id}/results", "查看某次验证记录命中的重复卡号"),
+        ("POST", "/api/v1/wms/simdup/api/verify", "对外API-验证SimNumber是否重复入库"),
+    ]
+    for method, path, summary in api_specs:
+        api_obj = await Api.filter(method=method, path=path).first()
+        if not api_obj:
+            api_obj = await Api.create(method=method, path=path, summary=summary, tags="仓储中心")
+        relation_exists = await MenuApi.filter(menu_id=child.id, api_id=api_obj.id).exists()
+        if not relation_exists:
+            await MenuApi.create(menu_id=child.id, api_id=api_obj.id)
+
 
 async def ensure_ehcf_newaccept_menu():
     """确保壹好车服-车务待办人刷新菜单存在"""

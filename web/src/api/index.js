@@ -257,4 +257,24 @@ export default {
     request.post('/wms/wms_curd/query_inside_deal_state', data),
   updateWmsInsideDealState: (data = {}) =>
     request.post('/wms/wms_curd/update_inside_deal_state', data),
+  // wms - SIM卡重复入库验证
+  downloadSimDupTemplate: () =>
+    request.get('/wms/simdup/template', { responseType: 'blob' }),
+  verifySimDup: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request.post('/wms/simdup/verify', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  exportSimDupRecord: (recordId) =>
+    request.get(`/wms/simdup/record/${recordId}/export`, {
+      responseType: 'blob',
+    }),
+  getSimDupRecordList: (params = {}) =>
+    request.post('/wms/simdup/record/list', params),
+  getSimDupRecordDetail: (recordId) =>
+    request.get(`/wms/simdup/record/${recordId}`),
+  getSimDupRecordResults: (recordId, params = {}) =>
+    request.get(`/wms/simdup/record/${recordId}/results`, { params }),
 }

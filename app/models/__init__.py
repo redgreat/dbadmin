@@ -8,5 +8,6 @@ from .oplog import *
 from .password import *
 from .report import *
 from .script import *
+from .simdupverify import *
 from .task import *
 from .task_notify import *
