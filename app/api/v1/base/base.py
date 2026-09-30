@@ -63,15 +63,26 @@ async def get_userinfo():
 async def get_user_menu():
     user_id = CTX_USER_ID.get()
     user_obj = await User.filter(id=user_id).first()
-    menus: list[Menu] = []
     if user_obj.is_superuser:
-        menus = await Menu.all()
+        menus = list(await Menu.all())
     else:
         role_objs: list[Role] = await user_obj.roles
+        granted_map: dict[int, Menu] = {}
         for role_obj in role_objs:
-            menu = await role_obj.menus
-            menus.extend(menu)
-        menus = list(set(menus))
+            for menu in await role_obj.menus:
+                granted_map[menu.id] = menu
+        # 只勾选子菜单时自动补全祖先目录（仅用于挂载菜单树，接口权限仍以实际勾选为准）
+        if granted_map:
+            menu_map = {m.id: m for m in await Menu.all()}
+            for menu in list(granted_map.values()):
+                parent_id = menu.parent_id
+                while parent_id and parent_id not in granted_map:
+                    parent = menu_map.get(parent_id)
+                    if not parent:
+                        break
+                    granted_map[parent.id] = parent
+                    parent_id = parent.parent_id
+        menus = list(granted_map.values())
     parent_menus: list[Menu] = []
     for menu in menus:
         if menu.parent_id == 0:

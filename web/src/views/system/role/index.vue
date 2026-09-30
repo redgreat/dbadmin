@@ -267,7 +267,7 @@ async function updateRoleAuthorized() {
             >
           </NGi>
         </NGrid>
-        <div class="mt-4 mb-2 text-gray-500">
+        <div class="mb-2 mt-4 text-gray-500">
           提示：设置菜单权限后，对应的接口访问权限将自动关联
         </div>
         <NTree
@@ -278,7 +278,6 @@ async function updateRoleAuthorized() {
           key-field="id"
           label-field="name"
           checkable
-          cascade
           :default-expand-all="true"
           :block-line="true"
           :selectable="false"
