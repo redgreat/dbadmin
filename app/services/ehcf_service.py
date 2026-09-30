@@ -1,11 +1,15 @@
-from typing import Dict, List, Tuple
-import aiomysql
 import logging
+from typing import Dict, List, Tuple
+
+import aiomysql
 
 from app.services.db_pool import db_pool
 from app.settings.config import settings
 
 logger = logging.getLogger(__name__)
+
+# 单据来源仅允许修改充电桩单据（壹好车服服务商编码）
+ALLOWED_SERVICE_PROVIDER_CODE = "1067"
 
 _ehcf_conn_id = None
 
@@ -672,6 +676,7 @@ class EhcfService:
                     for wo in workorder_nos:
                         await cur.execute(
                             """SELECT a.Id, a.AppCode, a.CreateType, a.CustomerName, a.OrderType,
+                                      a.ServiceProviderCode,
                                       fn_GetOrderTypeByCode(a.OrderType) AS OrderTypeName
                                FROM tb_workorderinfo a
                                WHERE (a.Id=%s OR a.AppCode=%s) AND a.Deleted=0""",
@@ -682,13 +687,17 @@ class EhcfService:
                             not_found_docs.append(wo)
                             continue
                         for row in rows:
+                            service_provider_code = str(row[5]) if row[5] else ""
                             found_docs.append({
                                 "workorder_id": str(row[0]),
                                 "app_code": str(row[1]) if row[1] else "",
                                 "create_type": row[2] if row[2] is not None else "",
                                 "customer_name": str(row[3]) if row[3] else "",
                                 "order_type": str(row[4]) if row[4] else "",
-                                "order_type_name": str(row[5]) if row[5] else "",
+                                "service_provider_code": service_provider_code,
+                                "allow_modify": service_provider_code
+                                == ALLOWED_SERVICE_PROVIDER_CODE,
+                                "order_type_name": str(row[6]) if row[6] else "",
                                 "input": wo,
                             })
         else:
@@ -703,8 +712,14 @@ class EhcfService:
             "message": f"找到 {len(found_docs)} 条，未找到 {len(not_found_docs)} 条",
         }
 
-    async def update_create_type(self, workorder_no: str, create_type: int) -> dict:
-        """修改工单CreateType（单据来源）"""
+    async def update_create_type(
+        self, workorder_no: str, create_type: int, restrict_charging_pile: bool = False
+    ) -> dict:
+        """修改工单CreateType（单据来源）
+
+        restrict_charging_pile=True 时仅允许充电桩单据（ServiceProviderCode=1067），
+        供独立的「修改单据来源」菜单使用；工单管理原入口不限制。
+        """
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -715,7 +730,7 @@ class EhcfService:
                 async with conn.cursor() as cur:
                     # 先查询工单是否存在
                     await cur.execute(
-                        """SELECT Id, AppCode, CreateType FROM tb_workorderinfo
+                        """SELECT Id, AppCode, CreateType, ServiceProviderCode FROM tb_workorderinfo
                            WHERE (Id=%s OR AppCode=%s) AND Deleted=0""",
                         (workorder_no, workorder_no),
                     )
@@ -729,17 +744,51 @@ class EhcfService:
                     workorder_id = str(row[0])
                     app_code = str(row[1]) if row[1] else ""
                     old_create_type = row[2]
+                    service_provider_code = str(row[3]) if row[3] else ""
 
-                    # 执行更新
-                    await cur.execute(
-                        "UPDATE tb_workorderinfo SET CreateType=%s WHERE Id=%s",
-                        (create_type, workorder_id),
-                    )
+                    # 仅充电桩单据可修改（独立菜单入口）
+                    if (
+                        restrict_charging_pile
+                        and service_provider_code != ALLOWED_SERVICE_PROVIDER_CODE
+                    ):
+                        return {
+                            "success": False,
+                            "workorder_id": workorder_id,
+                            "app_code": app_code,
+                            "service_provider_code": service_provider_code,
+                            "message": (
+                                f"工单 {workorder_id} 非充电桩单据"
+                                f"（ServiceProviderCode={service_provider_code or '空'}），"
+                                f"仅充电桩单据（ServiceProviderCode={ALLOWED_SERVICE_PROVIDER_CODE}）可修改单据来源"
+                            ),
+                        }
+
+                    if restrict_charging_pile:
+                        # 带上服务商编码条件双保险，防止并发下误改
+                        await cur.execute(
+                            "UPDATE tb_workorderinfo SET CreateType=%s "
+                            "WHERE Id=%s AND ServiceProviderCode=%s",
+                            (create_type, workorder_id, ALLOWED_SERVICE_PROVIDER_CODE),
+                        )
+                        if cur.rowcount != 1:
+                            return {
+                                "success": False,
+                                "workorder_id": workorder_id,
+                                "app_code": app_code,
+                                "service_provider_code": service_provider_code,
+                                "message": f"修改失败: 工单 {workorder_id} 非充电桩单据或状态已变化，请重新查询",
+                            }
+                    else:
+                        await cur.execute(
+                            "UPDATE tb_workorderinfo SET CreateType=%s WHERE Id=%s",
+                            (create_type, workorder_id),
+                        )
 
                     return {
                         "success": True,
                         "workorder_id": workorder_id,
                         "app_code": app_code,
+                        "service_provider_code": service_provider_code,
                         "old_create_type": old_create_type,
                         "new_create_type": create_type,
                         "message": f"修改成功: 工单 {workorder_id} 的 CreateType 从 {old_create_type} 修改为 {create_type}",

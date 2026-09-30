@@ -28,3 +28,4 @@ docs
 !web/src/views/alert/log/
 
 .zed/
+.mimocode/

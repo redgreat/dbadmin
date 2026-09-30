@@ -224,11 +224,14 @@ export default {
   restoreEhcfWorkorderLogical: (data = {}) =>
     request.post('/ehcf/workorder-manage/restore_logical', data),
   closeEhcfWorkorder: (data = {}) => request.post('/ehcf/workorder-manage/close', data),
-  // ehcf - 工单管理（修改单据来源）
+  // ehcf - 工单管理（修改单据来源，不限制服务商）
   queryEhcfCreateType: (data = {}) =>
     request.post('/ehcf/workorder-manage/query_create_type', data),
   updateEhcfCreateType: (data = {}) =>
     request.post('/ehcf/workorder-manage/update_create_type', data),
+  // ehcf - 修改单据来源（独立菜单，仅充电桩单据 ServiceProviderCode=1067 可改）
+  queryEhcfChargingPileCreateType: (data = {}) => request.post('/ehcf/create-type/query', data),
+  updateEhcfChargingPileCreateType: (data = {}) => request.post('/ehcf/create-type/update', data),
   // ehcf - 车务待办人刷新（Excel上传+临时表 tm_newaccept+存储过程 proc_VhsAcceptRefesh）
   downloadEhcfNewAcceptTemplate: () =>
     request.get('/ehcf/newaccept-refresh/template', { responseType: 'blob' }),
