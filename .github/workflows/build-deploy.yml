@@ -27,16 +27,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to Tencent Cloud Container Registry
-        # 腾讯云个人版 TCR，国内部署拉取快
-        uses: docker/login-action@v3
-        with:
-          registry: ccr.ccs.tencentyun.com
-          username: ${{ secrets.TENCENT_USERNAME }}
-          password: ${{ secrets.TENCENT_PASSWORD }}
-
       - name: Build and push to GHCR
-        # 主发布：先推 GHCR，不依赖腾讯云，保证 Release 永远成功
         uses: nick-fields/retry@v2
         with:
           max_attempts: 3
@@ -48,23 +39,3 @@ jobs:
               -t "ghcr.io/${REPO_LOWER}:${{ github.ref_name }}" \
               -t "ghcr.io/${REPO_LOWER}:latest" \
               .
-
-      - name: Copy image to Tencent TCR (国内镜像，失败不阻塞发布)
-        # 不在 CI 重新构建：pull GHCR（GitHub 内网，快）→ push TCR；
-        # docker push 按层推送且每层自带重试，比 buildx imagetools 的
-        # HTTP/2 流复制更耐跨境劣化链路（PROTOCOL_ERROR）；
-        # 仍失败只标黄该步骤，不影响 GHCR 正式发布
-        continue-on-error: true
-        uses: nick-fields/retry@v2
-        with:
-          max_attempts: 5
-          retry_wait_seconds: 20
-          timeout_minutes: 40
-          command: |
-            REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-            TCR_IMAGE="ccr.ccs.tencentyun.com/${{ secrets.TENCENT_NAMESPACE }}/${{ secrets.DOCKER_IMAGE_NAME }}"
-            docker pull "ghcr.io/${REPO_LOWER}:${{ github.ref_name }}"
-            docker tag "ghcr.io/${REPO_LOWER}:${{ github.ref_name }}" "${TCR_IMAGE}:${{ github.ref_name }}"
-            docker tag "ghcr.io/${REPO_LOWER}:${{ github.ref_name }}" "${TCR_IMAGE}:latest"
-            docker push "${TCR_IMAGE}:${{ github.ref_name }}"
-            docker push "${TCR_IMAGE}:latest"

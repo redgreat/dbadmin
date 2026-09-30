@@ -43,10 +43,8 @@ async def _get_wms_conn_id() -> int:
     return _wms_conn_id
 
 
-# 导出目录（本地文件，供页面下载；相对应用根目录 data/simdup）
-# 项目根目录 = 从 app/services 向上三级
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-_EXPORT_DIR = os.path.join(_PROJECT_ROOT, "data", "simdup")
+# 导出目录（本地文件，供页面下载；应用根目录下 data/simdup，对应挂载卷 /opt/dbadmin/data）
+_EXPORT_DIR = os.path.join(settings.BASE_DIR, "data", "simdup")
 
 BATCH_SIZE = 1000
 # 对外API单次验证数量上限（同时限制SQL IN占位符规模）
