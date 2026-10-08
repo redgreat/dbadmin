@@ -255,6 +255,9 @@ export default {
     batchId
       ? request.post('/ehcf/newaccept-refresh/cleanup', { batch_id: batchId })
       : request.post('/ehcf/newaccept-refresh/cleanup', {}),
+  // ehcf - 接口调用统计（只看 EHCF 成功写操作）
+  getEhcfApiStatList: (params = {}) => request.get('/ehcf/api-stat/list', { params }),
+  getEhcfApiStatInterfaces: () => request.get('/ehcf/api-stat/interfaces'),
   // wms - 出入库内部交易状态
   queryWmsInsideDealState: (data = {}) =>
     request.post('/wms/wms_curd/query_inside_deal_state', data),

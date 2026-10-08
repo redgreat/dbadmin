@@ -144,6 +144,7 @@ async def init_menus():
         await ensure_ehcf_newaccept_menu()
         await ensure_wms_simdup_menu()
         await ensure_ehcf_createtype_menu()
+        await ensure_ehcf_apistat_menu()
         return True
     except Exception as e:
         logger.error(f"检查菜单表失败: {e}", exc_info=True)
@@ -332,6 +333,51 @@ async def ensure_ehcf_createtype_menu():
     api_specs = [
         ("POST", "/api/v1/ehcf/create-type/query", "查询单据来源(CreateType)"),
         ("POST", "/api/v1/ehcf/create-type/update", "修改单据来源(CreateType)"),
+    ]
+    for method, path, summary in api_specs:
+        api_obj = await Api.filter(method=method, path=path).first()
+        if not api_obj:
+            api_obj = await Api.create(
+                method=method, path=path, summary=summary, tags="壹好车服"
+            )
+        relation_exists = await MenuApi.filter(
+            menu_id=child.id, api_id=api_obj.id
+        ).exists()
+        if not relation_exists:
+            await MenuApi.create(menu_id=child.id, api_id=api_obj.id)
+
+
+async def ensure_ehcf_apistat_menu():
+    """确保壹好车服-接口调用统计二级菜单存在（只读审计日志中 EHCF 成功写操作）"""
+    parent = await Menu.get_or_none(path="/ehcf", parent_id=0)
+    if not parent:
+        return  # 壹好车服一级菜单不存在时跳过
+
+    child = await Menu.get_or_none(path="api-stat", parent_id=parent.id)
+    if not child:
+        child = await Menu.create(
+            name="接口调用统计",
+            menu_type=MenuType.MENU.value,
+            icon="mdi:chart-bar",
+            path="api-stat",
+            order=6,
+            parent_id=parent.id,
+            is_hidden=False,
+            component="/ehcf/api-stat",
+            keepalive=True,
+        )
+
+    admin_role = await Role.get_or_none(name="管理员")
+    if admin_role:
+        await admin_role.menus.add(child)
+
+    ehcf_role = await Role.get_or_none(name="壹好车服运维")
+    if ehcf_role:
+        await ehcf_role.menus.add(child)
+
+    api_specs = [
+        ("GET", "/api/v1/ehcf/api-stat/list", "接口调用统计-成功修改"),
+        ("GET", "/api/v1/ehcf/api-stat/interfaces", "接口调用统计-写操作接口下拉"),
     ]
     for method, path, summary in api_specs:
         api_obj = await Api.filter(method=method, path=path).first()
