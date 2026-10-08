@@ -20,22 +20,19 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, h } from 'vue'
+import { onMounted, ref, h } from 'vue'
 import { NInput, NSelect, NPopover } from 'naive-ui'
 import TheIcon from '@/components/icon/TheIcon.vue'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
 import CrudTable from '@/components/table/CrudTable.vue'
 import api from '@/api'
-import { useUserStore } from '@/store'
 import { formatDateTime } from '@/utils'
 
 defineOptions({ name: '接口调用统计' })
 
 const $table = ref(null)
 const queryItems = ref({})
-const userStore = useUserStore()
-const isSuperUser = computed(() => !!userStore.isSuperUser)
 const interfaceOptions = ref([])
 
 async function handleGetStat(params = {}) {
@@ -44,7 +41,6 @@ async function handleGetStat(params = {}) {
     if (v === '' || v === null) continue
     cleaned[k] = v
   }
-  if (!isSuperUser.value) delete cleaned.username
   return api.getEhcfApiStatList(cleaned)
 }
 

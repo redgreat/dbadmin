@@ -5,8 +5,7 @@ from fastapi import APIRouter, Query
 
 from tortoise.expressions import Q
 
-from app.core.ctx import CTX_USER_ID
-from app.models.admin import AuditLog, User
+from app.models.admin import AuditLog
 from app.schemas import SuccessExtra
 
 logger = logging.getLogger(__name__)
@@ -60,11 +59,8 @@ async def get_ehcf_api_stat_list(
 
     q = Q(module="EHCF", status=200, path__in=list(WRITE_PATH_LABELS.keys()))
 
-    # 数据权限：与审计日志保持一致，普通用户仅能看自己的数据
-    current_user = await User.filter(id=CTX_USER_ID.get()).first()
-    if current_user is not None and not current_user.is_superuser:
-        q &= Q(username=current_user.username)
-    elif username and username.strip():
+    # 本页面不做行级数据权限：有菜单即可看全量数据
+    if username and username.strip():
         q &= Q(username__icontains=username.strip())
 
     if path and path.strip():
