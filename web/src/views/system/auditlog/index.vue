@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { NInput, NSelect, NPopover } from 'naive-ui'
 import TheIcon from '@/components/icon/TheIcon.vue'
 
@@ -8,12 +8,28 @@ import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
 import CrudTable from '@/components/table/CrudTable.vue'
 
 import api from '@/api'
+import { useUserStore } from '@/store'
 import { formatDateTime } from '@/utils'
 
 defineOptions({ name: '审计日志' })
 
 const $table = ref(null)
 const queryItems = ref({})
+const userStore = useUserStore()
+// 非超级管理员只能看自己的数据，后端会强制过滤；前端隐藏用户名筛选避免误解
+const isSuperUser = computed(() => !!userStore.isSuperUser)
+
+// 清洗空参数：把 '' / null 转为 undefined，避免 axios 以 start_time= 空串形式发送
+async function handleGetAuditLog(params = {}) {
+  const cleaned = {}
+  for (const [k, v] of Object.entries(params)) {
+    if (v === '' || v === null) continue
+    cleaned[k] = v
+  }
+  // 普通用户不允许按用户名筛选，后端强制为自己
+  if (!isSuperUser.value) delete cleaned.username
+  return api.getAuditLogList(cleaned)
+}
 
 onMounted(() => {
   $table.value?.handleSearch()
@@ -203,10 +219,10 @@ const columns = [
       ref="$table"
       v-model:query-items="queryItems"
       :columns="columns"
-      :get-data="api.getAuditLogList"
+      :get-data="handleGetAuditLog"
     >
       <template #queryBar>
-        <QueryBarItem label="用户名称" :label-width="70">
+        <QueryBarItem v-if="isSuperUser" label="用户名称" :label-width="70">
           <NInput
             v-model:value="queryItems.username"
             clearable
