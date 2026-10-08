@@ -230,22 +230,31 @@ const handleCreateTypeBatchUpdate = async () => {
   }
   createTypeExecuting.value = true
   let ok = 0
+  let already = 0
   let fail = 0
   for (const item of createTypeQueryResult.value) {
     try {
-      await api.updateEhcfChargingPileCreateType({
+      const res = await api.updateEhcfChargingPileCreateType({
         workorder_no: item.workorder_id,
         create_type: Number(createTypeForm.value.newCreateType),
         operator_id: createTypeForm.value.operatorId || '',
         remark: createTypeForm.value.remark || '',
       })
-      ok += 1
+      if (res?.data?.already_updated) {
+        already += 1
+      } else {
+        ok += 1
+      }
     } catch {
       fail += 1
     }
   }
   createTypeExecuting.value = false
-  message.success(`修改完成：成功 ${ok} 条，失败 ${fail} 条`)
+  if (already) {
+    message.success(`修改完成：成功 ${ok} 条（其中 ${already} 条已是目标值，无需修改），失败 ${fail} 条`)
+  } else {
+    message.success(`修改完成：成功 ${ok} 条，失败 ${fail} 条`)
+  }
   handleCreateTypeQuery()
 }
 </script>

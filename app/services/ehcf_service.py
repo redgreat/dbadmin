@@ -763,6 +763,19 @@ class EhcfService:
                             ),
                         }
 
+                    # 幂等：当前值已是目标值，直接返回成功，不再 UPDATE、不报错
+                    if old_create_type is not None and str(old_create_type) == str(create_type):
+                        return {
+                            "success": True,
+                            "already_updated": True,
+                            "workorder_id": workorder_id,
+                            "app_code": app_code,
+                            "service_provider_code": service_provider_code,
+                            "old_create_type": old_create_type,
+                            "new_create_type": create_type,
+                            "message": f"工单 {workorder_id} 的 CreateType 已是 {create_type}，无需修改",
+                        }
+
                     if restrict_charging_pile:
                         # 带上服务商编码条件双保险，防止并发下误改
                         await cur.execute(
