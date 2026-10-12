@@ -91,8 +91,9 @@ class WmsService:
                 (his_table,   no_field,  stock_no),
             ]
             for table, field, value in search_targets:
+                table_type = "main" if table == main_table else "his"
                 sql = f"SELECT {select_cols}, '{doc_type}' AS doc_type, " \
-                      f"{'main' if table == main_table else 'his'} AS table_type " \
+                      f"'{table_type}' AS table_type " \
                       f"FROM {table} WHERE {field}=%s LIMIT 1"
                 try:
                     await cur.execute(sql, (value,))
@@ -120,12 +121,15 @@ class WmsService:
         """
         在所有配置的表中查找单据的所有匹配记录（用于批量删除）。
 
+        返回行会在末尾追加 doc_type、table_type 两个字段，调用方可通过 row[-2] / row[-1] 获取。
+
         Returns:
-            匹配的 Id 列表
+            匹配的记录列表
         """
         is_numeric = stock_no.isdigit()
         numeric_id = int(stock_no) if is_numeric else None
         stock_ids: list[tuple] = []
+        seen: set[tuple] = set()
 
         for main_table, his_table, no_field, doc_type in self.STOCK_TABLES:
             search_targets = [
@@ -135,11 +139,19 @@ class WmsService:
                 (his_table,   no_field,  stock_no),
             ]
             for table, field, value in search_targets:
-                sql = f"SELECT {select_cols} FROM {table} WHERE {field}=%s"
+                table_type = "main" if table == main_table else "his"
+                sql = f"SELECT {select_cols}, '{doc_type}' AS doc_type, " \
+                      f"'{table_type}' AS table_type " \
+                      f"FROM {table} WHERE {field}=%s"
                 try:
                     await cur.execute(sql, (value,))
                     rows = await cur.fetchall()
                     for row in rows:
+                        # 同一记录可能同时被 Id 与 No 命中，按(主键, doc_type, table_type)去重
+                        key = (row[0], row[-2], row[-1])
+                        if key in seen:
+                            continue
+                        seen.add(key)
                         stock_ids.append(row)
                         logger.debug(
                             f"[find_all] 命中: stock_no={stock_no} → "
@@ -176,50 +188,64 @@ class WmsService:
         if isinstance(pool, aiomysql.Pool):
             async with pool.acquire() as conn, conn.cursor() as cur:
                 for stock_no in stock_nos:
-                    # 使用统一查询方法在所有配置的表中查找
-                    result = await self._find_stock_doc(
+                    # 同一单据可能同时存在于主表/历史表，需综合所有记录判断状态
+                    rows = await self._find_all_stock_docs(
                         cur, stock_no,
                         select_cols="Id AS stock_id, Deleted AS deleted, DeletedById",
                     )
 
-                    if not result:
+                    if not rows:
                         not_found_docs.append(stock_no)
-                    else:
-                        stock_id, deleted, deleted_by_id, doc_type, table_type = result
-                        doc_info = {
-                            "stock_id": stock_id,
-                            "stock_no": stock_no,
-                            "deleted": deleted,
-                            "deleted_by_id": deleted_by_id,
-                            "doc_type": doc_type,
-                            "table_type": table_type
-                        }
+                        continue
 
-                        if validate_type == "logical_delete":
-                            if deleted == 1:
-                                invalid_docs.append({
-                                    **doc_info,
-                                    "reason": "单据已被逻辑删除，不能再次删除"
-                                })
-                            else:
-                                found_docs.append(doc_info)
+                    # row: (stock_id, deleted, deleted_by_id, doc_type, table_type)
+                    stock_id = rows[0][0]
+                    doc_type = rows[0][-2]
+                    table_type = rows[-1][-1]
+                    not_deleted_rows = [r for r in rows if r[1] == 0]
+                    deleted_rows = [r for r in rows if r[1] == 1]
+                    deleted = 0 if not_deleted_rows else 1
+                    deleted_by_id = deleted_rows[0][2] if deleted_rows else None
+                    doc_info = {
+                        "stock_id": stock_id,
+                        "stock_no": stock_no,
+                        "deleted": deleted,
+                        "deleted_by_id": deleted_by_id,
+                        "doc_type": doc_type,
+                        "table_type": table_type
+                    }
 
-                        elif validate_type == "physical_delete":
+                    if validate_type == "logical_delete":
+                        if not not_deleted_rows:
+                            invalid_docs.append({
+                                **doc_info,
+                                "reason": "单据已被逻辑删除，不能再次删除"
+                            })
+                        else:
                             found_docs.append(doc_info)
 
-                        elif validate_type == "restore":
-                            if deleted == 0:
-                                invalid_docs.append({
-                                    **doc_info,
-                                    "reason": "单据未被逻辑删除，无需恢复"
-                                })
-                            elif operator_id and deleted_by_id != operator_id:
-                                invalid_docs.append({
-                                    **doc_info,
-                                    "reason": f"删除人不匹配，期望 {operator_id}，实际 {deleted_by_id}"
-                                })
-                            else:
-                                found_docs.append(doc_info)
+                    elif validate_type == "physical_delete":
+                        if not not_deleted_rows:
+                            invalid_docs.append({
+                                **doc_info,
+                                "reason": "单据已被逻辑删除，无法物理删除（存储过程仅处理未逻辑删除的记录）"
+                            })
+                        else:
+                            found_docs.append(doc_info)
+
+                    elif validate_type == "restore":
+                        if not deleted_rows:
+                            invalid_docs.append({
+                                **doc_info,
+                                "reason": "单据未被逻辑删除，无需恢复"
+                            })
+                        elif operator_id and deleted_by_id != operator_id:
+                            invalid_docs.append({
+                                **doc_info,
+                                "reason": f"删除人不匹配，期望 {operator_id}，实际 {deleted_by_id}"
+                            })
+                        else:
+                            found_docs.append(doc_info)
         else:
             raise ValueError("不支持的连接池类型")
 
@@ -279,6 +305,24 @@ class WmsService:
 
         return result
 
+    async def _call_stock_proc(self, cur, call_sql: str, params: tuple) -> tuple | None:
+        """调用仓储删除/恢复存储过程，并消费其返回的结果集（ErType, ErMessage）"""
+        await cur.execute(call_sql, params)
+        try:
+            rows = await cur.fetchall()
+        except Exception:
+            return None
+        return rows[0] if rows else None
+
+    def _proc_failed(self, result: tuple | None) -> bool:
+        """存储过程返回 ErType 非 0 视为失败（无返回结果集时不判定为失败）"""
+        if not result:
+            return False
+        try:
+            return int(result[0]) != 0
+        except (TypeError, ValueError):
+            return False
+
     async def delete_logical_batch(self, stock_nos: list[str], operator_id: str) -> tuple[int, list[str]]:
         """批量逻辑删除单据，查询所有配置的主表和历史表中的记录"""
         await self._ensure_pool()
@@ -317,14 +361,11 @@ class WmsService:
                             for row in deletable_rows:
                                 stock_id = row[0]
                                 try:
-                                    await cur.execute("CALL proc_DeleteStockInfoById(%s, %s)", (stock_id, operator_id))
-                                    # 检查存储过程是否有返回结果
-                                    try:
-                                        result = await cur.fetchone()
-                                        if result:
-                                            logger.info(f"[delete_logical_batch] 存储过程返回: stock_id={stock_id}, result={result}")
-                                    except Exception:
-                                        pass  # 存储过程可能没有返回结果集
+                                    result = await self._call_stock_proc(cur, "CALL proc_DeleteStockInfoById(%s, %s)", (stock_id, operator_id))
+                                    if self._proc_failed(result):
+                                        last_error = str(result[1]) if len(result) > 1 else "存储过程执行失败"
+                                        logger.error(f"[delete_logical_batch] 存储过程返回失败 stock_no={stock_no}, stock_id={stock_id}: {result}")
+                                        continue
                                     delete_success += 1
                                 except Exception as proc_e:
                                     error_msg = str(proc_e)
@@ -356,25 +397,53 @@ class WmsService:
         failed: list[str] = []
 
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn, conn.cursor() as cur:
-                for stock_no in stock_nos:
-                    try:
-                        # 使用统一查询方法查找所有匹配记录（含扩展表）
-                        all_rows = await self._find_all_stock_docs(cur, stock_no, select_cols="Id")
+            for stock_no in stock_nos:
+                try:
+                    # 为每个单据使用独立的连接，确保存储过程失败不影响其他单据
+                    async with pool.acquire() as conn:
+                        async with conn.cursor() as cur:
+                            # 使用统一查询方法查找所有匹配记录（含扩展表）
+                            all_rows = await self._find_all_stock_docs(cur, stock_no, select_cols="Id, Deleted")
 
-                        if not all_rows:
-                            failed.append(stock_no)
-                            continue
+                            if not all_rows:
+                                logger.warning(f"[delete_physical_batch] 未找到单据 stock_no={stock_no}")
+                                failed.append(stock_no)
+                                continue
 
-                        # 对每条记录都调用存储过程删除
-                        for row in all_rows:
-                            stock_id = row[0]
-                            await cur.execute("CALL proc_TruncateStockInfoById(%s)", (stock_id,))
+                            # 存储过程仅物理删除未逻辑删除(Deleted=0)的记录
+                            deletable_rows = [row for row in all_rows if row[1] == 0]
+                            if not deletable_rows:
+                                logger.warning(f"[delete_physical_batch] 单据 stock_no={stock_no} 已被逻辑删除，存储过程无法物理删除，共找到 {len(all_rows)} 条记录")
+                                failed.append(stock_no)
+                                continue
 
-                        success += 1
-                    except Exception as e:
-                        logger.error(f"[delete_physical_batch] 删除失败 stock_no={stock_no}: {e}")
-                        failed.append(stock_no)
+                            proc_failed = False
+                            for row in deletable_rows:
+                                stock_id = row[0]
+                                result = await self._call_stock_proc(cur, "CALL proc_TruncateStockInfoById(%s)", (stock_id,))
+                                if self._proc_failed(result):
+                                    proc_failed = True
+                                    logger.error(f"[delete_physical_batch] 存储过程返回失败 stock_no={stock_no}, stock_id={stock_id}: {result}")
+                                    break
+
+                            if proc_failed:
+                                failed.append(stock_no)
+                                continue
+
+                            # 校验物理删除是否真正生效（未逻辑删除的记录应已不存在）
+                            remain_rows = await self._find_all_stock_docs(cur, stock_no, select_cols="Id, Deleted")
+                            still_exists = [row for row in remain_rows if row[1] == 0]
+                            if still_exists:
+                                logger.error(f"[delete_physical_batch] 删除后仍存在未逻辑删除记录 stock_no={stock_no}, remain={still_exists}")
+                                failed.append(stock_no)
+                                continue
+
+                            success += 1
+                            logger.info(f"[delete_physical_batch] 删除成功 stock_no={stock_no}, 共处理 {len(deletable_rows)} 条记录")
+
+                except Exception as e:
+                    logger.error(f"[delete_physical_batch] 删除失败 stock_no={stock_no}: {e}")
+                    failed.append(stock_no)
         else:
             raise ValueError("不支持的连接池类型")
 
@@ -422,7 +491,9 @@ class WmsService:
                         raise ValueError(f"未找到已删除的单据 {stock_no}")
 
                     # 调用存储过程恢复单据
-                    await cur.execute("CALL proc_ReDeleteStockInfoById(%s, %s)", (stock_id, operator_id))
+                    result = await self._call_stock_proc(cur, "CALL proc_ReDeleteStockInfoById(%s, %s)", (stock_id, operator_id))
+                    if self._proc_failed(result):
+                        raise ValueError(f"恢复单据 {stock_no} 失败: {result[1] if len(result) > 1 else '存储过程执行失败'}")
                     return True
         else:
             raise ValueError("不支持的连接池类型")

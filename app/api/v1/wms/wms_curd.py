@@ -156,7 +156,11 @@ async def delete_physical_batch(req: Request, body: WmsDeleteBatchIn):
         if not validation["success"]:
             return Success(
                 msg=f"验证失败: {validation['message']}",
-                data={"success_count": 0, "failed_ids": validation["not_found_docs"]},
+                data={
+                    "success_count": 0,
+                    "failed_ids": validation["not_found_docs"]
+                    + [d["stock_no"] for d in validation["invalid_docs"]],
+                },
             )
 
         try:
