@@ -32,11 +32,12 @@ export default defineConfig(({ command, mode }) => {
         ? {
             [VITE_BASE_API]: {
               ...(PROXY_CONFIG[VITE_BASE_API] || {}),
-              target: VITE_PROXY_TARGET || (PROXY_CONFIG[VITE_BASE_API] || {}).target
+              target: VITE_PROXY_TARGET || (PROXY_CONFIG[VITE_BASE_API] || {}).target,
             },
           }
         : undefined,
-    },    build: {
+    },
+    build: {
       target: 'es2015',
       outDir: OUTPUT_DIR || 'dist',
       reportCompressedSize: false, // 启用/禁用 gzip 压缩大小报告

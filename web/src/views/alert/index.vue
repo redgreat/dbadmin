@@ -12,12 +12,7 @@
     </template>
 
     <!-- 表格 -->
-    <CrudTable
-      ref="$table"
-      v-model:query-items="queryItems"
-      :columns="columns"
-      :get-data="getData"
-    >
+    <CrudTable ref="$table" v-model:query-items="queryItems" :columns="columns" :get-data="getData">
       <template #queryBar>
         <QueryBarItem label="预警标题" :label-width="80">
           <n-input
@@ -140,9 +135,33 @@ const getData = () => {
   // 这里应该调用真实的API
   return Promise.resolve({
     items: [
-      { id: 1, title: '数据库连接异常', content: '数据库连接超时，请检查网络连接', level: 'high', type: 'system', status: 'pending', createTime: '2023-05-01 10:00:00' },
-      { id: 2, title: '磁盘空间不足', content: '服务器磁盘空间不足，请及时清理', level: 'medium', type: 'performance', status: 'processing', createTime: '2023-05-02 11:00:00' },
-      { id: 3, title: '异常登录尝试', content: '检测到多次异常登录尝试，可能存在安全风险', level: 'high', type: 'security', status: 'resolved', createTime: '2023-05-03 12:00:00' },
+      {
+        id: 1,
+        title: '数据库连接异常',
+        content: '数据库连接超时，请检查网络连接',
+        level: 'high',
+        type: 'system',
+        status: 'pending',
+        createTime: '2023-05-01 10:00:00',
+      },
+      {
+        id: 2,
+        title: '磁盘空间不足',
+        content: '服务器磁盘空间不足，请及时清理',
+        level: 'medium',
+        type: 'performance',
+        status: 'processing',
+        createTime: '2023-05-02 11:00:00',
+      },
+      {
+        id: 3,
+        title: '异常登录尝试',
+        content: '检测到多次异常登录尝试，可能存在安全风险',
+        level: 'high',
+        type: 'security',
+        status: 'resolved',
+        createTime: '2023-05-03 12:00:00',
+      },
     ],
     total: 3,
   })
@@ -150,30 +169,30 @@ const getData = () => {
 
 // 获取级别标签类型
 const getLevelType = (level) => {
-  const option = levelOptions.find(item => item.value === level)
+  const option = levelOptions.find((item) => item.value === level)
   return option ? option.color : 'default'
 }
 
 // 获取状态标签类型
 const getStatusType = (status) => {
   const map = {
-    'pending': 'error',
-    'processing': 'warning',
-    'resolved': 'success',
-    'ignored': 'info',
+    pending: 'error',
+    processing: 'warning',
+    resolved: 'success',
+    ignored: 'info',
   }
   return map[status] || 'default'
 }
 
 // 获取状态标签文本
 const getStatusText = (status) => {
-  const option = statusOptions.find(item => item.value === status)
+  const option = statusOptions.find((item) => item.value === status)
   return option ? option.label : '未知状态'
 }
 
 // 获取类型文本
 const getTypeText = (type) => {
-  const option = typeOptions.find(item => item.value === type)
+  const option = typeOptions.find((item) => item.value === type)
   return option ? option.label : '未知类型'
 }
 
@@ -187,11 +206,11 @@ const columns = [
     key: 'level',
     width: 100,
     render(row) {
-      const option = levelOptions.find(item => item.value === row.level)
+      const option = levelOptions.find((item) => item.value === row.level)
       return h(
         NTag,
         { type: getLevelType(row.level) },
-        { default: () => option ? option.label : '未知级别' }
+        { default: () => (option ? option.label : '未知级别') }
       )
     },
   },
@@ -222,28 +241,32 @@ const columns = [
     width: 200,
     fixed: 'right',
     render(row) {
-      return h(NSpace, { justify: 'center' }, {
-        default: () => [
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'primary',
-              onClick: () => handleEdit(row),
-            },
-            { default: () => '编辑' }
-          ),
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'error',
-              onClick: () => handleDelete(row.id),
-            },
-            { default: () => '删除' }
-          ),
-        ],
-      })
+      return h(
+        NSpace,
+        { justify: 'center' },
+        {
+          default: () => [
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'primary',
+                onClick: () => handleEdit(row),
+              },
+              { default: () => '编辑' }
+            ),
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'error',
+                onClick: () => handleDelete(row.id),
+              },
+              { default: () => '删除' }
+            ),
+          ],
+        }
+      )
     },
   },
 ]

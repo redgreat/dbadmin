@@ -196,7 +196,11 @@ const columns = [
         }
       }
 
-      if (row.status === 'pending' || row.status === 'processing' || row.execute_status === 'processing') {
+      if (
+        row.status === 'pending' ||
+        row.status === 'processing' ||
+        row.execute_status === 'processing'
+      ) {
         buttons.push(
           h(
             NPopconfirm,
@@ -395,8 +399,7 @@ const handleStop = async (row) => {
     const res = await api.stopExcelImportTask(row.id)
     message.success(res.msg || '停止请求已提交')
     handleRefresh()
-  } catch {
-  }
+  } catch {}
 }
 
 onBeforeUnmount(() => {

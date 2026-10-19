@@ -11,6 +11,53 @@ logger = logging.getLogger(__name__)
 # 单据来源仅允许修改充电桩单据（壹好车服服务商编码）
 ALLOWED_SERVICE_PROVIDER_CODE = "1067"
 
+# 附件类型枚举（tb_workresourceinfo.SourceType）
+RESOURCE_SOURCE_TYPE_MAP = {
+    1: "设备参照图片",
+    2: "AFC主单附件",
+    3: "AFC费用附件",
+    4: "AFC备案附件",
+    5: "主单附件",
+    6: "收件附件",
+    7: "VHS备案附件",
+    8: "归还附件",
+    9: "二手车检测报告",
+    10: "AFC路况异常附件",
+    11: "在线支付费用附件",
+    12: "VHS服务凭证",
+    13: "退单凭证",
+    14: "回款提报还款凭证",
+    15: "回款提报谈判记录",
+    16: "回款提报其他",
+    17: "VHS邮寄凭证",
+    18: "金融预约附件",
+    19: "金融备案视频附件",
+    20: "谈判记录附件",
+    21: "营业执照",
+    22: "相关资质证书",
+    23: "车务ETC附件",
+    24: "通用异常签到附件",
+    25: "车管工单附件",
+    26: "AFC住宿打卡附件",
+    27: "VHS请求关闭退单凭证",
+    28: "下单附件",
+    29: "科目附件",
+    30: "服务结果附件",
+    31: "异常反馈附件",
+    32: "勘测附件",
+    33: "安装附件",
+    34: "增项费附件",
+    35: "增项费付款附件",
+    36: "勘测费付款附件",
+    37: "AFC二访附件",
+    38: "车务补录附件",
+    39: "车务工单PDF报告",
+}
+
+# tb_remarkinfo.Type：附件删除/恢复备注
+REMARK_TYPE_RESOURCE_DELETE = 13
+REMARK_TYPE_RESOURCE_RESTORE = 14
+
 _ehcf_conn_id = None
 _order_conn_id = None
 
@@ -264,11 +311,11 @@ class EhcfService:
                                 "old_detail_id": str(row[1]) if row[1] else "",
                             })
 
-                    # 为每行明细生成新的 OI 编号（每行一个，OI 序列在订单中心库）
+                    # 为每行明细生成新的 OE 编号（明细每行一个，OE 序列在订单中心库）
                     for r in all_detail_rows:
-                        new_id = await self._next_val(order_cur, 'OI')
+                        new_id = await self._next_val(order_cur, 'OE')
                         if not new_id:
-                            return {"success": False, "message": "生成OI编号失败"}
+                            return {"success": False, "message": "生成OE编号失败"}
                         r["new_id"] = new_id
 
                     # 更新明细表
@@ -303,6 +350,7 @@ class EhcfService:
                     unique_mall_ids = list({str(row[0]) if row[0] else "" for row in goodsinfo_rows})
                     mall_oi_mapping = {}
                     mall_order_no_mapping = {}
+                    # 按旧 MallOrderId 分组：同一个旧 OI 共享一个新 OI，不同旧值各生成一个（订单级，OI 序列在订单中心库）
                     for old_mall_id in unique_mall_ids:
                         new_oi_id = await self._next_val(order_cur, 'OI')
                         if not new_oi_id:
@@ -344,6 +392,7 @@ class EhcfService:
                     )
                     fixgoods_rows = await cur.fetchall()
                     unique_fix_ids = list({str(row[1]) if row[1] else "" for row in fixgoods_rows})
+                    # 按旧值分组生成新 MallOrderId（订单级，OI 序列在订单中心库）
                     fix_oi_mapping = {}
                     for old_id in unique_fix_ids:
                         new_oi_id = await self._next_val(order_cur, 'OI')
@@ -381,6 +430,7 @@ class EhcfService:
                     )
                     fixitem_rows = await cur.fetchall()
                     unique_fixitem_ids = list({str(row[1]) if row[1] else "" for row in fixitem_rows})
+                    # 按旧值分组生成新 MallOrderId（订单级，OI 序列在订单中心库）
                     fixitem_oi_mapping = {}
                     for old_id in unique_fixitem_ids:
                         new_oi_id = await self._next_val(order_cur, 'OI')
@@ -539,6 +589,319 @@ class EhcfService:
                 failed.append(wo_id)
                 logger.error(f"逻辑删除工单失败 {wo_id}: {e}")
         return success, failed, remark_failed
+
+    async def query_resources(
+        self,
+        keyword: str = "",
+        source_type: int | None = None,
+        deleted_by_id: str = "",
+        include_deleted: bool = False,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> Dict:
+        """附件列表查询（工单附件三表关联，分页）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("EHCF连接池不存在")
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    where = ["a.Deleted=0"]
+                    params: list = []
+                    if keyword:
+                        where.append("(a.Id=%s OR a.AppCode=%s)")
+                        params.extend([keyword, keyword])
+                    if source_type is not None:
+                        where.append("b.SourceType=%s")
+                        params.append(source_type)
+                    if deleted_by_id:
+                        where.append("b.DeletedById=%s")
+                        params.append(deleted_by_id)
+                    if not include_deleted:
+                        where.append("b.Deleted=0")
+                    where_sql = " AND ".join(where)
+
+                    await cur.execute(
+                        "SELECT COUNT(*) FROM tb_workorderinfo a "
+                        "JOIN tb_workresourceinfo b ON b.WorkOrderId=a.Id "
+                        "JOIN basic_resourceitem c ON c.Id=b.ResourceId AND c.Deleted=0 "
+                        f"WHERE {where_sql}",
+                        tuple(params),
+                    )
+                    total = (await cur.fetchone())[0]
+
+                    await cur.execute(
+                        "SELECT a.Id, a.AppCode, "
+                        "fn_GetOrderTypeByCode(a.OrderType), "
+                        "fn_GetStatusNameByCode(a.WorkStatus), "
+                        "b.Id, b.SourceType, b.ResourceName, b.Remark, "
+                        "b.RemindContent, b.ResourceTag, "
+                        "b.Deleted, b.DeletedById, b.DeletedAt, c.Url "
+                        "FROM tb_workorderinfo a "
+                        "JOIN tb_workresourceinfo b ON b.WorkOrderId=a.Id "
+                        "JOIN basic_resourceitem c ON c.Id=b.ResourceId AND c.Deleted=0 "
+                        f"WHERE {where_sql} "
+                        "ORDER BY b.Id DESC LIMIT %s OFFSET %s",
+                        (*params, page_size, (page - 1) * page_size),
+                    )
+                    rows = await cur.fetchall()
+
+                    deleted_by_ids = [str(r[11]) for r in rows if r[11]]
+                    user_map = await self._resolve_user_names(deleted_by_ids)
+
+                    items = []
+                    for r in rows:
+                        did = str(r[11]) if r[11] else ""
+                        u = user_map.get(did, {})
+                        items.append({
+                            "workorder_id": str(r[0]) if r[0] else "",
+                            "app_code": str(r[1]) if r[1] else "",
+                            "order_type_name": str(r[2]) if r[2] else "",
+                            "work_status_name": str(r[3]) if r[3] else "",
+                            "resource_id": str(r[4]) if r[4] else "",
+                            "source_type": r[5] if r[5] is not None else "",
+                            "source_type_name": RESOURCE_SOURCE_TYPE_MAP.get(
+                                r[5], str(r[5] or "")
+                            ),
+                            "resource_name": str(r[6]) if r[6] else "",
+                            "remark": str(r[7]) if r[7] else "",
+                            "remind_content": str(r[8]) if r[8] else "",
+                            "resource_tag": str(r[9]) if r[9] else "",
+                            "deleted": r[10],
+                            "deleted_by_id": did,
+                            "deleted_by_name": u.get("user_name", ""),
+                            "deleted_by_code": u.get("code", ""),
+                            "deleted_at": str(r[12]) if r[12] else "",
+                            "url": str(r[13]) if r[13] else "",
+                        })
+
+                    return {
+                        "total": total,
+                        "page": page,
+                        "page_size": page_size,
+                        "items": items,
+                        "message": f"共查到 {total} 条附件",
+                    }
+        raise ValueError("不支持的连接池类型")
+
+    @staticmethod
+    async def _resolve_user_names(user_ids: list[str]) -> dict:
+        """用户中心Id批量翻译姓名/编码（查不到时降级查本库用户）"""
+        if not user_ids:
+            return {}
+        user_map: dict = {}
+        try:
+            from app.services.user_service import user_service
+
+            user_map = await user_service.batch_get_by_user_center_ids(user_ids)
+        except Exception as e:
+            logger.warning(f"获取用户信息失败: {e}")
+        unmatched = [d for d in user_ids if d not in user_map]
+        if unmatched:
+            try:
+                from app.services.user_service import user_service
+
+                local_map = await user_service.get_local_user_display_names(unmatched)
+                for did, display_name in local_map.items():
+                    user_map[did] = {
+                        "user_name": display_name,
+                        "code": "",
+                        "user_center_user_id": did,
+                    }
+            except Exception as e:
+                logger.warning(f"本库用户查询降级失败: {e}")
+        return user_map
+
+    async def delete_resources(
+        self, resource_ids: list[str], operator_id: str, remark: str = ""
+    ) -> Dict:
+        """附件逻辑删除（记录删除人；原因备注写入 tb_remarkinfo Type=13）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("EHCF连接池不存在")
+
+        if not operator_id:
+            raise ValueError("请填写操作人")
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    placeholders = ",".join(["%s"] * len(resource_ids))
+                    await cur.execute(
+                        f"SELECT Id, WorkOrderId FROM tb_workresourceinfo "
+                        f"WHERE Id IN ({placeholders}) AND Deleted=0",
+                        tuple(resource_ids),
+                    )
+                    rows = await cur.fetchall()
+
+                    operator_name, operator_code = "", ""
+                    if remark:
+                        um = await self._resolve_user_names([operator_id])
+                        u = um.get(operator_id, {})
+                        operator_name = u.get("user_name", "")
+                        operator_code = u.get("code", "")
+
+                    if not rows:
+                        return {
+                            "updated_count": 0,
+                            "failed_count": len(resource_ids),
+                            "message": "未找到可删除的附件（可能已被删除）",
+                        }
+
+                    await cur.execute(
+                        "UPDATE tb_workresourceinfo "
+                        "SET Deleted=1, DeletedById=%s, DeletedAt=NOW() "
+                        f"WHERE Id IN ({placeholders}) AND Deleted=0",
+                        (operator_id, *resource_ids),
+                    )
+                    updated = cur.rowcount
+
+                    # 联动删除资源文件：仅当该资源已无其他正常附件引用时才标记删除
+                    if updated > 0:
+                        await cur.execute(
+                            f"SELECT DISTINCT b.ResourceId FROM tb_workresourceinfo b "
+                            f"WHERE b.Id IN ({placeholders}) AND b.ResourceId IS NOT NULL "
+                            f"AND NOT EXISTS ("
+                            f"SELECT 1 FROM tb_workresourceinfo b2 "
+                            f"WHERE b2.ResourceId = b.ResourceId AND b2.Id NOT IN ({placeholders}) "
+                            f"AND b2.Deleted = 0)",
+                            (*resource_ids, *resource_ids),
+                        )
+                        safe_resource_ids = [
+                            str(r[0]) for r in await cur.fetchall() if r[0]
+                        ]
+                        if safe_resource_ids:
+                            sp = ",".join(["%s"] * len(safe_resource_ids))
+                            await cur.execute(
+                                "UPDATE basic_resourceitem "
+                                "SET Deleted=1, DeletedById=%s, DeletedAt=NOW() "
+                                f"WHERE Id IN ({sp}) AND Deleted=0",
+                                (operator_id, *safe_resource_ids),
+                            )
+                            logger.info(
+                                f"附件删除联动标记资源文件 {len(safe_resource_ids)} 个: "
+                                f"{safe_resource_ids}"
+                            )
+
+                    remark_failed = []
+                    if remark:
+                        for r in rows:
+                            try:
+                                await cur.execute(
+                                    "INSERT INTO tb_remarkinfo "
+                                    "(Type, Remark, WorkOrderId, RemarkPersonCode, RemarkPersonName, RemarkTime) "
+                                    "VALUES (%s, %s, %s, %s, %s, NOW())",
+                                    (
+                                        REMARK_TYPE_RESOURCE_DELETE,
+                                        remark,
+                                        str(r[1]) if r[1] else "",
+                                        operator_code,
+                                        operator_name,
+                                    ),
+                                )
+                            except Exception as e:
+                                remark_failed.append(str(r[0]))
+                                logger.warning(f"附件 {r[0]} 删除备注写入失败: {e}")
+
+                    failed = len(resource_ids) - updated
+                    return {
+                        "updated_count": updated,
+                        "failed_count": failed,
+                        "remark_failed_count": len(remark_failed),
+                        "message": f"附件删除完成: 成功 {updated} 条, 失败 {failed} 条",
+                    }
+        raise ValueError("不支持的连接池类型")
+
+    async def restore_resources(
+        self, resource_ids: list[str], operator_id: str = "", remark: str = ""
+    ) -> Dict:
+        """附件恢复（Deleted 置回 0；填写操作人时仅恢复该删除人删除的附件）"""
+        await self._ensure_pool()
+        pool = db_pool.get_pool(await _get_conn_id())
+        if pool is None:
+            raise ValueError("EHCF连接池不存在")
+
+        if isinstance(pool, aiomysql.Pool):
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    where = "Deleted=1"
+                    params: list = []
+                    if operator_id:
+                        where += " AND DeletedById=%s"
+                        params.append(operator_id)
+                    placeholders = ",".join(["%s"] * len(resource_ids))
+
+                    operator_name, operator_code = "", ""
+                    if remark and operator_id:
+                        um = await self._resolve_user_names([operator_id])
+                        u = um.get(operator_id, {})
+                        operator_name = u.get("user_name", "")
+                        operator_code = u.get("code", "")
+
+                    await cur.execute(
+                        "UPDATE tb_workresourceinfo "
+                        "SET Deleted=0, DeletedById=NULL, DeletedAt=NULL "
+                        f"WHERE Id IN ({placeholders}) AND {where}",
+                        (*resource_ids, *params),
+                    )
+                    updated = cur.rowcount
+
+                    # 恢复资源文件：附件恢复后其引用的资源若处于删除状态则一并恢复
+                    if updated > 0:
+                        await cur.execute(
+                            f"SELECT DISTINCT ResourceId FROM tb_workresourceinfo "
+                            f"WHERE Id IN ({placeholders}) AND ResourceId IS NOT NULL",
+                            tuple(resource_ids),
+                        )
+                        affected_resources = [
+                            str(r[0]) for r in await cur.fetchall() if r[0]
+                        ]
+                        if affected_resources:
+                            ap = ",".join(["%s"] * len(affected_resources))
+                            await cur.execute(
+                                "UPDATE basic_resourceitem "
+                                "SET Deleted=0, DeletedById=NULL, DeletedAt=NULL "
+                                f"WHERE Id IN ({ap}) AND Deleted=1",
+                                tuple(affected_resources),
+                            )
+
+                    remark_failed = []
+                    if remark:
+                        await cur.execute(
+                            "SELECT Id, WorkOrderId FROM tb_workresourceinfo "
+                            f"WHERE Id IN ({placeholders})",
+                            tuple(resource_ids),
+                        )
+                        rows = await cur.fetchall()
+                        for r in rows:
+                            try:
+                                await cur.execute(
+                                    "INSERT INTO tb_remarkinfo "
+                                    "(Type, Remark, WorkOrderId, RemarkPersonCode, RemarkPersonName, RemarkTime) "
+                                    "VALUES (%s, %s, %s, %s, %s, NOW())",
+                                    (
+                                        REMARK_TYPE_RESOURCE_RESTORE,
+                                        remark,
+                                        str(r[1]) if r[1] else "",
+                                        operator_code,
+                                        operator_name,
+                                    ),
+                                )
+                            except Exception as e:
+                                remark_failed.append(str(r[0]))
+                                logger.warning(f"附件 {r[0]} 恢复备注写入失败: {e}")
+
+                    failed = len(resource_ids) - updated
+                    return {
+                        "updated_count": updated,
+                        "failed_count": failed,
+                        "remark_failed_count": len(remark_failed),
+                        "message": f"附件恢复完成: 成功 {updated} 条, 失败 {failed} 条",
+                    }
+        raise ValueError("不支持的连接池类型")
 
     async def restore_logical_workorder(self, workorder_id: str, operator_id: str) -> bool:
         """恢复逻辑删除的工单（调用存储过程 proc_UnDeleteOrderInfo）"""

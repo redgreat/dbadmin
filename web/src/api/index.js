@@ -232,6 +232,10 @@ export default {
   // ehcf - 修改单据来源（独立菜单，仅充电桩单据 ServiceProviderCode=1067 可改）
   queryEhcfChargingPileCreateType: (data = {}) => request.post('/ehcf/create-type/query', data),
   updateEhcfChargingPileCreateType: (data = {}) => request.post('/ehcf/create-type/update', data),
+  // ehcf - 附件管理（查询/删除/恢复）
+  queryEhcfResources: (data = {}) => request.post('/ehcf/resource-manage/query', data),
+  deleteEhcfResources: (data = {}) => request.post('/ehcf/resource-manage/delete', data),
+  restoreEhcfResources: (data = {}) => request.post('/ehcf/resource-manage/restore', data),
   // ehcf - 车务待办人刷新（Excel上传+临时表 tm_newaccept+存储过程 proc_VhsAcceptRefesh）
   downloadEhcfNewAcceptTemplate: () =>
     request.get('/ehcf/newaccept-refresh/template', { responseType: 'blob' }),
@@ -264,8 +268,7 @@ export default {
   updateWmsInsideDealState: (data = {}) =>
     request.post('/wms/wms_curd/update_inside_deal_state', data),
   // wms - SIM卡重复入库验证
-  downloadSimDupTemplate: () =>
-    request.get('/wms/simdup/template', { responseType: 'blob' }),
+  downloadSimDupTemplate: () => request.get('/wms/simdup/template', { responseType: 'blob' }),
   verifySimDup: (file) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -277,10 +280,8 @@ export default {
     request.get(`/wms/simdup/record/${recordId}/export`, {
       responseType: 'blob',
     }),
-  getSimDupRecordList: (params = {}) =>
-    request.post('/wms/simdup/record/list', params),
-  getSimDupRecordDetail: (recordId) =>
-    request.get(`/wms/simdup/record/${recordId}`),
+  getSimDupRecordList: (params = {}) => request.post('/wms/simdup/record/list', params),
+  getSimDupRecordDetail: (recordId) => request.get(`/wms/simdup/record/${recordId}`),
   getSimDupRecordResults: (recordId, params = {}) =>
     request.get(`/wms/simdup/record/${recordId}/results`, { params }),
 }

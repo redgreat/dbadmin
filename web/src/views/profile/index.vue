@@ -132,7 +132,6 @@ function validatePasswordSame(rule, value) {
             :rules="infoFormRules"
             class="w-400"
           >
-
             <NFormItem :label="$t('views.profile.label_username')" path="username">
               <NInput
                 v-model:value="infoForm.username"

@@ -15,11 +15,19 @@
           >
             <n-button type="primary">选择文件</n-button>
           </n-upload>
-          <n-button v-if="!selectedFile" text tag="a" href="/SimICCID.xlsx" download>下载样例文件（SimICCID.xlsx）</n-button>
+          <n-button v-if="!selectedFile" text tag="a" href="/SimICCID.xlsx" download
+            >下载样例文件（SimICCID.xlsx）</n-button
+          >
         </n-space>
       </n-form-item>
       <n-space>
-        <n-button type="primary" :loading="submitting" :disabled="!selectedFile" @click="handleSubmit">提交处理</n-button>
+        <n-button
+          type="primary"
+          :loading="submitting"
+          :disabled="!selectedFile"
+          @click="handleSubmit"
+          >提交处理</n-button
+        >
         <n-button @click="handleReset">重置</n-button>
       </n-space>
     </n-form>
@@ -32,8 +40,8 @@
           <n-step title="完成" />
         </n-steps>
         <div class="mt-10">
-          <n-tag type="info" v-if="fileKey">批次号：{{ fileKey }}</n-tag>
-          <n-tag class="ml-10" :type="statusTagType" v-if="progress">
+          <n-tag v-if="fileKey" type="info">批次号：{{ fileKey }}</n-tag>
+          <n-tag v-if="progress" class="ml-10" :type="statusTagType">
             {{ statusText }}
           </n-tag>
         </div>
@@ -49,7 +57,7 @@ import CommonPage from '@/components/page/CommonPage.vue'
 import api from '@/api'
 import { lStorage } from '@/utils'
 
-defineOptions({ name: 'SIM-ICCID导入' })
+defineOptions({ name: 'SIMICCID导入' })
 
 const message = useMessage()
 const formRef = ref(null)

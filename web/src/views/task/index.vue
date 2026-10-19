@@ -15,12 +15,7 @@
     </template>
 
     <!-- 表格 -->
-    <CrudTable
-      ref="$table"
-      v-model:query-items="queryItems"
-      :columns="columns"
-      :get-data="getData"
-    >
+    <CrudTable ref="$table" v-model:query-items="queryItems" :columns="columns" :get-data="getData">
       <template #queryBar>
         <QueryBarItem label="任务名称" :label-width="80">
           <n-input
@@ -69,25 +64,57 @@
           <n-input v-model:value="modalForm.cron" clearable placeholder="请输入Cron表达式" />
         </n-form-item>
         <n-form-item label="执行命令/函数" path="command">
-          <n-input v-model:value="modalForm.command" type="textarea" placeholder="请输入执行命令或函数" />
+          <n-input
+            v-model:value="modalForm.command"
+            type="textarea"
+            placeholder="请输入执行命令或函数"
+          />
         </n-form-item>
         <n-form-item label="执行目录" path="work_dir">
-          <n-input v-model:value="modalForm.work_dir" clearable placeholder="请输入执行目录，如：/home/app" />
+          <n-input
+            v-model:value="modalForm.work_dir"
+            clearable
+            placeholder="请输入执行目录，如：/home/app"
+          />
         </n-form-item>
         <n-form-item label="执行用户" path="run_user">
-          <n-input v-model:value="modalForm.run_user" clearable placeholder="请输入执行用户，如：root" />
+          <n-input
+            v-model:value="modalForm.run_user"
+            clearable
+            placeholder="请输入执行用户，如：root"
+          />
         </n-form-item>
         <n-form-item label="环境变量" path="env_vars">
-          <n-input v-model:value="modalForm.env_vars" type="textarea" placeholder="请输入环境变量，格式：KEY=VALUE，每行一个" />
+          <n-input
+            v-model:value="modalForm.env_vars"
+            type="textarea"
+            placeholder="请输入环境变量，格式：KEY=VALUE，每行一个"
+          />
         </n-form-item>
         <n-form-item label="参数" path="args">
-          <n-input v-model:value="modalForm.args" type="textarea" placeholder="请输入参数，JSON格式" />
+          <n-input
+            v-model:value="modalForm.args"
+            type="textarea"
+            placeholder="请输入参数，JSON格式"
+          />
         </n-form-item>
         <n-form-item label="超时时间(秒)" path="timeout">
-          <n-input-number v-model:value="modalForm.timeout" :min="0" :max="86400" clearable placeholder="任务执行超时时间，0表示不限制" />
+          <n-input-number
+            v-model:value="modalForm.timeout"
+            :min="0"
+            :max="86400"
+            clearable
+            placeholder="任务执行超时时间，0表示不限制"
+          />
         </n-form-item>
         <n-form-item label="最大重试次数" path="max_retries">
-          <n-input-number v-model:value="modalForm.max_retries" :min="0" :max="10" clearable placeholder="任务失败后最大重试次数" />
+          <n-input-number
+            v-model:value="modalForm.max_retries"
+            :min="0"
+            :max="10"
+            clearable
+            placeholder="任务失败后最大重试次数"
+          />
         </n-form-item>
         <n-form-item label="任务状态" path="status">
           <n-switch v-model:value="modalForm.status" />
@@ -119,15 +146,41 @@
 
             <template v-if="cronParts.seconds.type === '/'">
               <n-space>
-                从第 <n-input-number v-model:value="cronParts.seconds.start" :min="0" :max="59" style="width: 80px" /> 秒开始，每隔
-                <n-input-number v-model:value="cronParts.seconds.interval" :min="1" :max="59" style="width: 80px" /> 秒执行一次
+                从第
+                <n-input-number
+                  v-model:value="cronParts.seconds.start"
+                  :min="0"
+                  :max="59"
+                  style="width: 80px"
+                />
+                秒开始，每隔
+                <n-input-number
+                  v-model:value="cronParts.seconds.interval"
+                  :min="1"
+                  :max="59"
+                  style="width: 80px"
+                />
+                秒执行一次
               </n-space>
             </template>
 
             <template v-if="cronParts.seconds.type === '-'">
               <n-space>
-                从第 <n-input-number v-model:value="cronParts.seconds.start" :min="0" :max="59" style="width: 80px" /> 秒到第
-                <n-input-number v-model:value="cronParts.seconds.end" :min="0" :max="59" style="width: 80px" /> 秒
+                从第
+                <n-input-number
+                  v-model:value="cronParts.seconds.start"
+                  :min="0"
+                  :max="59"
+                  style="width: 80px"
+                />
+                秒到第
+                <n-input-number
+                  v-model:value="cronParts.seconds.end"
+                  :min="0"
+                  :max="59"
+                  style="width: 80px"
+                />
+                秒
               </n-space>
             </template>
 
@@ -214,7 +267,7 @@ const getData = () => {
         max_retries: 3,
         status: true,
         lastRunTime: '2023-05-01 02:00:00',
-        nextRunTime: '2023-05-02 02:00:00'
+        nextRunTime: '2023-05-02 02:00:00',
       },
       {
         id: 2,
@@ -230,7 +283,7 @@ const getData = () => {
         max_retries: 1,
         status: true,
         lastRunTime: '2023-05-01 01:00:00',
-        nextRunTime: '2023-05-02 01:00:00'
+        nextRunTime: '2023-05-02 01:00:00',
       },
       {
         id: 3,
@@ -246,7 +299,7 @@ const getData = () => {
         max_retries: 2,
         status: false,
         lastRunTime: '2023-04-30 23:30:00',
-        nextRunTime: null
+        nextRunTime: null,
       },
     ],
     total: 3,
@@ -274,7 +327,7 @@ const columns = [
           // 这里应该调用API更新状态
           console.log(`更新任务 ${row.id} 状态为 ${value}`)
           row.status = value
-        }
+        },
       })
     },
   },
@@ -286,46 +339,50 @@ const columns = [
     width: 250,
     fixed: 'right',
     render(row) {
-      return h(NSpace, { justify: 'center' }, {
-        default: () => [
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'primary',
-              onClick: () => handleEdit(row),
-            },
-            { default: () => '编辑' }
-          ),
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'info',
-              onClick: () => handleRunNow(row.id),
-            },
-            { default: () => '立即执行' }
-          ),
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'success',
-              onClick: () => handleViewLogs(row.id),
-            },
-            { default: () => '执行日志' }
-          ),
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'error',
-              onClick: () => handleDelete(row.id),
-            },
-            { default: () => '删除' }
-          ),
-        ],
-      })
+      return h(
+        NSpace,
+        { justify: 'center' },
+        {
+          default: () => [
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'primary',
+                onClick: () => handleEdit(row),
+              },
+              { default: () => '编辑' }
+            ),
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'info',
+                onClick: () => handleRunNow(row.id),
+              },
+              { default: () => '立即执行' }
+            ),
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'success',
+                onClick: () => handleViewLogs(row.id),
+              },
+              { default: () => '执行日志' }
+            ),
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'error',
+                onClick: () => handleDelete(row.id),
+              },
+              { default: () => '删除' }
+            ),
+          ],
+        }
+      )
     },
   },
 ]

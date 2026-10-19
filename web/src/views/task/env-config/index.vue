@@ -5,7 +5,13 @@
       <n-card title="环境变量配置" size="small">
         <n-space justify="space-between" class="mb-3">
           <n-space>
-            <n-input v-model:value="envSearchParams.key" clearable placeholder="搜索变量名" style="width: 200px" @keyup.enter="handleEnvSearch" />
+            <n-input
+              v-model:value="envSearchParams.key"
+              clearable
+              placeholder="搜索变量名"
+              style="width: 200px"
+              @keyup.enter="handleEnvSearch"
+            />
             <n-button type="primary" @click="handleEnvSearch">搜索</n-button>
             <n-button @click="handleEnvReset">重置</n-button>
           </n-space>
@@ -34,8 +40,20 @@
       <n-card title="Python包管理" size="small">
         <n-space justify="space-between" class="mb-3">
           <n-space>
-            <n-input v-model:value="pkgSearchParams.name" clearable placeholder="搜索包名" style="width: 200px" @keyup.enter="handlePkgSearch" />
-            <n-select v-model:value="pkgSearchParams.is_installed" :options="installStatusOptions" clearable placeholder="安装状态" style="width: 120px" />
+            <n-input
+              v-model:value="pkgSearchParams.name"
+              clearable
+              placeholder="搜索包名"
+              style="width: 200px"
+              @keyup.enter="handlePkgSearch"
+            />
+            <n-select
+              v-model:value="pkgSearchParams.is_installed"
+              :options="installStatusOptions"
+              clearable
+              placeholder="安装状态"
+              style="width: 120px"
+            />
             <n-button type="primary" @click="handlePkgSearch">搜索</n-button>
             <n-button @click="handlePkgReset">重置</n-button>
           </n-space>
@@ -67,7 +85,13 @@
 
     <!-- 环境变量编辑弹窗 -->
     <n-modal v-model:show="showEnvModal" :title="envModalTitle" preset="card" style="width: 600px">
-      <n-form ref="envFormRef" :model="envFormData" :rules="envFormRules" label-placement="left" :label-width="90">
+      <n-form
+        ref="envFormRef"
+        :model="envFormData"
+        :rules="envFormRules"
+        label-placement="left"
+        :label-width="90"
+      >
         <n-form-item label="变量名" path="key">
           <n-input v-model:value="envFormData.key" placeholder="请输入变量名（大写字母_格式）" />
         </n-form-item>
@@ -75,7 +99,12 @@
           <n-input v-model:value="envFormData.value" placeholder="请输入变量值" />
         </n-form-item>
         <n-form-item label="描述" path="description">
-          <n-input v-model:value="envFormData.description" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="请输入描述" />
+          <n-input
+            v-model:value="envFormData.description"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            placeholder="请输入描述"
+          />
         </n-form-item>
         <n-form-item label="敏感信息" path="is_sensitive">
           <n-switch v-model:value="envFormData.is_sensitive">
@@ -95,15 +124,29 @@
 
     <!-- 包编辑弹窗 -->
     <n-modal v-model:show="showPkgModal" :title="pkgModalTitle" preset="card" style="width: 600px">
-      <n-form ref="pkgFormRef" :model="pkgFormData" :rules="pkgFormRules" label-placement="left" :label-width="90">
+      <n-form
+        ref="pkgFormRef"
+        :model="pkgFormData"
+        :rules="pkgFormRules"
+        label-placement="left"
+        :label-width="90"
+      >
         <n-form-item label="包名" path="name">
           <n-input v-model:value="pkgFormData.name" placeholder="请输入包名" />
         </n-form-item>
         <n-form-item label="版本" path="version">
-          <n-input v-model:value="pkgFormData.version" placeholder="请输入版本号（可选，如：1.0.0）" />
+          <n-input
+            v-model:value="pkgFormData.version"
+            placeholder="请输入版本号（可选，如：1.0.0）"
+          />
         </n-form-item>
         <n-form-item label="描述" path="description">
-          <n-input v-model:value="pkgFormData.description" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="请输入描述" />
+          <n-input
+            v-model:value="pkgFormData.description"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            placeholder="请输入描述"
+          />
         </n-form-item>
       </n-form>
       <template #footer>
@@ -115,7 +158,12 @@
     </n-modal>
 
     <!-- 已安装包列表弹窗 -->
-    <n-modal v-model:show="showInstalledModal" title="已安装的Python包" preset="card" style="width: 800px; max-width: 90vw">
+    <n-modal
+      v-model:show="showInstalledModal"
+      title="已安装的Python包"
+      preset="card"
+      style="width: 800px; max-width: 90vw"
+    >
       <n-data-table
         :columns="installedColumns"
         :data="installedPackages"
@@ -143,7 +191,13 @@ const dialog = useDialog()
 const envLoading = ref(false)
 const envSubmitting = ref(false)
 const envTableData = ref([])
-const envPagination = reactive({ page: 1, pageSize: 10, itemCount: 0, showSizePicker: true, pageSizes: [10, 20, 50] })
+const envPagination = reactive({
+  page: 1,
+  pageSize: 10,
+  itemCount: 0,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50],
+})
 const envSearchParams = reactive({ key: '' })
 const showEnvModal = ref(false)
 const envModalTitle = ref('')
@@ -161,7 +215,13 @@ const envFormRules = {
 const pkgLoading = ref(false)
 const pkgSubmitting = ref(false)
 const pkgTableData = ref([])
-const pkgPagination = reactive({ page: 1, pageSize: 10, itemCount: 0, showSizePicker: true, pageSizes: [10, 20, 50] })
+const pkgPagination = reactive({
+  page: 1,
+  pageSize: 10,
+  itemCount: 0,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50],
+})
 const pkgSearchParams = reactive({ name: '', is_installed: null })
 const showPkgModal = ref(false)
 const pkgModalTitle = ref('')
@@ -188,13 +248,24 @@ const envColumns = [
   { title: 'ID', key: 'id', width: 60 },
   { title: '变量名', key: 'key', width: 150 },
   { title: '变量值', key: 'value', ellipsis: { tooltip: true } },
-  { title: '描述', key: 'description', width: 200, render(row) { return row.description || '-' } },
+  {
+    title: '描述',
+    key: 'description',
+    width: 200,
+    render(row) {
+      return row.description || '-'
+    },
+  },
   {
     title: '敏感',
     key: 'is_sensitive',
     width: 80,
     render(row) {
-      return h(NTag, { type: row.is_sensitive ? 'warning' : 'default', size: 'small' }, { default: () => (row.is_sensitive ? '是' : '否') })
+      return h(
+        NTag,
+        { type: row.is_sensitive ? 'warning' : 'default', size: 'small' },
+        { default: () => (row.is_sensitive ? '是' : '否') }
+      )
     },
   },
   { title: '创建时间', key: 'created_at', width: 160 },
@@ -205,8 +276,16 @@ const envColumns = [
     render(row) {
       return h(NSpace, null, {
         default: () => [
-          h(NButton, { size: 'small', onClick: () => handleEnvEdit(row) }, { default: () => '编辑' }),
-          h(NButton, { size: 'small', type: 'error', onClick: () => handleEnvDelete(row) }, { default: () => '删除' }),
+          h(
+            NButton,
+            { size: 'small', onClick: () => handleEnvEdit(row) },
+            { default: () => '编辑' }
+          ),
+          h(
+            NButton,
+            { size: 'small', type: 'error', onClick: () => handleEnvDelete(row) },
+            { default: () => '删除' }
+          ),
         ],
       })
     },
@@ -216,17 +295,42 @@ const envColumns = [
 const pkgColumns = [
   { title: 'ID', key: 'id', width: 60 },
   { title: '包名', key: 'name', width: 150 },
-  { title: '版本', key: 'version', width: 100, render(row) { return row.version || '-' } },
-  { title: '描述', key: 'description', width: 200, render(row) { return row.description || '-' } },
+  {
+    title: '版本',
+    key: 'version',
+    width: 100,
+    render(row) {
+      return row.version || '-'
+    },
+  },
+  {
+    title: '描述',
+    key: 'description',
+    width: 200,
+    render(row) {
+      return row.description || '-'
+    },
+  },
   {
     title: '状态',
     key: 'is_installed',
     width: 100,
     render(row) {
-      return h(NTag, { type: row.is_installed ? 'success' : 'default', size: 'small' }, { default: () => (row.is_installed ? '已安装' : '未安装') })
+      return h(
+        NTag,
+        { type: row.is_installed ? 'success' : 'default', size: 'small' },
+        { default: () => (row.is_installed ? '已安装' : '未安装') }
+      )
     },
   },
-  { title: '安装时间', key: 'installed_at', width: 160, render(row) { return row.installed_at || '-' } },
+  {
+    title: '安装时间',
+    key: 'installed_at',
+    width: 160,
+    render(row) {
+      return row.installed_at || '-'
+    },
+  },
   { title: '创建时间', key: 'created_at', width: 160 },
   {
     title: '操作',
@@ -235,10 +339,36 @@ const pkgColumns = [
     render(row) {
       return h(NSpace, null, {
         default: () => [
-          h(NButton, { size: 'small', disabled: row.is_installed, type: 'success', onClick: () => handlePkgInstall(row) }, { default: () => '安装' }),
-          h(NButton, { size: 'small', disabled: !row.is_installed, type: 'warning', onClick: () => handlePkgUninstall(row) }, { default: () => '卸载' }),
-          h(NButton, { size: 'small', onClick: () => handlePkgEdit(row) }, { default: () => '编辑' }),
-          h(NButton, { size: 'small', type: 'error', onClick: () => handlePkgDelete(row) }, { default: () => '删除' }),
+          h(
+            NButton,
+            {
+              size: 'small',
+              disabled: row.is_installed,
+              type: 'success',
+              onClick: () => handlePkgInstall(row),
+            },
+            { default: () => '安装' }
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              disabled: !row.is_installed,
+              type: 'warning',
+              onClick: () => handlePkgUninstall(row),
+            },
+            { default: () => '卸载' }
+          ),
+          h(
+            NButton,
+            { size: 'small', onClick: () => handlePkgEdit(row) },
+            { default: () => '编辑' }
+          ),
+          h(
+            NButton,
+            { size: 'small', type: 'error', onClick: () => handlePkgDelete(row) },
+            { default: () => '删除' }
+          ),
         ],
       })
     },

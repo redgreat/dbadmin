@@ -10,14 +10,9 @@
         </n-button>
       </div>
     </template>
-    
+
     <!-- 表格 -->
-    <CrudTable
-      ref="$table"
-      v-model:query-items="queryItems"
-      :columns="columns"
-      :get-data="getData"
-    >
+    <CrudTable ref="$table" v-model:query-items="queryItems" :columns="columns" :get-data="getData">
       <template #queryBar>
         <QueryBarItem label="车牌号" :label-width="80">
           <n-input
@@ -129,9 +124,36 @@ const getData = () => {
   // 这里应该调用真实的API
   return Promise.resolve({
     items: [
-      { id: 1, plateNumber: '沪A12345', ownerName: '张三', phone: '13800138000', carModel: '奥迪A6', serviceType: 1, serviceTime: '2023-05-01 10:00:00', status: 1 },
-      { id: 2, plateNumber: '沪B67890', ownerName: '李四', phone: '13900139000', carModel: '宝马3系', serviceType: 2, serviceTime: '2023-05-02 11:00:00', status: 2 },
-      { id: 3, plateNumber: '沪C54321', ownerName: '王五', phone: '13700137000', carModel: '奔驰C级', serviceType: 3, serviceTime: '2023-05-03 12:00:00', status: 3 },
+      {
+        id: 1,
+        plateNumber: '沪A12345',
+        ownerName: '张三',
+        phone: '13800138000',
+        carModel: '奥迪A6',
+        serviceType: 1,
+        serviceTime: '2023-05-01 10:00:00',
+        status: 1,
+      },
+      {
+        id: 2,
+        plateNumber: '沪B67890',
+        ownerName: '李四',
+        phone: '13900139000',
+        carModel: '宝马3系',
+        serviceType: 2,
+        serviceTime: '2023-05-02 11:00:00',
+        status: 2,
+      },
+      {
+        id: 3,
+        plateNumber: '沪C54321',
+        ownerName: '王五',
+        phone: '13700137000',
+        carModel: '奔驰C级',
+        serviceType: 3,
+        serviceTime: '2023-05-03 12:00:00',
+        status: 3,
+      },
     ],
     total: 3,
   })
@@ -139,7 +161,7 @@ const getData = () => {
 
 // 获取服务类型文本
 const getServiceTypeText = (type) => {
-  const option = serviceTypeOptions.find(item => item.value === type)
+  const option = serviceTypeOptions.find((item) => item.value === type)
   return option ? option.label : '未知类型'
 }
 
@@ -199,28 +221,32 @@ const columns = [
     width: 200,
     fixed: 'right',
     render(row) {
-      return h(NSpace, { justify: 'center' }, {
-        default: () => [
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'primary',
-              onClick: () => handleEdit(row),
-            },
-            { default: () => '编辑' }
-          ),
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'error',
-              onClick: () => handleDelete(row.id),
-            },
-            { default: () => '删除' }
-          ),
-        ],
-      })
+      return h(
+        NSpace,
+        { justify: 'center' },
+        {
+          default: () => [
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'primary',
+                onClick: () => handleEdit(row),
+              },
+              { default: () => '编辑' }
+            ),
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'error',
+                onClick: () => handleDelete(row.id),
+              },
+              { default: () => '删除' }
+            ),
+          ],
+        }
+      )
     },
   },
 ]

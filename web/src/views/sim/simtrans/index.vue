@@ -5,7 +5,13 @@
         <template #header-extra>
           <n-tag type="info">从仓储中心同步数据到SIM卡中心</n-tag>
         </template>
-        <n-form ref="formRef" :model="formData" :rules="rules" label-placement="left" :label-width="120">
+        <n-form
+          ref="formRef"
+          :model="formData"
+          :rules="rules"
+          label-placement="left"
+          :label-width="120"
+        >
           <n-form-item label="入库单号" path="receiptNumbers">
             <n-input
               v-model:value="formData.receiptNumbers"
@@ -46,7 +52,13 @@ RK2024003"
           <n-progress
             type="line"
             :percentage="taskStatus.progress || 0"
-            :status="taskStatus.status === 'failed' ? 'error' : taskStatus.status === 'success' ? 'success' : 'info'"
+            :status="
+              taskStatus.status === 'failed'
+                ? 'error'
+                : taskStatus.status === 'success'
+                ? 'success'
+                : 'info'
+            "
           />
         </n-space>
       </n-card>
@@ -78,7 +90,9 @@ RK2024003"
             </n-tag>
           </n-descriptions-item>
           <n-descriptions-item v-if="syncResult.sync_result" label="写入SIM卡">
-            <n-tag type="success" size="large">{{ syncResult.sync_result.sim_card_count || 0 }} 张</n-tag>
+            <n-tag type="success" size="large"
+              >{{ syncResult.sync_result.sim_card_count || 0 }} 张</n-tag
+            >
           </n-descriptions-item>
           <n-descriptions-item v-if="syncResult.sync_result" label="总计写入">
             <n-tag type="info">{{ syncResult.sync_result.total_inserted || 0 }} 条</n-tag>

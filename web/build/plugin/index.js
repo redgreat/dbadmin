@@ -27,7 +27,7 @@ export function createVitePlugins(viteEnv, isBuild) {
         open: false,
         gzipSize: true,
         brotliSize: true,
-      }),
+      })
     )
   }
 

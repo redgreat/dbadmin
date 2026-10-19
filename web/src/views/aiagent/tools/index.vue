@@ -37,15 +37,15 @@ const columns = [
       )
     },
   },
-  { 
-    title: '参数 Schema', 
-    key: 'inputSchema', 
-    width: 400, 
+  {
+    title: '参数 Schema',
+    key: 'inputSchema',
+    width: 400,
     align: 'left',
     ellipsis: { tooltip: true },
     render(row) {
       return JSON.stringify(row.inputSchema || {})
-    }
+    },
   },
 ]
 

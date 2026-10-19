@@ -26,15 +26,20 @@
           />
         </n-form-item>
       </n-form>
-      
+
       <!-- 操作按钮 -->
       <div class="mt-4">
         <n-space>
-          <n-button type="primary" @click="handleValidate" :loading="loading">
+          <n-button type="primary" :loading="loading" @click="handleValidate">
             <TheIcon icon="material-symbols:check-circle" :size="16" class="mr-2" />
             数据校验
           </n-button>
-          <n-button type="error" @click="handleBatchDelete" :disabled="!validationResult || !validationResult.success" :loading="loading">
+          <n-button
+            type="error"
+            :disabled="!validationResult || !validationResult.success"
+            :loading="loading"
+            @click="handleBatchDelete"
+          >
             <TheIcon icon="material-symbols:delete" :size="16" class="mr-2" />
             批量删除
           </n-button>
@@ -51,11 +56,16 @@
       </n-form>
       <div class="mt-4">
         <n-space>
-          <n-button type="primary" @click="handleQueryCheckRecord" :loading="checkRecordQuerying">
+          <n-button type="primary" :loading="checkRecordQuerying" @click="handleQueryCheckRecord">
             <TheIcon icon="material-symbols:search" :size="16" class="mr-2" />
             查询校验记录
           </n-button>
-          <n-button type="error" @click="handleDeleteCheckRecord" :loading="checkRecordDeleting" :disabled="!checkRecordForm.orderId">
+          <n-button
+            type="error"
+            :loading="checkRecordDeleting"
+            :disabled="!checkRecordForm.orderId"
+            @click="handleDeleteCheckRecord"
+          >
             <TheIcon icon="material-symbols:delete" :size="16" class="mr-2" />
             删除校验记录
           </n-button>
@@ -82,11 +92,16 @@
       </n-form>
       <div class="mt-4">
         <n-space>
-          <n-button type="primary" @click="handleQueryGfsStatus" :loading="gfsQuerying">
+          <n-button type="primary" :loading="gfsQuerying" @click="handleQueryGfsStatus">
             <TheIcon icon="material-symbols:search" :size="16" class="mr-2" />
             查询GFS状态
           </n-button>
-          <n-button type="error" @click="handleDeleteGfsOrder" :loading="gfsDeleting" :disabled="!gfsForm.orderId">
+          <n-button
+            type="error"
+            :loading="gfsDeleting"
+            :disabled="!gfsForm.orderId"
+            @click="handleDeleteGfsOrder"
+          >
             <TheIcon icon="material-symbols:delete" :size="16" class="mr-2" />
             GFS删除
           </n-button>
@@ -150,12 +165,11 @@
     <!-- 验证结果展示 -->
     <n-card v-if="validationResult" title="数据校验结果" class="mb-4">
       <n-alert v-if="validationResult.success" type="warning" class="mb-3">
-        校验通过，共找到 {{ validationResult.foundOrders?.length || 0 }} 条订单记录，确认要删除这些订单吗？
+        校验通过，共找到
+        {{ validationResult.foundOrders?.length || 0 }} 条订单记录，确认要删除这些订单吗？
       </n-alert>
-      <n-alert v-else type="error" class="mb-3">
-        校验失败：{{ validationResult.message }}
-      </n-alert>
-      
+      <n-alert v-else type="error" class="mb-3"> 校验失败：{{ validationResult.message }} </n-alert>
+
       <div v-if="validationResult.foundOrders && validationResult.foundOrders.length > 0">
         <n-text strong>待删除的订单：</n-text>
         <n-table :bordered="false" :single-line="false" size="small" class="mt-2">
@@ -172,31 +186,43 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="order in (validationResult.foundOrders || [])" :key="order.id">
+            <tr v-for="order in validationResult.foundOrders || []" :key="order.id">
               <td>{{ order.id }}</td>
               <td>{{ order.orderNo }}</td>
               <td>{{ order.status || '未知' }}</td>
               <td>{{ order.createTime || '未知' }}</td>
               <td>
-                <n-tag v-if="order.gfs_status" :type="order.gfs_status.reconc_state === 0 ? 'success' : 'warning'">
+                <n-tag
+                  v-if="order.gfs_status"
+                  :type="order.gfs_status.reconc_state === 0 ? 'success' : 'warning'"
+                >
                   {{ formatGfsStatus('reconc', order.gfs_status.reconc_state) }}
                 </n-tag>
                 <span v-else>-</span>
               </td>
               <td>
-                <n-tag v-if="order.gfs_status" :type="order.gfs_status.invoice_state === 0 ? 'success' : 'warning'">
+                <n-tag
+                  v-if="order.gfs_status"
+                  :type="order.gfs_status.invoice_state === 0 ? 'success' : 'warning'"
+                >
                   {{ formatGfsStatus('invoice', order.gfs_status.invoice_state) }}
                 </n-tag>
                 <span v-else>-</span>
               </td>
               <td>
-                <n-tag v-if="order.gfs_status" :type="order.gfs_status.receipt_state === 0 ? 'success' : 'warning'">
+                <n-tag
+                  v-if="order.gfs_status"
+                  :type="order.gfs_status.receipt_state === 0 ? 'success' : 'warning'"
+                >
                   {{ formatGfsStatus('receipt', order.gfs_status.receipt_state) }}
                 </n-tag>
                 <span v-else>-</span>
               </td>
               <td>
-                <n-tag v-if="order.gfs_status" :type="order.gfs_status.promotion_state === 0 ? 'success' : 'warning'">
+                <n-tag
+                  v-if="order.gfs_status"
+                  :type="order.gfs_status.promotion_state === 0 ? 'success' : 'warning'"
+                >
                   {{ formatGfsStatus('promotion', order.gfs_status.promotion_state) }}
                 </n-tag>
                 <span v-else>-</span>
@@ -205,10 +231,13 @@
           </tbody>
         </n-table>
       </div>
-      
-      <div v-if="validationResult.notFoundIds && validationResult.notFoundIds.length > 0" class="mt-3">
+
+      <div
+        v-if="validationResult.notFoundIds && validationResult.notFoundIds.length > 0"
+        class="mt-3"
+      >
         <n-text type="error" strong>未找到的订单ID/编码：</n-text>
-        <n-tag v-for="id in (validationResult.notFoundIds || [])" :key="id" type="error" class="ml-2">
+        <n-tag v-for="id in validationResult.notFoundIds || []" :key="id" type="error" class="ml-2">
           {{ id }}
         </n-tag>
       </div>
@@ -219,10 +248,8 @@
       <n-alert v-if="deleteResult.success" type="success" class="mb-3">
         批量删除成功，共删除 {{ deleteResult.deleted_count }} 条订单
       </n-alert>
-      <n-alert v-else type="error" class="mb-3">
-        批量删除失败：{{ deleteResult.message }}
-      </n-alert>
-      
+      <n-alert v-else type="error" class="mb-3"> 批量删除失败：{{ deleteResult.message }} </n-alert>
+
       <div v-if="deleteResult.details && deleteResult.details.length > 0">
         <n-text strong>删除详情：</n-text>
         <n-table :bordered="false" :single-line="false" size="small" class="mt-2">
@@ -256,7 +283,18 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { NButton, NTag, NSpace, NText, NTable, NAlert, NCard, NForm, NFormItem, NInput } from 'naive-ui'
+import {
+  NButton,
+  NTag,
+  NSpace,
+  NText,
+  NTable,
+  NAlert,
+  NCard,
+  NForm,
+  NFormItem,
+  NInput,
+} from 'naive-ui'
 import { useMessage } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
@@ -284,10 +322,10 @@ const checkRecordDeleting = ref(false)
 const formatGfsStatus = (type, value) => {
   if (value === null || value === undefined) return '未同步'
   const maps = {
-    'reconc': { 0: '未对账', 1: '已对账', 2: '对账中', 3: '对账异常' },
-    'invoice': { 0: '待开票', 1: '已开票', 2: '开票中' },
-    'receipt': { 0: '未回款', 1: '已回款', 2: '部分回款' },
-    'promotion': { 0: '待申请', 1: '已申请', 2: '已确认' },
+    reconc: { 0: '未对账', 1: '已对账', 2: '对账中', 3: '对账异常' },
+    invoice: { 0: '待开票', 1: '已开票', 2: '开票中' },
+    receipt: { 0: '未回款', 1: '已回款', 2: '部分回款' },
+    promotion: { 0: '待申请', 1: '已申请', 2: '已确认' },
   }
   const map = maps[type]
   return map && map[value] !== undefined ? map[value] : `未知(${value})`
@@ -302,7 +340,7 @@ const gfsDeleting = ref(false)
 // 批量删除表单
 const batchForm = ref({
   orderNos: '',
-  reason: ''
+  reason: '',
 })
 
 // 表单验证规则
@@ -310,21 +348,22 @@ const batchFormRules = {
   orderNos: {
     required: true,
     message: '请输入订单编码或Id',
-    trigger: ['blur']
+    trigger: ['blur'],
   },
   reason: {
     required: true,
     message: '请输入删除原因',
-    trigger: ['blur']
-  }
+    trigger: ['blur'],
+  },
 }
-
-
 
 // 解析订单编码字符串
 const parseOrderNos = (orderNosStr) => {
   if (!orderNosStr) return []
-  return orderNosStr.split(',').map(no => no.trim()).filter(no => no)
+  return orderNosStr
+    .split(',')
+    .map((no) => no.trim())
+    .filter((no) => no)
 }
 
 // 数据校验处理
@@ -344,7 +383,7 @@ const handleValidate = async () => {
     loading.value = true
     const response = await api.validateOrdersForDelete({
       order_nos: orderNos.join(','),
-      conn_id: 5
+      conn_id: 5,
     })
 
     validationResult.value = response.data
@@ -362,7 +401,7 @@ const handleValidate = async () => {
       id: 1000 + index,
       orderNo: no,
       status: index % 3 === 0 ? '待审核' : index % 3 === 1 ? '已审核' : '已完成',
-      createTime: '2023-05-01 10:00:00'
+      createTime: '2023-05-01 10:00:00',
     }))
 
     const notFoundIds = orderNos.slice(Math.floor(orderNos.length * 0.8))
@@ -371,7 +410,7 @@ const handleValidate = async () => {
       success: notFoundIds.length === 0,
       foundOrders,
       notFoundIds,
-      message: notFoundIds.length > 0 ? `有 ${notFoundIds.length} 个订单未找到` : ''
+      message: notFoundIds.length > 0 ? `有 ${notFoundIds.length} 个订单未找到` : '',
     }
 
     if (notFoundIds.length === 0) {
@@ -394,7 +433,10 @@ const handleQueryCheckRecord = async () => {
   try {
     const response = await api.queryOrderStatus({ order_nos: checkRecordForm.value.orderId })
     if (response.code === 200 && response.data.success) {
-      checkRecordResult.value = { found: true, message: `找到订单 ${checkRecordForm.value.orderId}，可删除校验记录` }
+      checkRecordResult.value = {
+        found: true,
+        message: `找到订单 ${checkRecordForm.value.orderId}，可删除校验记录`,
+      }
     } else {
       checkRecordResult.value = { found: false, message: response.msg || '未找到订单' }
     }
@@ -418,7 +460,7 @@ const handleDeleteCheckRecord = async () => {
       positiveText: '确认删除',
       negativeText: '取消',
       onPositiveClick: () => resolve(true),
-      onNegativeClick: () => resolve(false)
+      onNegativeClick: () => resolve(false),
     })
   })
   if (!confirmed) return
@@ -446,9 +488,12 @@ const handleQueryGfsStatus = async () => {
   }
   gfsQuerying.value = true
   try {
-    const items = gfsForm.value.orderNos.split(',').map(s => s.trim()).filter(s => s)
-    const orderNos = items.filter(s => !s.match(/^\d+$/))
-    const orderIds = items.filter(s => s.match(/^\d+$/))
+    const items = gfsForm.value.orderNos
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s)
+    const orderNos = items.filter((s) => !s.match(/^\d+$/))
+    const orderIds = items.filter((s) => s.match(/^\d+$/))
     const response = await api.queryGfsStatus({ order_nos: orderNos, order_ids: orderIds })
     if (response.code === 200) {
       gfsResult.value = response.data
@@ -480,7 +525,7 @@ const handleDeleteGfsOrder = async () => {
       positiveText: '确认删除',
       negativeText: '取消',
       onPositiveClick: () => resolve(true),
-      onNegativeClick: () => resolve(false)
+      onNegativeClick: () => resolve(false),
     })
   })
   if (!confirmed) return
@@ -504,13 +549,13 @@ const handleDeleteGfsOrder = async () => {
 const handleBatchDelete = async () => {
   try {
     await batchFormRef.value?.validate()
-    
+
     // 检查校验结果
     if (!validationResult.value || !validationResult.value.success) {
       message.error('请先通过数据校验')
       return
     }
-    
+
     // 二次确认
     const confirmed = await new Promise((resolve) => {
       const dialog = window.$dialog.warning({
@@ -519,19 +564,19 @@ const handleBatchDelete = async () => {
         positiveText: '确认删除',
         negativeText: '取消',
         onPositiveClick: () => resolve(true),
-        onNegativeClick: () => resolve(false)
+        onNegativeClick: () => resolve(false),
       })
     })
-    
+
     if (!confirmed) return
-    
+
     loading.value = true
 
     // 执行批量删除
     const response = await api.batchDeleteOrders({
       order_nos: parseOrderNos(batchForm.value.orderNos).join(','),
       reason: batchForm.value.reason,
-      conn_id: 5
+      conn_id: 5,
     })
 
     deleteResult.value = response.data
@@ -541,13 +586,12 @@ const handleBatchDelete = async () => {
       // 重置表单
       batchForm.value = {
         orderNos: '',
-        reason: ''
+        reason: '',
       }
       validationResult.value = null
     } else {
       message.error('批量删除失败：' + response.data.message)
     }
-
   } catch (error) {
     console.error('批量删除失败:', error)
     // 模拟删除结果
@@ -556,13 +600,13 @@ const handleBatchDelete = async () => {
       success: false,
       message: error.response?.data?.message || error.message,
       deleted_count: 0,
-      details: orderNos.map(no => ({
+      details: orderNos.map((no) => ({
         orderId: null,
         orderNo: no,
         deleteTime: new Date().toLocaleString(),
         success: false,
-        message: error.response?.data?.message || error.message
-      }))
+        message: error.response?.data?.message || error.message,
+      })),
     }
     message.error('批量删除失败：' + (error.response?.data?.message || error.message))
   } finally {

@@ -7,8 +7,10 @@
           <p>1. 点击「下载模板」获取固定模板 Excel（仅一列 SimNumber）。</p>
           <p>2. 按模板格式填入需要校验的 SIM 卡号（一列 SimNumber）。</p>
           <p>
-            3. 上传文件执行验证：系统会将 SimNumber 写入仓储中心（WMS_CONN）临时表 tm_remano，再执行验证SQL，
-            命中 <code>tb_materialinit</code>（未删除）的即视为「重复入库」，并保存验证记录、导出重复编码 Excel。
+            3. 上传文件执行验证：系统会将 SimNumber 写入仓储中心（WMS_CONN）临时表
+            tm_remano，再执行验证SQL， 命中
+            <code>tb_materialinit</code>（未删除）的即视为「重复入库」，并保存验证记录、导出重复编码
+            Excel。
           </p>
         </n-alert>
       </n-card>
@@ -31,13 +33,17 @@
           </n-upload>
           <n-text depth="3">支持 .xlsx / .xls / .csv，仅一列 SimNumber，最大 20MB。</n-text>
           <n-space>
-            <n-button type="primary" v-permission="'get/api/v1/wms/simdup/template'" @click="handleDownloadTemplate">
+            <n-button
+              v-permission="'get/api/v1/wms/simdup/template'"
+              type="primary"
+              @click="handleDownloadTemplate"
+            >
               <TheIcon icon="mdi:download" :size="16" class="mr-2" />
               下载模板
             </n-button>
             <n-button
-              type="primary"
               v-permission="'post/api/v1/wms/simdup/verify'"
+              type="primary"
               :loading="verifying"
               :disabled="!currentFile"
               @click="handleVerify"
@@ -58,7 +64,9 @@
           <n-descriptions-item label="批次号">{{ verifyResult.batch_no }}</n-descriptions-item>
           <n-descriptions-item label="状态">{{ verifyResult.status }}</n-descriptions-item>
           <n-descriptions-item label="导入总数">{{ verifyResult.total_count }}</n-descriptions-item>
-          <n-descriptions-item label="重复数">{{ verifyResult.duplicate_count }}</n-descriptions-item>
+          <n-descriptions-item label="重复数">{{
+            verifyResult.duplicate_count
+          }}</n-descriptions-item>
         </n-descriptions>
         <n-space class="mt-3">
           <n-button
@@ -94,9 +102,19 @@
           />
           <n-button @click="loadRecords">刷新</n-button>
         </n-space>
-        <n-data-table :columns="recordColumns" :data="records" :loading="recordLoading" :bordered="false" size="small" />
+        <n-data-table
+          :columns="recordColumns"
+          :data="records"
+          :loading="recordLoading"
+          :bordered="false"
+          size="small"
+        />
         <n-space justify="end" class="mt-3">
-          <n-pagination v-model:page="recordPage" :page-size="recordFilter.page_size" :item-count="recordTotal" />
+          <n-pagination
+            v-model:page="recordPage"
+            :page-size="recordFilter.page_size"
+            :item-count="recordTotal"
+          />
         </n-space>
       </n-card>
     </n-space>
@@ -247,7 +265,8 @@ const recordColumns = [
     width: 90,
     render: (row) => {
       const map = { processing: '进行中', completed: '已完成', failed: '失败' }
-      const type = row.status === 'completed' ? 'success' : row.status === 'failed' ? 'error' : 'default'
+      const type =
+        row.status === 'completed' ? 'success' : row.status === 'failed' ? 'error' : 'default'
       return h(NTag, { type, size: 'small' }, { default: () => map[row.status] || row.status })
     },
   },
@@ -267,7 +286,7 @@ const recordColumns = [
       return h(
         NButton,
         { size: 'small', type: 'primary', secondary: true, onClick: () => handleExport(row.id) },
-        { default: () => '导出' },
+        { default: () => '导出' }
       )
     },
   },

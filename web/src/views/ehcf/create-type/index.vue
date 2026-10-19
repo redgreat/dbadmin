@@ -31,9 +31,9 @@
         <n-form-item label="操作人" path="operatorId">
           <n-select
             v-model:value="createTypeForm.operatorId"
+            clearable
             filterable
             remote
-            clearable
             placeholder="输入姓名搜索用户中心用户"
             :options="operatorOptions"
             :loading="operatorLoading"
@@ -251,7 +251,9 @@ const handleCreateTypeBatchUpdate = async () => {
   }
   createTypeExecuting.value = false
   if (already) {
-    message.success(`修改完成：成功 ${ok} 条（其中 ${already} 条已是目标值，无需修改），失败 ${fail} 条`)
+    message.success(
+      `修改完成：成功 ${ok} 条（其中 ${already} 条已是目标值，无需修改），失败 ${fail} 条`
+    )
   } else {
     message.success(`修改完成：成功 ${ok} 条，失败 ${fail} 条`)
   }

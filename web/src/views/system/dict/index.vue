@@ -1,13 +1,6 @@
 <script setup>
 import { h, onMounted, ref, resolveDirective, withDirectives, computed } from 'vue'
-import {
-  NButton,
-  NForm,
-  NFormItem,
-  NInput,
-  NPopconfirm,
-  NTag,
-} from 'naive-ui'
+import { NButton, NForm, NFormItem, NInput, NPopconfirm, NTag } from 'naive-ui'
 
 import CommonPage from '@/components/page/CommonPage.vue'
 import CrudModal from '@/components/table/CrudModal.vue'
@@ -106,7 +99,7 @@ const columns = [
       // 计算当前层级
       const currentLevel = (row.code.match(/-/g) || []).length + 1
       const canAddChild = currentLevel < 3 // 最多三层
-      
+
       return [
         withDirectives(
           h(

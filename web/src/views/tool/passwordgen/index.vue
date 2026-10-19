@@ -5,15 +5,9 @@
         <n-form :model="options" label-placement="left" :label-width="100">
           <n-form-item label="所用字符">
             <n-space>
-              <n-checkbox v-model:checked="options.lowercase">
-                a-z
-              </n-checkbox>
-              <n-checkbox v-model:checked="options.uppercase">
-                A-Z
-              </n-checkbox>
-              <n-checkbox v-model:checked="options.digits">
-                0-9
-              </n-checkbox>
+              <n-checkbox v-model:checked="options.lowercase"> a-z </n-checkbox>
+              <n-checkbox v-model:checked="options.uppercase"> A-Z </n-checkbox>
+              <n-checkbox v-model:checked="options.digits"> 0-9 </n-checkbox>
               <n-checkbox v-model:checked="options.specials">
                 !@#$%^&amp;*()_+-=[]{}|;:,.
               </n-checkbox>
@@ -32,12 +26,7 @@
           <n-form-item label="密码长度">
             <n-grid :cols="2" x-gap="12">
               <n-grid-item style="padding-right: 16px">
-                <n-slider
-                  v-model:value="options.length"
-                  :min="4"
-                  :max="64"
-                  :step="1"
-                />
+                <n-slider v-model:value="options.length" :min="4" :max="64" :step="1" />
               </n-grid-item>
               <n-grid-item>
                 <n-input-number
@@ -69,9 +58,7 @@
 
           <n-form-item label=" ">
             <n-space>
-              <n-checkbox v-model:checked="recordHistory">
-                记录历史记录
-              </n-checkbox>
+              <n-checkbox v-model:checked="recordHistory"> 记录历史记录 </n-checkbox>
             </n-space>
           </n-form-item>
 
@@ -104,11 +91,7 @@
           </n-button>
         </template>
         <div class="password-list">
-          <div
-            v-for="(pwd, idx) in passwords"
-            :key="idx"
-            class="password-item"
-          >
+          <div v-for="(pwd, idx) in passwords" :key="idx" class="password-item">
             <span class="password-index">{{ idx + 1 }}.</span>
             <n-input
               :value="pwd.value"
@@ -238,7 +221,7 @@ function getEffectiveCharSet() {
   if (options.value.specials) chars += CHAR_SETS.specials
 
   const excludeSet = new Set(options.value.excludeChars.split(''))
-  chars = [...chars].filter(c => !excludeSet.has(c)).join('')
+  chars = [...chars].filter((c) => !excludeSet.has(c)).join('')
 
   if (chars.length === 0) {
     message.error('请至少选择一种字符类型，并确保排除字符后仍有可用字符')
@@ -257,8 +240,10 @@ function estimateCrackTime(charSetSize, length) {
   if (seconds < 86400) return { seconds, text: `${Math.round(seconds / 3600)} 小时` }
   if (seconds < 31536000) return { seconds, text: `${Math.round(seconds / 86400)} 天` }
   if (seconds < 31536000 * 100) return { seconds, text: `${Math.round(seconds / 31536000)} 年` }
-  if (seconds < 31536000 * 1e6) return { seconds, text: `${Math.round(seconds / 31536000 / 1000)} 千年` }
-  if (seconds < 31536000 * 1e9) return { seconds, text: `${Math.round(seconds / 31536000 / 1e6)} 百万年` }
+  if (seconds < 31536000 * 1e6)
+    return { seconds, text: `${Math.round(seconds / 31536000 / 1000)} 千年` }
+  if (seconds < 31536000 * 1e9)
+    return { seconds, text: `${Math.round(seconds / 31536000 / 1e6)} 百万年` }
   return { seconds, text: `${Math.round(seconds / 31536000 / 1e9)} 十亿年` }
 }
 
@@ -296,30 +281,50 @@ function generateSecureRandom(length, chars) {
     let idx = 0
 
     if (needLower) {
-      const lowerChars = [...CHAR_SETS.lowercase].filter(c => !new Set(options.value.excludeChars).has(c)).join('')
+      const lowerChars = [...CHAR_SETS.lowercase]
+        .filter((c) => !new Set(options.value.excludeChars).has(c))
+        .join('')
       if (lowerChars.length > 0) {
-        result = result.substring(0, posArr[idx]) + lowerChars[Math.floor(Math.random() * lowerChars.length)] + result.substring(posArr[idx] + 1)
+        result =
+          result.substring(0, posArr[idx]) +
+          lowerChars[Math.floor(Math.random() * lowerChars.length)] +
+          result.substring(posArr[idx] + 1)
         idx++
       }
     }
     if (needUpper) {
-      const upperChars = [...CHAR_SETS.uppercase].filter(c => !new Set(options.value.excludeChars).has(c)).join('')
+      const upperChars = [...CHAR_SETS.uppercase]
+        .filter((c) => !new Set(options.value.excludeChars).has(c))
+        .join('')
       if (upperChars.length > 0) {
-        result = result.substring(0, posArr[idx]) + upperChars[Math.floor(Math.random() * upperChars.length)] + result.substring(posArr[idx] + 1)
+        result =
+          result.substring(0, posArr[idx]) +
+          upperChars[Math.floor(Math.random() * upperChars.length)] +
+          result.substring(posArr[idx] + 1)
         idx++
       }
     }
     if (needDigit) {
-      const digitChars = [...CHAR_SETS.digits].filter(c => !new Set(options.value.excludeChars).has(c)).join('')
+      const digitChars = [...CHAR_SETS.digits]
+        .filter((c) => !new Set(options.value.excludeChars).has(c))
+        .join('')
       if (digitChars.length > 0) {
-        result = result.substring(0, posArr[idx]) + digitChars[Math.floor(Math.random() * digitChars.length)] + result.substring(posArr[idx] + 1)
+        result =
+          result.substring(0, posArr[idx]) +
+          digitChars[Math.floor(Math.random() * digitChars.length)] +
+          result.substring(posArr[idx] + 1)
         idx++
       }
     }
     if (needSpecial) {
-      const specialChars = [...CHAR_SETS.specials].filter(c => !new Set(options.value.excludeChars).has(c)).join('')
+      const specialChars = [...CHAR_SETS.specials]
+        .filter((c) => !new Set(options.value.excludeChars).has(c))
+        .join('')
       if (specialChars.length > 0) {
-        result = result.substring(0, posArr[idx]) + specialChars[Math.floor(Math.random() * specialChars.length)] + result.substring(posArr[idx] + 1)
+        result =
+          result.substring(0, posArr[idx]) +
+          specialChars[Math.floor(Math.random() * specialChars.length)] +
+          result.substring(posArr[idx] + 1)
         idx++
       }
     }
@@ -381,7 +386,7 @@ async function handleGenerate() {
       if (options.value.specials) charTypes.push('特殊字符')
 
       const fd = new FormData()
-      fd.append('passwords', JSON.stringify(list.map(p => p.value)))
+      fd.append('passwords', JSON.stringify(list.map((p) => p.value)))
       fd.append('length', options.value.length.toString())
       fd.append('char_types', JSON.stringify(charTypes))
       fd.append('exclude_chars', options.value.excludeChars)
@@ -443,7 +448,7 @@ async function handleCopyOne(text) {
 }
 
 async function handleCopyAll() {
-  const all = passwords.value.map(p => p.value).join('\n')
+  const all = passwords.value.map((p) => p.value).join('\n')
   try {
     await copyToClipboard(all)
     message.success('已复制全部密码到剪贴板')
@@ -460,7 +465,7 @@ async function fetchHistory() {
       page_size: historyPageSize.value,
     })
     if (res.code === 200) {
-      historyData.value = (res.data || []).map(item => ({
+      historyData.value = (res.data || []).map((item) => ({
         id: item.id,
         password: item.password,
         length: item.length,
@@ -523,8 +528,7 @@ const historyColumns = [
         NPopconfirm,
         { onPositiveClick: () => handleDeleteHistory(row.id) },
         {
-          trigger: () =>
-            h(NButton, { size: 'tiny', type: 'error' }, { default: () => '删除' }),
+          trigger: () => h(NButton, { size: 'tiny', type: 'error' }, { default: () => '删除' }),
           default: () => '确定要删除这条记录吗？',
         }
       )

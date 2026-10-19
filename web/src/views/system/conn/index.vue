@@ -12,12 +12,7 @@
     </template>
 
     <!-- 表格 -->
-    <CrudTable
-      ref="$table"
-      v-model:query-items="queryItems"
-      :columns="columns"
-      :get-data="getData"
-    >
+    <CrudTable ref="$table" v-model:query-items="queryItems" :columns="columns" :get-data="getData">
       <template #queryBar>
         <QueryBarItem label="连接名称" :label-width="80">
           <n-input
@@ -46,17 +41,21 @@
         :rules="rules"
       >
         <n-form-item label="数据库类型" path="dbType">
-          <n-select v-model:value="modalForm.dbType" :options="dbTypeOptions" placeholder="请选择数据库类型" />
+          <n-select
+            v-model:value="modalForm.dbType"
+            :options="dbTypeOptions"
+            placeholder="请选择数据库类型"
+          />
         </n-form-item>
         <n-form-item label="连接名称" path="name">
           <n-input v-model:value="modalForm.name" clearable placeholder="请输入连接名称" />
         </n-form-item>
         <n-form-item label="连接别名" path="alias">
-          <n-input 
-            v-model:value="modalForm.alias" 
+          <n-input
+            v-model:value="modalForm.alias"
             :disabled="!!modalForm.id"
-            clearable 
-            placeholder="请输入连接别名（创建后不可修改）" 
+            clearable
+            placeholder="请输入连接别名（创建后不可修改）"
           />
         </n-form-item>
 
@@ -124,7 +123,7 @@ const dbTypeOptions = [
 const statusOptions = [
   { label: '已连接', value: 1 },
   { label: '未连接', value: 2 },
-  { label: '未测试', value: 0 }
+  { label: '未测试', value: 0 },
 ]
 
 // 获取数据的API
@@ -135,17 +134,21 @@ const getData = async (params) => {
       query.db_type = query.dbType
       delete query.dbType
     }
-    if (Object.prototype.hasOwnProperty.call(query, 'status') && query.status !== undefined && query.status !== null) {
+    if (
+      Object.prototype.hasOwnProperty.call(query, 'status') &&
+      query.status !== undefined &&
+      query.status !== null
+    ) {
       query.status = query.status === 1 || query.status === '1'
     }
     const res = await api.getConnList(query)
     if (res.code === 200) {
-      const items = res.data.map(item => ({
+      const items = res.data.map((item) => ({
         ...item,
         dbType: item.db_type,
         createTime: item.created_at,
         updateTime: item.updated_at,
-        status: item.status
+        status: item.status,
       }))
       return { data: items, total: res.total }
     } else {
@@ -186,14 +189,12 @@ const getStatusText = (status) => {
   return '未知'
 }
 
-
-
 // 表格列定义
 const columns = [
   { title: 'ID', key: 'id', width: 80 },
-  { 
-    title: '连接名称', 
-    key: 'name', 
+  {
+    title: '连接名称',
+    key: 'name',
     width: 150,
     render(row) {
       return h(
@@ -203,20 +204,20 @@ const columns = [
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            cursor: 'pointer'
+            cursor: 'pointer',
           },
           title: row.name,
           onClick: () => {
             window.$message.info(row.name)
-          }
+          },
         },
         row.name
       )
-    }
+    },
   },
-  { 
-    title: '连接别名', 
-    key: 'alias', 
+  {
+    title: '连接别名',
+    key: 'alias',
     width: 120,
     render(row) {
       return h(
@@ -228,21 +229,21 @@ const columns = [
             whiteSpace: 'nowrap',
             cursor: 'pointer',
             color: '#2080f0',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
           },
           title: row.alias,
           onClick: () => {
             window.$message.info(row.alias)
-          }
+          },
         },
         row.alias || '-'
       )
-    }
+    },
   },
 
-  { 
-    title: '主机地址', 
-    key: 'host', 
+  {
+    title: '主机地址',
+    key: 'host',
     width: 150,
     render(row) {
       return h(
@@ -252,21 +253,21 @@ const columns = [
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            cursor: 'pointer'
+            cursor: 'pointer',
           },
           title: row.host,
           onClick: () => {
             window.$message.info(row.host)
-          }
+          },
         },
         row.host
       )
-    }
+    },
   },
   { title: '端口', key: 'port', width: 80 },
-  { 
-    title: '用户名', 
-    key: 'username', 
+  {
+    title: '用户名',
+    key: 'username',
     width: 120,
     render(row) {
       return h(
@@ -276,20 +277,20 @@ const columns = [
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            cursor: 'pointer'
+            cursor: 'pointer',
           },
           title: row.username,
           onClick: () => {
             window.$message.info(row.username)
-          }
+          },
         },
         row.username
       )
-    }
+    },
   },
-  { 
-    title: '数据库名', 
-    key: 'database', 
+  {
+    title: '数据库名',
+    key: 'database',
     width: 120,
     render(row) {
       return h(
@@ -299,16 +300,16 @@ const columns = [
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            cursor: 'pointer'
+            cursor: 'pointer',
           },
           title: row.database,
           onClick: () => {
             window.$message.info(row.database)
-          }
+          },
         },
         row.database
       )
-    }
+    },
   },
   {
     title: '连接状态',
@@ -330,37 +331,41 @@ const columns = [
     width: 250,
     fixed: 'right',
     render(row) {
-      return h(NSpace, { justify: 'center' }, {
-        default: () => [
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'primary',
-              onClick: () => handleEdit(row),
-            },
-            { default: () => '编辑' }
-          ),
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'info',
-              onClick: () => handleTest(row),
-            },
-            { default: () => '测试连接' }
-          ),
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'error',
-              onClick: () => handleDelete(row.id),
-            },
-            { default: () => '删除' }
-          ),
-        ],
-      })
+      return h(
+        NSpace,
+        { justify: 'center' },
+        {
+          default: () => [
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'primary',
+                onClick: () => handleEdit(row),
+              },
+              { default: () => '编辑' }
+            ),
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'info',
+                onClick: () => handleTest(row),
+              },
+              { default: () => '测试连接' }
+            ),
+            h(
+              NButton,
+              {
+                size: 'small',
+                type: 'error',
+                onClick: () => handleDelete(row.id),
+              },
+              { default: () => '删除' }
+            ),
+          ],
+        }
+      )
     },
   },
 ]
@@ -470,10 +475,10 @@ const rules = {
   name: [{ required: true, message: '请输入连接名称' }],
   alias: [
     { required: true, message: '请输入连接别名' },
-    { 
-      pattern: /^[A-Z_0-9]+$/, 
-      message: '连接别名只能包含大写字母、下划线和数字' 
-    }
+    {
+      pattern: /^[A-Z_0-9]+$/,
+      message: '连接别名只能包含大写字母、下划线和数字',
+    },
   ],
   dbType: [{ required: true, message: '请选择数据库类型' }],
   host: [{ required: true, message: '请输入主机地址' }],

@@ -24,14 +24,20 @@
     <n-modal v-model:show="showApproveModal" preset="dialog" title="审批处理">
       <n-form :model="approveForm">
         <n-form-item label="审批意见">
-          <n-input v-model:value="approveForm.comment" type="textarea" placeholder="选填，审批意见" />
+          <n-input
+            v-model:value="approveForm.comment"
+            type="textarea"
+            placeholder="选填，审批意见"
+          />
         </n-form-item>
       </n-form>
       <template #action>
         <n-space>
           <n-button @click="showApproveModal = false">取消</n-button>
-          <n-button type="error" @click="handleReject" :loading="submitLoading">拒绝</n-button>
-          <n-button type="success" @click="handleApprove" :loading="submitLoading">通过并执行</n-button>
+          <n-button type="error" :loading="submitLoading" @click="handleReject">拒绝</n-button>
+          <n-button type="success" :loading="submitLoading" @click="handleApprove"
+            >通过并执行</n-button
+          >
         </n-space>
       </template>
     </n-modal>
@@ -101,20 +107,32 @@ const columns = [
   { title: '单号', key: 'approval_no', width: 150, align: 'center' },
   { title: '模块', key: 'op_module', width: 100, align: 'center' },
   { title: '操作类型', key: 'op_type', width: 150, align: 'center' },
-  { title: '操作参数', key: 'op_params', width: 250, ellipsis: { tooltip: true }, render(row) {
-    return JSON.stringify(row.op_params || {})
-  } },
+  {
+    title: '操作参数',
+    key: 'op_params',
+    width: 250,
+    ellipsis: { tooltip: true },
+    render(row) {
+      return JSON.stringify(row.op_params || {})
+    },
+  },
   { title: '申请人', key: 'applicant_id', width: 120, align: 'center' },
   { title: '备注', key: 'remark', width: 150, ellipsis: { tooltip: true } },
-  { title: '状态', key: 'status', width: 100, align: 'center', render(row) {
-    const statusMap = {
-      pending: { type: 'warning', label: '待审批' },
-      executed: { type: 'success', label: '已执行' },
-      rejected: { type: 'error', label: '已拒绝' }
-    }
-    const s = statusMap[row.status] || { type: 'default', label: row.status }
-    return h(NTag, { type: s.type }, { default: () => s.label })
-  } },
+  {
+    title: '状态',
+    key: 'status',
+    width: 100,
+    align: 'center',
+    render(row) {
+      const statusMap = {
+        pending: { type: 'warning', label: '待审批' },
+        executed: { type: 'success', label: '已执行' },
+        rejected: { type: 'error', label: '已拒绝' },
+      }
+      const s = statusMap[row.status] || { type: 'default', label: row.status }
+      return h(NTag, { type: s.type }, { default: () => s.label })
+    },
+  },
   {
     title: '创建时间',
     key: 'created_at',

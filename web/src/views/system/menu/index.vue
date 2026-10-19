@@ -68,14 +68,14 @@ const {
 const apiDrawerVisible = ref(false)
 const currentMenuId = ref(0)
 const currentMenuName = ref('')
-const allApisRaw = ref([])  // 原始API列表
+const allApisRaw = ref([]) // 原始API列表
 const selectedApiIds = ref([])
 const searchKeyword = ref('')
 
 // 按标签分组的API
 const apisByTag = computed(() => {
   const grouped = {}
-  allApisRaw.value.forEach(item => {
+  allApisRaw.value.forEach((item) => {
     const tag = item.tags || '其他'
     if (!grouped[tag]) {
       grouped[tag] = []
@@ -93,10 +93,11 @@ const filteredApisByTag = computed(() => {
   const keyword = searchKeyword.value.toLowerCase()
   const filtered = {}
   Object.entries(apisByTag.value).forEach(([tag, apis]) => {
-    const matchedApis = apis.filter(api => 
-      api.path.toLowerCase().includes(keyword) ||
-      api.method.toLowerCase().includes(keyword) ||
-      (api.summary && api.summary.toLowerCase().includes(keyword))
+    const matchedApis = apis.filter(
+      (api) =>
+        api.path.toLowerCase().includes(keyword) ||
+        api.method.toLowerCase().includes(keyword) ||
+        (api.summary && api.summary.toLowerCase().includes(keyword))
     )
     if (matchedApis.length > 0) {
       filtered[tag] = matchedApis
@@ -332,15 +333,15 @@ async function openApiDrawer(row) {
   currentMenuId.value = row.id
   currentMenuName.value = row.name
   searchKeyword.value = ''
-  
+
   // 获取所有可用API
   const apisRes = await api.getAvailableApis({ page: 1, page_size: 9999 })
   allApisRaw.value = apisRes.data
-  
+
   // 获取当前菜单已关联的API
   const menuApisRes = await api.getMenuApis({ menu_id: row.id })
-  selectedApiIds.value = menuApisRes.data.map(item => item.id)
-  
+  selectedApiIds.value = menuApisRes.data.map((item) => item.id)
+
   apiDrawerVisible.value = true
 }
 
@@ -364,17 +365,17 @@ const refreshModeOptions = [
   {
     label: '增量更新（推荐）',
     value: 'increment',
-    description: '只新增不删除，保留所有手动配置'
+    description: '只新增不删除，保留所有手动配置',
   },
   {
     label: '智能更新',
     value: 'smart',
-    description: '识别多菜单共用API并保留，更新其他关联'
+    description: '识别多菜单共用API并保留，更新其他关联',
   },
   {
     label: '完全刷新',
     value: 'full',
-    description: '删除所有关联后重新创建（会丢失手动配置）'
+    description: '删除所有关联后重新创建（会丢失手动配置）',
   },
 ]
 
@@ -382,26 +383,49 @@ const selectedRefreshMode = ref('increment')
 
 async function handleRefreshMenuApi() {
   selectedRefreshMode.value = 'increment' // 重置为默认值
-  
+
   await $dialog.confirm({
     title: '刷新菜单-API关系',
     type: 'warning',
-    content: () => h('div', {}, [
-      h('p', { style: 'margin-bottom: 12px;' }, '此操作会根据代码中的路由信息自动刷新菜单-API关系表。'),
-      h('p', { style: 'margin-bottom: 12px; font-weight: bold;' }, '请选择刷新模式：'),
-      h(NSelect, {
-        value: selectedRefreshMode.value,
-        'onUpdate:value': (val) => { selectedRefreshMode.value = val },
-        options: refreshModeOptions,
-        placeholder: '请选择刷新模式',
-      }),
-      h('div', { style: 'margin-top: 12px; padding: 8px; background: #f5f5f5; border-radius: 4px;' }, [
-        h('p', { style: 'font-size: 12px; color: #666;' }, '模式说明：'),
-        h('p', { style: 'font-size: 12px; color: #666; margin-top: 4px;' }, '• 增量更新：只新增不删除，保留所有手动配置'),
-        h('p', { style: 'font-size: 12px; color: #666; margin-top: 4px;' }, '• 智能更新：识别多菜单共用API并保留'),
-        h('p', { style: 'font-size: 12px; color: #666; margin-top: 4px;' }, '• 完全刷新：删除所有关联后重建（慎用）'),
+    content: () =>
+      h('div', {}, [
+        h(
+          'p',
+          { style: 'margin-bottom: 12px;' },
+          '此操作会根据代码中的路由信息自动刷新菜单-API关系表。'
+        ),
+        h('p', { style: 'margin-bottom: 12px; font-weight: bold;' }, '请选择刷新模式：'),
+        h(NSelect, {
+          value: selectedRefreshMode.value,
+          'onUpdate:value': (val) => {
+            selectedRefreshMode.value = val
+          },
+          options: refreshModeOptions,
+          placeholder: '请选择刷新模式',
+        }),
+        h(
+          'div',
+          { style: 'margin-top: 12px; padding: 8px; background: #f5f5f5; border-radius: 4px;' },
+          [
+            h('p', { style: 'font-size: 12px; color: #666;' }, '模式说明：'),
+            h(
+              'p',
+              { style: 'font-size: 12px; color: #666; margin-top: 4px;' },
+              '• 增量更新：只新增不删除，保留所有手动配置'
+            ),
+            h(
+              'p',
+              { style: 'font-size: 12px; color: #666; margin-top: 4px;' },
+              '• 智能更新：识别多菜单共用API并保留'
+            ),
+            h(
+              'p',
+              { style: 'font-size: 12px; color: #666; margin-top: 4px;' },
+              '• 完全刷新：删除所有关联后重建（慎用）'
+            ),
+          ]
+        ),
       ]),
-    ]),
     positiveText: '确定',
     negativeText: '取消',
     async onPositiveClick() {
@@ -582,36 +606,41 @@ function getMethodColor(method) {
         <div class="mb-4 text-gray-500">
           提示：选择此菜单关联的API接口，拥有此菜单权限的角色将自动获得这些API的访问权限
         </div>
-        
+
         <!-- 按标签分组的API列表 -->
         <NScrollbar style="max-height: calc(100vh - 280px)">
           <NCollapse :default-expanded-names="sortedTags">
-            <NCollapseItem
-              v-for="tag in sortedTags"
-              :key="tag"
-              :name="tag"
-            >
+            <NCollapseItem v-for="tag in sortedTags" :key="tag" :name="tag">
               <template #header>
                 <div class="flex items-center gap-2" @click.stop>
                   <NCheckbox
-                    :checked="filteredApisByTag[tag].every(api => selectedApiIds.includes(api.id))"
-                    :indeterminate="filteredApisByTag[tag].some(api => selectedApiIds.includes(api.id)) && !filteredApisByTag[tag].every(api => selectedApiIds.includes(api.id))"
-                    @update:checked="(checked) => {
-                      if (checked) {
-                        filteredApisByTag[tag].forEach(api => {
-                          if (!selectedApiIds.includes(api.id)) {
-                            selectedApiIds.push(api.id)
-                          }
-                        })
-                      } else {
-                        filteredApisByTag[tag].forEach(api => {
-                          const index = selectedApiIds.indexOf(api.id)
-                          if (index > -1) selectedApiIds.splice(index, 1)
-                        })
+                    :checked="
+                      filteredApisByTag[tag].every((api) => selectedApiIds.includes(api.id))
+                    "
+                    :indeterminate="
+                      filteredApisByTag[tag].some((api) => selectedApiIds.includes(api.id)) &&
+                      !filteredApisByTag[tag].every((api) => selectedApiIds.includes(api.id))
+                    "
+                    @update:checked="
+                      (checked) => {
+                        if (checked) {
+                          filteredApisByTag[tag].forEach((api) => {
+                            if (!selectedApiIds.includes(api.id)) {
+                              selectedApiIds.push(api.id)
+                            }
+                          })
+                        } else {
+                          filteredApisByTag[tag].forEach((api) => {
+                            const index = selectedApiIds.indexOf(api.id)
+                            if (index > -1) selectedApiIds.splice(index, 1)
+                          })
+                        }
                       }
-                    }"
+                    "
                   />
-                  <span class="text-[17px] font-semibold">{{ tag }} ({{ filteredApisByTag[tag].length }})</span>
+                  <span class="text-[17px] font-semibold"
+                    >{{ tag }} ({{ filteredApisByTag[tag].length }})</span
+                  >
                 </div>
               </template>
               <div class="grid grid-cols-2 gap-3">
@@ -620,14 +649,16 @@ function getMethodColor(method) {
                   :key="apiItem.id"
                   :value="apiItem.id"
                   :checked="selectedApiIds.includes(apiItem.id)"
-                  @update:checked="(checked) => {
-                    if (checked) {
-                      selectedApiIds.push(apiItem.id)
-                    } else {
-                      const index = selectedApiIds.indexOf(apiItem.id)
-                      if (index > -1) selectedApiIds.splice(index, 1)
+                  @update:checked="
+                    (checked) => {
+                      if (checked) {
+                        selectedApiIds.push(apiItem.id)
+                      } else {
+                        const index = selectedApiIds.indexOf(apiItem.id)
+                        if (index > -1) selectedApiIds.splice(index, 1)
+                      }
                     }
-                  }"
+                  "
                 >
                   <div class="flex items-center gap-2 py-1">
                     <NTag :type="getMethodColor(apiItem.method)" size="small" round>
@@ -635,7 +666,7 @@ function getMethodColor(method) {
                     </NTag>
                     <span class="text-[15px]">{{ apiItem.path }}</span>
                   </div>
-                  <div v-if="apiItem.summary" class="text-[13px] text-gray-400 mt-1 ml-6">
+                  <div v-if="apiItem.summary" class="ml-6 mt-1 text-[13px] text-gray-400">
                     {{ apiItem.summary }}
                   </div>
                 </NCheckbox>
@@ -643,30 +674,26 @@ function getMethodColor(method) {
             </NCollapseItem>
           </NCollapse>
         </NScrollbar>
-        
+
         <template #footer>
           <div class="flex justify-between">
             <div>
-              <NButton 
-                size="small" 
-                @click="() => {
-                  const allIds = allApisRaw.map(a => a.id)
-                  selectedApiIds = [...allIds]
-                }"
+              <NButton
+                size="small"
+                @click="
+                  () => {
+                    const allIds = allApisRaw.map((a) => a.id)
+                    selectedApiIds = [...allIds]
+                  }
+                "
               >
                 全选
               </NButton>
-              <NButton 
-                size="small" 
-                @click="selectedApiIds = []"
-                class="ml-2"
-              >
-                清空
-              </NButton>
+              <NButton size="small" class="ml-2" @click="selectedApiIds = []"> 清空 </NButton>
             </div>
             <div>
               <NButton type="primary" @click="saveMenuApis">保存</NButton>
-              <NButton @click="apiDrawerVisible = false" class="ml-2">取消</NButton>
+              <NButton class="ml-2" @click="apiDrawerVisible = false">取消</NButton>
             </div>
           </div>
         </template>

@@ -6,12 +6,7 @@
       </n-button>
     </template>
 
-    <CrudTable
-      ref="$table"
-      v-model:query-items="queryItems"
-      :columns="columns"
-      :get-data="getData"
-    >
+    <CrudTable ref="$table" v-model:query-items="queryItems" :columns="columns" :get-data="getData">
       <template #queryBar>
         <QueryBarItem label="发送人名称" :label-width="90">
           <n-input

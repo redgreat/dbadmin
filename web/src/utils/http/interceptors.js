@@ -60,5 +60,10 @@ export async function resReject(error) {
   const code = data?.code ?? status
   const message = resolveResError(code, data?.msg ?? error.message)
   window.$message?.error(message, { keepAliveOnHover: true })
-  return Promise.reject({ code, message, error: error.response?.data || error.response, handled: true })
+  return Promise.reject({
+    code,
+    message,
+    error: error.response?.data || error.response,
+    handled: true,
+  })
 }

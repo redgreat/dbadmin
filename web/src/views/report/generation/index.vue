@@ -244,13 +244,16 @@ const handleDownload = async (row) => {
     }
 
     // 先尝试获取下载信息（可能是OSS URL或直接的文件流）
-    const response = await fetch(`${import.meta.env.VITE_BASE_API}/report/generation/download?generation_id=${row.id}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+    const response = await fetch(
+      `${import.meta.env.VITE_BASE_API}/report/generation/download?generation_id=${row.id}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       }
-    })
+    )
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))

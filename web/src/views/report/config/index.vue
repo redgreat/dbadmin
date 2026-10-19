@@ -12,12 +12,7 @@
     </template>
 
     <!-- 表格 -->
-    <CrudTable
-      ref="$table"
-      v-model:query-items="queryItems"
-      :columns="columns"
-      :get-data="getData"
-    >
+    <CrudTable ref="$table" v-model:query-items="queryItems" :columns="columns" :get-data="getData">
       <template #queryBar>
         <QueryBarItem label="系统名称" :label-width="80">
           <n-select
@@ -142,11 +137,11 @@ const columns = [
         {
           text: true,
           type: 'primary',
-          onClick: () => showSQLDetail(row.sql_statement)
+          onClick: () => showSQLDetail(row.sql_statement),
         },
         { default: () => row.sql_statement_short }
       )
-    }
+    },
   },
   { title: '数据库连接', key: 'db_connection_name', width: 150 },
   { title: '维护人', key: 'maintainer', width: 100 },
@@ -154,7 +149,7 @@ const columns = [
     title: '维护时间',
     key: 'updated_at',
     width: 180,
-    render: (row) => row.updated_at || row.created_at
+    render: (row) => row.updated_at || row.created_at,
   },
   {
     title: '操作',
@@ -168,10 +163,10 @@ const columns = [
           {
             size: 'small',
             type: 'primary',
-            onClick: () => handleGenerate(row)
+            onClick: () => handleGenerate(row),
           },
           { default: () => '生成' }
-        )
+        ),
       ]
 
       // 权限控制：管理员或自己维护的报表可以编辑删除
@@ -183,7 +178,7 @@ const columns = [
               size: 'small',
               type: 'info',
               style: 'margin-left: 8px',
-              onClick: () => handleEdit(row)
+              onClick: () => handleEdit(row),
             },
             { default: () => '编辑' }
           )
@@ -195,7 +190,7 @@ const columns = [
               size: 'small',
               type: 'error',
               style: 'margin-left: 8px',
-              onClick: () => handleDelete(row)
+              onClick: () => handleDelete(row),
             },
             { default: () => '删除' }
           )
@@ -203,8 +198,8 @@ const columns = [
       }
 
       return h(NSpace, null, { default: () => buttons })
-    }
-  }
+    },
+  },
 ]
 
 // 表单规则
@@ -215,11 +210,16 @@ const rules = {
     {
       pattern: /^[^\/\\:*?"<>|]+$/,
       message: '报表名称不能包含 / \\ : * ? " < > | 等特殊字符',
-      trigger: 'blur'
-    }
+      trigger: 'blur',
+    },
   ],
   sql_statement: { required: true, message: '请输入SQL语句', trigger: 'blur' },
-  db_connection_id: { required: true, type: 'number', message: '请选择数据库连接', trigger: 'blur' }
+  db_connection_id: {
+    required: true,
+    type: 'number',
+    message: '请选择数据库连接',
+    trigger: 'blur',
+  },
 }
 
 // 获取数据的API
@@ -249,19 +249,19 @@ const {
   handleAdd,
   handleEdit,
   handleDelete,
-  handleSave
+  handleSave,
 } = useCRUD({
   name: '报表配置',
   initForm: {
     system_name: null,
     report_name: '',
     sql_statement: '',
-    db_connection_id: null
+    db_connection_id: null,
   },
   doCreate: (data) => api.createReportConfig(data),
   doUpdate: (data) => api.updateReportConfig(data),
   doDelete: (data) => api.deleteReportConfig({ config_id: data.id }),
-  refresh: () => $table.value?.handleSearch()
+  refresh: () => $table.value?.handleSearch(),
 })
 
 // 刷新数据
@@ -294,7 +294,7 @@ const handleGenerate = (row) => {
         console.error('生成报表失败', error)
         $message.error('生成失败')
       }
-    }
+    },
   })
 }
 
@@ -317,7 +317,7 @@ const loadDBConnectionOptions = async () => {
     if (res.code === 200) {
       dbConnectionOptions.value = res.data.map((item) => ({
         label: item.name,
-        value: item.id
+        value: item.id,
       }))
     }
   } catch (error) {

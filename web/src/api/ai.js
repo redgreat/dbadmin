@@ -6,7 +6,7 @@ export default {
   createToken: (data = {}) => request.post('/ai/token/', data),
   updateToken: (data = {}) => request.post('/ai/token/update', data),
   deleteToken: (data = {}) => request.post('/ai/token/delete', data),
-  
+
   // MCP Tools
   listMcpTools: (params = {}) => request.get('/ai/token/mcp_tools', { params }),
 
@@ -20,6 +20,8 @@ export default {
 
   // 审批管理
   listApprovals: (params = {}) => request.get('/ai/approval/', { params }),
-  approveApproval: (approval_no, data = {}) => request.post(`/ai/approval/${approval_no}/approve`, data),
-  rejectApproval: (approval_no, data = {}) => request.post(`/ai/approval/${approval_no}/reject`, data),
+  approveApproval: (approval_no, data = {}) =>
+    request.post(`/ai/approval/${approval_no}/approve`, data),
+  rejectApproval: (approval_no, data = {}) =>
+    request.post(`/ai/approval/${approval_no}/reject`, data),
 }

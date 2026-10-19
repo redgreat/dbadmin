@@ -11,7 +11,12 @@
         />
       </n-form-item>
       <n-form-item label="修改时间" path="entryTime">
-        <n-date-picker v-model:value="form.entryTime" type="datetime" clearable placeholder="请选择入职时间" />
+        <n-date-picker
+          v-model:value="form.entryTime"
+          type="datetime"
+          clearable
+          placeholder="请选择入职时间"
+        />
       </n-form-item>
       <n-space>
         <n-button type="primary" :loading="executing" @click="handleExecute">执行</n-button>
@@ -90,7 +95,9 @@ const columns = [
 const buildPayload = (includeTime = false) => {
   const payload = { codes: codes.value }
   if (includeTime) {
-    payload.positive_time = dayjs(form.value.entryTime).tz('Asia/Shanghai').format('YYYY-MM-DDTHH:mm:ss')
+    payload.positive_time = dayjs(form.value.entryTime)
+      .tz('Asia/Shanghai')
+      .format('YYYY-MM-DDTHH:mm:ss')
   }
   return payload
 }

@@ -68,22 +68,32 @@
       <n-checkbox-group v-model:value="selectedTools">
         <n-space vertical align="start" :size="16">
           <n-checkbox v-for="tool in allTools" :key="tool.name" :value="tool.name">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-weight: bold;">{{ tool.name }}</span>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span style="font-weight: bold">{{ tool.name }}</span>
               <n-tag v-if="tool.is_write" type="warning" size="small">写操作</n-tag>
             </div>
-            <div style="color: #999; font-size: 12px; margin-top: 4px;">{{ tool.description }}</div>
+            <div style="color: #999; font-size: 12px; margin-top: 4px">{{ tool.description }}</div>
           </n-checkbox>
         </n-space>
       </n-checkbox-group>
     </CrudModal>
-
   </CommonPage>
 </template>
 
 <script setup>
 import { ref, h, onMounted } from 'vue'
-import { NButton, NForm, NFormItem, NInput, NSwitch, NTag, NPopconfirm, NCheckboxGroup, NSpace, NCheckbox } from 'naive-ui'
+import {
+  NButton,
+  NForm,
+  NFormItem,
+  NInput,
+  NSwitch,
+  NTag,
+  NPopconfirm,
+  NCheckboxGroup,
+  NSpace,
+  NCheckbox,
+} from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import QueryBarItem from '@/components/query-bar/QueryBarItem.vue'
 import CrudModal from '@/components/table/CrudModal.vue'
@@ -219,7 +229,12 @@ const columns = [
             ),
             h(
               NButton,
-              { size: 'small', type: row.enabled ? 'warning' : 'success', secondary: true, onClick: () => handleToggleStatus(row) },
+              {
+                size: 'small',
+                type: row.enabled ? 'warning' : 'success',
+                secondary: true,
+                onClick: () => handleToggleStatus(row),
+              },
               { default: () => (row.enabled ? '停用' : '启用') }
             ),
             h(
@@ -233,7 +248,12 @@ const columns = [
                 onPositiveClick: () => handleDelete({ id: row.id }),
               },
               {
-                trigger: () => h(NButton, { size: 'small', type: 'error', secondary: true }, { default: () => '删除' }),
+                trigger: () =>
+                  h(
+                    NButton,
+                    { size: 'small', type: 'error', secondary: true },
+                    { default: () => '删除' }
+                  ),
                 default: () => '确定要删除此 Token 吗？',
               }
             ),

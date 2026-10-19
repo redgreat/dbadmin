@@ -2,20 +2,40 @@
   <CommonPage show-footer>
     <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" :label-width="100">
       <n-form-item label="订单Id/编码" path="orderIds">
-        <n-input v-model:value="form.orderIds" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单Id或订单编码，逗号分隔" />
+        <n-input
+          v-model:value="form.orderIds"
+          type="textarea"
+          :autosize="{ minRows: 6, maxRows: 12 }"
+          placeholder="输入单个或多个订单Id或订单编码，逗号分隔"
+        />
       </n-form-item>
       <n-form-item label="修改时间" path="auditTime">
-        <n-date-picker v-model:value="form.auditTime" type="datetime" placeholder="请选择日期时间（东八区）" />
+        <n-date-picker
+          v-model:value="form.auditTime"
+          type="datetime"
+          placeholder="请选择日期时间（东八区）"
+        />
       </n-form-item>
       <n-form-item label="备注" path="remark">
-        <n-input v-model:value="form.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
+        <n-input
+          v-model:value="form.remark"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 4 }"
+          placeholder="非必填，记录运维日志使用"
+        />
       </n-form-item>
       <n-space>
         <n-button :loading="querying" @click="handleQuery">查询</n-button>
         <n-button type="primary" :loading="executing" @click="handleExecute">执行</n-button>
         <n-button @click="handleReset">重置</n-button>
       </n-space>
-      <n-table v-if="queryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+      <n-table
+        v-if="queryResult.length"
+        :bordered="false"
+        :single-line="false"
+        size="small"
+        class="mt-3"
+      >
         <thead>
           <tr>
             <th>订单Id</th>
@@ -36,7 +56,18 @@
                 {{ item.deleted ? '已删除' : '正常' }}
               </n-tag>
             </td>
-            <td>{{ item.deleted_by_name ? item.deleted_by_name + '-' + (item.deleted_by_code || '') + '-(' + item.deleted_by_id + ')' : (item.deleted_by_id || '-') }}</td>
+            <td>
+              {{
+                item.deleted_by_name
+                  ? item.deleted_by_name +
+                    '-' +
+                    (item.deleted_by_code || '') +
+                    '-(' +
+                    item.deleted_by_id +
+                    ')'
+                  : item.deleted_by_id || '-'
+              }}
+            </td>
             <td>{{ item.deleted_at || '-' }}</td>
           </tr>
         </tbody>
@@ -129,7 +160,11 @@ const handleExecute = async () => {
     if (res.code === 200) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
       if (failed_ids.length > 0) {
-        message.warning(`执行完成：成功 ${success_count} 条，失败 ${failed_ids.length} 条。未找到的订单：${failed_ids.join(', ')}`)
+        message.warning(
+          `执行完成：成功 ${success_count} 条，失败 ${
+            failed_ids.length
+          } 条。未找到的订单：${failed_ids.join(', ')}`
+        )
       } else {
         message.success(`执行成功：${success_count} 条`)
       }

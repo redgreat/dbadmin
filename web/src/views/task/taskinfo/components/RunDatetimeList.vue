@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { propTypes } from '@/utils/propTypes'
 
 const props = defineProps({
-  expression: propTypes.string.def('')
+  expression: propTypes.string.def(''),
 })
 
 let dateArr = []
@@ -285,7 +285,7 @@ const expressionChange = (expression) => {
               continue
             }
             // 循环"秒"数组
-            goSecond: for (let si = sIdx; si <= sDate.length - 1; si++) {
+            for (let si = sIdx; si <= sDate.length - 1; si++) {
               let ss = sDate[si] < 10 ? '0' + sDate[si] : sDate[si]
               // 添加当前时间（时间合法性在日期循环时已经判断）
               if (MM !== '00' && DD !== '00') {
@@ -558,7 +558,7 @@ expressionChange(props.expression)
 
 <template>
   <ol class="text-center">
-    <li v-for="(item, index) in resultList" :key="index" class="leading-9"> {{ item }}</li>
+    <li v-for="(item, index) in resultList" :key="index" class="leading-9">{{ item }}</li>
   </ol>
 </template>
 

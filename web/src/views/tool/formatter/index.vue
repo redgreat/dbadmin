@@ -105,7 +105,7 @@ const windowWidth = ref(window.innerWidth)
 // 格式化选项
 const formatOptions = ref({
   keywordCase: 'upper',
-  indentWidth: 2
+  indentWidth: 2,
 })
 
 // 响应式输入区域行数
@@ -162,7 +162,7 @@ const handleClear = () => {
   inputSql.value = ''
   formatOptions.value = {
     keywordCase: 'upper',
-    indentWidth: 2
+    indentWidth: 2,
   }
 }
 

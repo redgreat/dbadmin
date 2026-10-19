@@ -3,7 +3,12 @@
     <n-card title="工单查询" class="mb-4">
       <n-form label-placement="left" label-align="left" :label-width="100">
         <n-form-item label="工单编码/Id">
-          <n-input v-model:value="keyword" placeholder="请输入工单AppCode或Id" clearable @keydown="handleKeywordEnter" />
+          <n-input
+            v-model:value="keyword"
+            placeholder="请输入工单AppCode或Id"
+            clearable
+            @keydown="handleKeywordEnter"
+          />
         </n-form-item>
       </n-form>
       <div class="mt-4">
@@ -20,16 +25,26 @@
           <n-descriptions label-placement="left" :column="2" bordered>
             <n-descriptions-item label="工单编码">{{ workorder.app_code }}</n-descriptions-item>
             <n-descriptions-item label="工单Id">{{ workorder.id }}</n-descriptions-item>
-            <n-descriptions-item label="VIN码">{{ workorder.vin_number || '-' }}</n-descriptions-item>
-            <n-descriptions-item label="订单类型">{{ workorder.order_type_name }}</n-descriptions-item>
-            <n-descriptions-item label="状态类型">{{ workorder.status_type_name }}</n-descriptions-item>
+            <n-descriptions-item label="VIN码">{{
+              workorder.vin_number || '-'
+            }}</n-descriptions-item>
+            <n-descriptions-item label="订单类型">{{
+              workorder.order_type_name
+            }}</n-descriptions-item>
+            <n-descriptions-item label="状态类型">{{
+              workorder.status_type_name
+            }}</n-descriptions-item>
             <n-descriptions-item label="工单状态">
               <n-tag :type="workorder.work_status === 9 ? 'success' : 'default'" size="small">
                 {{ workorder.work_status === 9 ? '已完成(9)' : workorder.work_status }}
               </n-tag>
             </n-descriptions-item>
-            <n-descriptions-item label="关闭状态">{{ workorder.close_status_name }}</n-descriptions-item>
-            <n-descriptions-item label="客户名称" :span="2">{{ workorder.customer_name }}</n-descriptions-item>
+            <n-descriptions-item label="关闭状态">{{
+              workorder.close_status_name
+            }}</n-descriptions-item>
+            <n-descriptions-item label="客户名称" :span="2">{{
+              workorder.customer_name
+            }}</n-descriptions-item>
           </n-descriptions>
 
           <n-alert v-if="workorder.work_status === 9" type="warning" class="mt-3">
@@ -77,7 +92,12 @@
         <n-alert :type="fixResult.success ? 'success' : 'error'" class="mb-3">
           {{ fixResult.message }}
         </n-alert>
-        <n-table v-if="fixResult.results?.updated?.length" :bordered="false" :single-line="false" size="small">
+        <n-table
+          v-if="fixResult.results?.updated?.length"
+          :bordered="false"
+          :single-line="false"
+          size="small"
+        >
           <thead>
             <tr>
               <th>表名</th>
@@ -107,7 +127,12 @@
           <n-tag type="info" class="mr-2">新订单编码: {{ regenResult.summary.new_order_no }}</n-tag>
           <n-tag type="info">新OE: {{ regenResult.summary.new_oe_id }}</n-tag>
         </div>
-        <n-table v-if="regenResult.results?.updated?.length" :bordered="false" :single-line="false" size="small">
+        <n-table
+          v-if="regenResult.results?.updated?.length"
+          :bordered="false"
+          :single-line="false"
+          size="small"
+        >
           <thead>
             <tr>
               <th>表名</th>
@@ -260,7 +285,9 @@ const handleRegenerateOrder = async () => {
   const confirmed = await new Promise((resolve) => {
     const dialog = window.$dialog.error({
       title: '确认重新生成（不可逆操作）',
-      content: `将为工单「${workorder.value.app_code}」重新生成OI订单编号和订单编码，更新所有关联表。
+      content: `将为工单「${
+        workorder.value.app_code
+      }」重新生成OI订单编号和订单编码，更新所有关联表。
 
 此操作不可逆转，原有订单Id、订单编码、明细Id将被永久替换，无法恢复！
 ${remark.value ? `\n原因备注：${remark.value}` : ''}`,

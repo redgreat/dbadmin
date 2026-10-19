@@ -2,9 +2,20 @@
   <CommonPage show-footer>
     <n-space vertical size="large">
       <n-card title="订单逻辑删除" size="small">
-        <n-form ref="logicalFormRef" :model="logicalForm" :rules="rules" label-placement="left" :label-width="100">
+        <n-form
+          ref="logicalFormRef"
+          :model="logicalForm"
+          :rules="rules"
+          label-placement="left"
+          :label-width="100"
+        >
           <n-form-item label="订单编码/Id" path="orderNos">
-            <n-input v-model:value="logicalForm.orderNos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单编码或Id，逗号分隔" />
+            <n-input
+              v-model:value="logicalForm.orderNos"
+              type="textarea"
+              :autosize="{ minRows: 6, maxRows: 12 }"
+              placeholder="输入单个或多个订单编码或Id，逗号分隔"
+            />
           </n-form-item>
           <n-form-item label="删除人" path="operatorId">
             <n-select
@@ -19,14 +30,27 @@
             />
           </n-form-item>
           <n-form-item label="备注" path="remark">
-            <n-input v-model:value="logicalForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
+            <n-input
+              v-model:value="logicalForm.remark"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              placeholder="非必填，记录运维日志使用"
+            />
           </n-form-item>
           <n-space>
             <n-button :loading="logicalQuerying" @click="handleLogicalQuery">查询</n-button>
-            <n-button type="primary" :loading="logicalExecuting" @click="handleLogicalExecute">执行逻辑删除</n-button>
+            <n-button type="primary" :loading="logicalExecuting" @click="handleLogicalExecute"
+              >执行逻辑删除</n-button
+            >
             <n-button @click="handleLogicalReset">重置</n-button>
           </n-space>
-          <n-table v-if="logicalQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+          <n-table
+            v-if="logicalQueryResult.length"
+            :bordered="false"
+            :single-line="false"
+            size="small"
+            class="mt-3"
+          >
             <thead>
               <tr>
                 <th>订单Id</th>
@@ -47,7 +71,18 @@
                     {{ item.deleted ? '已删除' : '正常' }}
                   </n-tag>
                 </td>
-                <td>{{ item.deleted_by_name ? item.deleted_by_name + '-' + (item.deleted_by_code || '') + '-(' + item.deleted_by_id + ')' : (item.deleted_by_id || '-') }}</td>
+                <td>
+                  {{
+                    item.deleted_by_name
+                      ? item.deleted_by_name +
+                        '-' +
+                        (item.deleted_by_code || '') +
+                        '-(' +
+                        item.deleted_by_id +
+                        ')'
+                      : item.deleted_by_id || '-'
+                  }}
+                </td>
                 <td>{{ item.deleted_at || '-' }}</td>
               </tr>
             </tbody>
@@ -56,19 +91,43 @@
       </n-card>
 
       <n-card title="订单物理删除" size="small">
-        <n-form ref="physicalFormRef" :model="physicalForm" :rules="rules" label-placement="left" :label-width="100">
+        <n-form
+          ref="physicalFormRef"
+          :model="physicalForm"
+          :rules="rules"
+          label-placement="left"
+          :label-width="100"
+        >
           <n-form-item label="订单编码/Id" path="orderNos">
-            <n-input v-model:value="physicalForm.orderNos" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="输入单个或多个订单编码或Id，逗号分隔" />
+            <n-input
+              v-model:value="physicalForm.orderNos"
+              type="textarea"
+              :autosize="{ minRows: 6, maxRows: 12 }"
+              placeholder="输入单个或多个订单编码或Id，逗号分隔"
+            />
           </n-form-item>
           <n-form-item label="备注" path="remark">
-            <n-input v-model:value="physicalForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
+            <n-input
+              v-model:value="physicalForm.remark"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              placeholder="非必填，记录运维日志使用"
+            />
           </n-form-item>
           <n-space>
             <n-button :loading="physicalQuerying" @click="handlePhysicalQuery">查询</n-button>
-            <n-button type="error" :loading="physicalExecuting" @click="handlePhysicalExecute">执行物理删除</n-button>
+            <n-button type="error" :loading="physicalExecuting" @click="handlePhysicalExecute"
+              >执行物理删除</n-button
+            >
             <n-button @click="handlePhysicalReset">重置</n-button>
           </n-space>
-          <n-table v-if="physicalQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+          <n-table
+            v-if="physicalQueryResult.length"
+            :bordered="false"
+            :single-line="false"
+            size="small"
+            class="mt-3"
+          >
             <thead>
               <tr>
                 <th>订单Id</th>
@@ -89,7 +148,18 @@
                     {{ item.deleted ? '已删除' : '正常' }}
                   </n-tag>
                 </td>
-                <td>{{ item.deleted_by_name ? item.deleted_by_name + '-' + (item.deleted_by_code || '') + '-(' + item.deleted_by_id + ')' : (item.deleted_by_id || '-') }}</td>
+                <td>
+                  {{
+                    item.deleted_by_name
+                      ? item.deleted_by_name +
+                        '-' +
+                        (item.deleted_by_code || '') +
+                        '-(' +
+                        item.deleted_by_id +
+                        ')'
+                      : item.deleted_by_id || '-'
+                  }}
+                </td>
                 <td>{{ item.deleted_at || '-' }}</td>
               </tr>
             </tbody>
@@ -98,9 +168,19 @@
       </n-card>
 
       <n-card title="订单逻辑删除恢复" size="small">
-        <n-form ref="restoreFormRef" :model="restoreForm" :rules="restoreRules" label-placement="left" :label-width="100">
+        <n-form
+          ref="restoreFormRef"
+          :model="restoreForm"
+          :rules="restoreRules"
+          label-placement="left"
+          :label-width="100"
+        >
           <n-form-item label="订单编码/Id" path="orderNo">
-            <n-input v-model:value="restoreForm.orderNo" clearable placeholder="输入单个订单编码或Id" />
+            <n-input
+              v-model:value="restoreForm.orderNo"
+              clearable
+              placeholder="输入单个订单编码或Id"
+            />
           </n-form-item>
           <n-form-item label="删除人" path="operatorId">
             <n-select
@@ -115,14 +195,27 @@
             />
           </n-form-item>
           <n-form-item label="备注" path="remark">
-            <n-input v-model:value="restoreForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
+            <n-input
+              v-model:value="restoreForm.remark"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              placeholder="非必填，记录运维日志使用"
+            />
           </n-form-item>
           <n-space>
             <n-button :loading="restoreQuerying" @click="handleRestoreQuery">查询</n-button>
-            <n-button type="primary" :loading="restoreExecuting" @click="handleRestoreExecute">执行恢复</n-button>
+            <n-button type="primary" :loading="restoreExecuting" @click="handleRestoreExecute"
+              >执行恢复</n-button
+            >
             <n-button @click="handleRestoreReset">重置</n-button>
           </n-space>
-          <n-table v-if="restoreQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+          <n-table
+            v-if="restoreQueryResult.length"
+            :bordered="false"
+            :single-line="false"
+            size="small"
+            class="mt-3"
+          >
             <thead>
               <tr>
                 <th>订单Id</th>
@@ -143,7 +236,18 @@
                     {{ item.deleted ? '已删除' : '正常' }}
                   </n-tag>
                 </td>
-                <td>{{ item.deleted_by_name ? item.deleted_by_name + '-' + (item.deleted_by_code || '') + '-(' + item.deleted_by_id + ')' : (item.deleted_by_id || '-') }}</td>
+                <td>
+                  {{
+                    item.deleted_by_name
+                      ? item.deleted_by_name +
+                        '-' +
+                        (item.deleted_by_code || '') +
+                        '-(' +
+                        item.deleted_by_id +
+                        ')'
+                      : item.deleted_by_id || '-'
+                  }}
+                </td>
                 <td>{{ item.deleted_at || '-' }}</td>
               </tr>
             </tbody>
@@ -152,14 +256,30 @@
       </n-card>
 
       <n-card title="订单退货单原单维护" size="small">
-        <n-form ref="originFormRef" :model="originForm" :rules="originRules" label-placement="left" :label-width="140">
+        <n-form
+          ref="originFormRef"
+          :model="originForm"
+          :rules="originRules"
+          label-placement="left"
+          :label-width="140"
+        >
           <n-form-item label="退货单Id或编码" path="returnOrderNo">
-            <n-input v-model:value="originForm.returnOrderNo" clearable placeholder="输入退货单Id或编码" />
+            <n-input
+              v-model:value="originForm.returnOrderNo"
+              clearable
+              placeholder="输入退货单Id或编码"
+            />
           </n-form-item>
           <n-space>
             <n-button :loading="originQuerying" @click="handleOriginQuery">查询退货单</n-button>
           </n-space>
-          <n-table v-if="originQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+          <n-table
+            v-if="originQueryResult.length"
+            :bordered="false"
+            :single-line="false"
+            size="small"
+            class="mt-3"
+          >
             <thead>
               <tr>
                 <th>订单Id</th>
@@ -181,12 +301,24 @@
           <n-divider />
 
           <n-form-item label="变更原订单Id或编码" path="newOriginOrderNo">
-            <n-input v-model:value="originForm.newOriginOrderNo" clearable placeholder="输入新的原订单Id或编码" />
+            <n-input
+              v-model:value="originForm.newOriginOrderNo"
+              clearable
+              placeholder="输入新的原订单Id或编码"
+            />
           </n-form-item>
           <n-space class="mb-3">
-            <n-button :loading="newOriginQuerying" @click="handleNewOriginQuery">查询原订单</n-button>
+            <n-button :loading="newOriginQuerying" @click="handleNewOriginQuery"
+              >查询原订单</n-button
+            >
           </n-space>
-          <n-table v-if="newOriginQueryResult.length" :bordered="false" :single-line="false" size="small" class="mt-3">
+          <n-table
+            v-if="newOriginQueryResult.length"
+            :bordered="false"
+            :single-line="false"
+            size="small"
+            class="mt-3"
+          >
             <thead>
               <tr>
                 <th>原订单Id</th>
@@ -214,10 +346,17 @@
             />
           </n-form-item>
           <n-form-item label="备注" path="remark">
-            <n-input v-model:value="originForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
+            <n-input
+              v-model:value="originForm.remark"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              placeholder="非必填，记录运维日志使用"
+            />
           </n-form-item>
           <n-space>
-            <n-button type="primary" :loading="originExecuting" @click="handleOriginExecute">执行更新</n-button>
+            <n-button type="primary" :loading="originExecuting" @click="handleOriginExecute"
+              >执行更新</n-button
+            >
             <n-button @click="handleOriginReset">重置</n-button>
           </n-space>
         </n-form>
@@ -280,30 +419,18 @@ const rules = {
       },
     },
   ],
-  operatorId: [
-    { required: true, message: '请选择删除人' },
-  ],
+  operatorId: [{ required: true, message: '请选择删除人' }],
 }
 
 const restoreRules = {
-  orderNo: [
-    { required: true, message: '请输入订单编码或Id' },
-  ],
-  operatorId: [
-    { required: true, message: '请选择删除人' },
-  ],
+  orderNo: [{ required: true, message: '请输入订单编码或Id' }],
+  operatorId: [{ required: true, message: '请选择删除人' }],
 }
 
 const originRules = {
-  returnOrderNo: [
-    { required: true, message: '请输入退货单Id或编码' },
-  ],
-  newOriginOrderNo: [
-    { required: true, message: '请输入变更原订单Id或编码' },
-  ],
-  updatedById: [
-    { required: true, message: '请选择数据更新人' },
-  ],
+  returnOrderNo: [{ required: true, message: '请输入退货单Id或编码' }],
+  newOriginOrderNo: [{ required: true, message: '请输入变更原订单Id或编码' }],
+  updatedById: [{ required: true, message: '请选择数据更新人' }],
 }
 
 // 删除人远程搜索：从OA查 membership_userbaseinfo
@@ -337,7 +464,11 @@ const handleSearchOperator = (query) => {
   }, 300)
 }
 
-const parseIds = (text) => text.split(',').map((s) => s.trim()).filter((s) => s.length)
+const parseIds = (text) =>
+  text
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length)
 
 const handleLogicalReset = () => {
   logicalForm.value = { orderNos: '', operatorId: '', remark: '' }
@@ -445,11 +576,17 @@ const handleLogicalExecute = async () => {
   }
   logicalExecuting.value = true
   try {
-    const res = await api.deleteOrdersLogicalBatch({ order_nos: ids, operator_id: operatorId, remark })
+    const res = await api.deleteOrdersLogicalBatch({
+      order_nos: ids,
+      operator_id: operatorId,
+      remark,
+    })
     if (res.code === 200 || res.code === 0) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
       if (failed_ids.length > 0) {
-        message.warning(res.msg || `逻辑删除完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`)
+        message.warning(
+          res.msg || `逻辑删除完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`
+        )
       } else {
         message.success(res.msg || `逻辑删除成功：${success_count} 条`)
       }
@@ -473,7 +610,9 @@ const handlePhysicalExecute = async () => {
     if (res.code === 200 || res.code === 0) {
       const { success_count = 0, failed_ids = [] } = res.data || {}
       if (failed_ids.length > 0) {
-        message.warning(res.msg || `物理删除完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`)
+        message.warning(
+          res.msg || `物理删除完成，成功 ${success_count} 条，失败 ${failed_ids.length} 条`
+        )
       } else {
         message.success(res.msg || `物理删除成功：${success_count} 条`)
       }

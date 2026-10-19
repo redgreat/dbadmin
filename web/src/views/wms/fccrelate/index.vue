@@ -13,10 +13,12 @@
               <li>分号(;) - 每行结尾标识</li>
             </ul>
             <p><strong>样例数据：</strong></p>
-            <pre>J202512250009:ZD20260325153906B413D18,ZD202603251538028DCFA89,ZD20260325152917553AF9F;
-J202601130001:ZD20260325153221C268F6B,ZD202603251531139A103CE;</pre>
+            <pre>
+J202512250009:ZD20260325153906B413D18,ZD202603251538028DCFA89,ZD20260325152917553AF9F;
+J202601130001:ZD20260325153221C268F6B,ZD202603251531139A103CE;</pre
+            >
           </n-alert>
-          <n-button type="primary" size="small" @click="useExample" style="margin-top: 10px">
+          <n-button type="primary" size="small" style="margin-top: 10px" @click="useExample">
             使用样例
           </n-button>
         </n-collapse-item>
@@ -47,12 +49,7 @@ J202601130001:ZD20260325153221C268F6B,ZD202603251531139A103CE;</pre>
       <n-alert type="success" style="margin-bottom: 10px">
         共解析 {{ parseResult.total_fcc }} 个FCC报销单，{{ parseResult.total_wms }} 个仓储对账单
       </n-alert>
-      <n-data-table
-        :columns="previewColumns"
-        :data="previewData"
-        :bordered="false"
-        size="small"
-      />
+      <n-data-table :columns="previewColumns" :data="previewData" :bordered="false" size="small" />
       <n-space style="margin-top: 10px">
         <n-button type="primary" :loading="submitting" @click="handleSubmit">提交</n-button>
       </n-space>
@@ -62,9 +59,7 @@ J202601130001:ZD20260325153221C268F6B,ZD202603251531139A103CE;</pre>
 
     <!-- 结果展示区 -->
     <n-card v-if="taskStatus" title="执行结果" size="small">
-      <n-alert :type="statusType" style="margin-bottom: 10px">
-        任务状态：{{ statusText }}
-      </n-alert>
+      <n-alert :type="statusType" style="margin-bottom: 10px"> 任务状态：{{ statusText }} </n-alert>
       <n-progress
         type="line"
         :percentage="progressPercentage"
@@ -93,7 +88,18 @@ J202601130001:ZD20260325153221C268F6B,ZD202603251531139A103CE;</pre>
 import { ref, computed, onUnmounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
-import { NCard, NSpace, NDataTable, NDivider, NInput, NButton, NCollapse, NCollapseItem, NAlert, NProgress } from 'naive-ui'
+import {
+  NCard,
+  NSpace,
+  NDataTable,
+  NDivider,
+  NInput,
+  NButton,
+  NCollapse,
+  NCollapseItem,
+  NAlert,
+  NProgress,
+} from 'naive-ui'
 import api from '@/api'
 
 defineOptions({ name: 'FCC报销单关联' })
@@ -126,10 +132,10 @@ const failedColumns = [
 // 预览数据
 const previewData = computed(() => {
   if (!parseResult.value || !parseResult.value.relations) return []
-  return parseResult.value.relations.map(r => ({
+  return parseResult.value.relations.map((r) => ({
     fcc_no: r.fcc_no,
     wms_nos_str: r.wms_nos.join(', '),
-    wms_count: r.wms_nos.length
+    wms_count: r.wms_nos.length,
   }))
 })
 
@@ -148,10 +154,10 @@ const statusText = computed(() => {
   if (!taskStatus.value) return ''
   const status = taskStatus.value.status
   const statusMap = {
-    'pending': '等待中',
-    'processing': '处理中',
-    'completed': '已完成',
-    'failed': '失败'
+    pending: '等待中',
+    processing: '处理中',
+    completed: '已完成',
+    failed: '失败',
   }
   return statusMap[status] || status
 })
@@ -186,7 +192,7 @@ const handleParse = async () => {
     message.warning('请输入内容')
     return
   }
-  
+
   parsing.value = true
   try {
     const res = await api.fccParse({ input_text: inputText.value })
@@ -224,7 +230,7 @@ const handleSubmit = async () => {
       message.error(validateRes.data.message || '验证失败')
       return
     }
-    
+
     // 提交任务
     const submitRes = await api.fccSubmit({ relations: parseResult.value.relations })
     if (submitRes.code === 200) {

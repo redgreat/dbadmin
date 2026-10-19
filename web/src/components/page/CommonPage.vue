@@ -1,6 +1,14 @@
 <template>
   <AppPage :show-footer="showFooter">
-    <header v-if="showHeader && (title || $slots.header || $slots.action)" mb-15 min-h-45 flex items-center justify-between px-15>
+    <header
+      v-if="showHeader && (title || $slots.header || $slots.action)"
+      mb-15
+      min-h-45
+      flex
+      items-center
+      justify-between
+      px-15
+    >
       <slot v-if="$slots.header" name="header" />
       <template v-else>
         <h2 v-if="title" text-22 font-normal text-hex-333 dark:text-hex-ccc>{{ title }}</h2>

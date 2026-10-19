@@ -1,28 +1,55 @@
 <template>
   <CommonPage show-footer>
     <n-card title="价格查询与修改" size="small">
-      <n-form ref="priceFormRef" :model="priceForm" :rules="priceRules" label-placement="left" :label-width="100">
+      <n-form
+        ref="priceFormRef"
+        :model="priceForm"
+        :rules="priceRules"
+        label-placement="left"
+        :label-width="100"
+      >
         <n-form-item label="单据编码" path="stock_code">
-          <n-input v-model:value="priceForm.stock_code" clearable placeholder="请输入入库单或出库单编码" />
+          <n-input
+            v-model:value="priceForm.stock_code"
+            clearable
+            placeholder="请输入入库单或出库单编码"
+          />
         </n-form-item>
         <n-form-item label="物料名称" path="material_name">
           <n-input v-model:value="priceForm.material_name" clearable placeholder="请输入物料名称" />
         </n-form-item>
         <n-form-item label="修改后价格" path="new_price">
-          <n-input v-model:value="priceForm.new_price" clearable placeholder="请输入修改后价格（decimal(18,2)）" />
+          <n-input
+            v-model:value="priceForm.new_price"
+            clearable
+            placeholder="请输入修改后价格（decimal(18,2)）"
+          />
         </n-form-item>
         <n-form-item label="备注" path="remark">
-          <n-input v-model:value="priceForm.remark" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="非必填，记录运维日志使用" />
+          <n-input
+            v-model:value="priceForm.remark"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            placeholder="非必填，记录运维日志使用"
+          />
         </n-form-item>
         <n-space>
-          <n-button type="primary" :loading="priceQuerying" @click="handlePriceQuery">查询</n-button>
-          <n-button type="warning" :loading="priceModifying" :disabled="!canModify" @click="handlePriceModify">{{ modifyButtonText }}</n-button>
+          <n-button type="primary" :loading="priceQuerying" @click="handlePriceQuery"
+            >查询</n-button
+          >
+          <n-button
+            type="warning"
+            :loading="priceModifying"
+            :disabled="!canModify"
+            @click="handlePriceModify"
+            >{{ modifyButtonText }}</n-button
+          >
           <n-button @click="handlePriceReset">重置</n-button>
         </n-space>
       </n-form>
 
       <n-divider />
-      
+
       <n-data-table
         v-if="priceResults.length > 0"
         :columns="priceColumns"
@@ -73,11 +100,15 @@ const priceColumns = [
   { title: '单据编码', key: 'stock_no' },
   { title: '物料名称', key: 'material_name' },
   { title: '单据类型', key: 'doc_type', render: (row) => docTypeMap[row.doc_type] || row.doc_type },
-  { title: '单据状态', key: 'table_type', render: (row) => tableTypeMap[row.table_type] || row.table_type },
+  {
+    title: '单据状态',
+    key: 'table_type',
+    render: (row) => tableTypeMap[row.table_type] || row.table_type,
+  },
   { title: '原价格', key: 'original_price' },
   { title: '数量', key: 'instocked_num' },
   { title: '新价格', key: 'new_price' },
-  { title: '对账状态', key: 'can_modify', render: (row) => row.can_modify ? '可修改' : '已对账' },
+  { title: '对账状态', key: 'can_modify', render: (row) => (row.can_modify ? '可修改' : '已对账') },
   { title: '说明', key: 'reason' },
 ]
 
@@ -104,7 +135,9 @@ const handlePriceQuery = async () => {
       } else {
         const cannot = priceResults.value.filter((r) => r.can_modify === false)
         if (cannot.length > 0) {
-          message.warning(`查询到 ${priceResults.value.length} 条记录，其中 ${cannot.length} 条已对账不可修改`)
+          message.warning(
+            `查询到 ${priceResults.value.length} 条记录，其中 ${cannot.length} 条已对账不可修改`
+          )
         } else {
           message.success(`查询到 ${priceResults.value.length} 条记录，可批量修改`)
         }

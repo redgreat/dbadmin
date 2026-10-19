@@ -89,7 +89,7 @@ async function handleLogin() {
     loading.value = true
 
     $message.loading(t('views.login.message_verifying'), {
-      duration: 1000
+      duration: 1000,
     })
 
     const res = await api.login({ username, password: password.toString() })

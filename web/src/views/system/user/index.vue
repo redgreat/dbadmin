@@ -100,7 +100,8 @@ const columns = [
         )
       return h('span', group)
     },
-  },  {
+  },
+  {
     width: 40,
     ellipsis: { tooltip: true },
   },
@@ -165,10 +166,12 @@ const columns = [
             {
               size: 'small',
               type: 'primary',
-              style: 'margin-right: 8px;',              onClick: () => {
+              style: 'margin-right: 8px;',
+              onClick: () => {
                 handleEdit(row)
                 modalForm.value.role_ids = row.roles.map((e) => (e = e.id))
-                modalForm.value.conn_ids = row.conn_ids || row.conn_permissions?.map((e) => e.id) || []
+                modalForm.value.conn_ids =
+                  row.conn_ids || row.conn_permissions?.map((e) => e.id) || []
               },
             },
             {
@@ -204,40 +207,41 @@ const columns = [
             default: () => h('div', {}, '确定删除该用户吗?'),
           }
         ),
-        !row.is_superuser && h(
-          NPopconfirm,
-          {
-            onPositiveClick: async () => {
-              try {
-                await api.resetPassword({ user_id: row.id });
-                $message.success('密码已成功重置为123456');
-                await $table.value?.handleSearch();
-              } catch (error) {
-                $message.error('重置密码失败: ' + error.message);
-              }
+        !row.is_superuser &&
+          h(
+            NPopconfirm,
+            {
+              onPositiveClick: async () => {
+                try {
+                  await api.resetPassword({ user_id: row.id })
+                  $message.success('密码已成功重置为123456')
+                  await $table.value?.handleSearch()
+                } catch (error) {
+                  $message.error('重置密码失败: ' + error.message)
+                }
+              },
+              onNegativeClick: () => {},
             },
-            onNegativeClick: () => {},
-          },
-          {
-            trigger: () =>
-              withDirectives(
-                h(
-                  NButton,
-                  {
-                    size: 'small',
-                    type: 'warning',
-                    style: 'margin-right: 8px;',
-                  },
-                  {
-                    default: () => '重置密码',
-                    icon: renderIcon('material-symbols:lock-reset', { size: 16 }),
-                  }
+            {
+              trigger: () =>
+                withDirectives(
+                  h(
+                    NButton,
+                    {
+                      size: 'small',
+                      type: 'warning',
+                      style: 'margin-right: 8px;',
+                    },
+                    {
+                      default: () => '重置密码',
+                      icon: renderIcon('material-symbols:lock-reset', { size: 16 }),
+                    }
+                  ),
+                  [[vPermission, 'post/api/v1/user/reset_password']]
                 ),
-                [[vPermission, 'post/api/v1/user/reset_password']]
-              ),
-            default: () => h('div', {}, '确定重置用户密码为123456吗?'),
-          }
-        ),
+              default: () => h('div', {}, '确定重置用户密码为123456吗?'),
+            }
+          ),
       ]
     },
   },
@@ -272,8 +276,6 @@ async function handleUpdateDisable(row) {
     row.publishing = false
   }
 }
-
-
 
 const validateAddUser = {
   username: [
@@ -429,9 +431,9 @@ const validateAddUser = {
               <NSelect
                 v-model:value="modalForm.conn_ids"
                 :options="connOption"
-                multiple
                 clearable
                 filterable
+                multiple
                 placeholder="请选择该账号可使用的数据库连接"
               />
             </NFormItem>
@@ -450,7 +452,8 @@ const validateAddUser = {
                 :unchecked-value="true"
                 :default-value="true"
               />
-            </NFormItem>          </NForm>
+            </NFormItem>
+          </NForm>
         </CrudModal>
       </CommonPage>
     </NLayoutContent>

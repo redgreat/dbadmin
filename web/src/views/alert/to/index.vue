@@ -2,7 +2,12 @@
   <CommonPage show-footer>
     <template #action>
       <div>
-        <n-button v-permission="'post/api/v1/alert/to/create'" class="float-right mr-15" type="primary" @click="handleAdd">
+        <n-button
+          v-permission="'post/api/v1/alert/to/create'"
+          class="float-right mr-15"
+          type="primary"
+          @click="handleAdd"
+        >
           <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新增发送人
         </n-button>
         <n-button class="float-right mr-15" type="info" @click="handleRefresh">
@@ -11,12 +16,7 @@
       </div>
     </template>
 
-    <CrudTable
-      ref="$table"
-      v-model:query-items="queryItems"
-      :columns="columns"
-      :get-data="getData"
-    >
+    <CrudTable ref="$table" v-model:query-items="queryItems" :columns="columns" :get-data="getData">
       <template #queryBar>
         <QueryBarItem label="发送人名称" :label-width="90">
           <n-input
@@ -55,10 +55,18 @@
           <n-input v-model:value="modalForm.sender_name" clearable placeholder="请输入发送人名称" />
         </n-form-item>
         <n-form-item label="发送渠道" path="channel_type">
-          <n-select v-model:value="modalForm.channel_type" :options="channelOptions" :disabled="true" />
+          <n-select
+            v-model:value="modalForm.channel_type"
+            :options="channelOptions"
+            :disabled="true"
+          />
         </n-form-item>
         <n-form-item label="企业微信群ID" path="channel_target">
-          <n-input v-model:value="modalForm.channel_target" clearable placeholder="请输入企业微信群ID" />
+          <n-input
+            v-model:value="modalForm.channel_target"
+            clearable
+            placeholder="请输入企业微信群ID"
+          />
         </n-form-item>
         <n-form-item label="启用状态" path="is_enabled">
           <n-switch v-model:value="modalForm.is_enabled" />
@@ -137,7 +145,11 @@ const columns = [
     key: 'is_enabled',
     width: 100,
     render(row) {
-      return h(NTag, { type: row.is_enabled ? 'success' : 'warning' }, { default: () => (row.is_enabled ? '启用' : '停用') })
+      return h(
+        NTag,
+        { type: row.is_enabled ? 'success' : 'warning' },
+        { default: () => (row.is_enabled ? '启用' : '停用') }
+      )
     },
   },
   { title: '备注', key: 'remark', width: 180 },
@@ -148,30 +160,34 @@ const columns = [
     width: 180,
     fixed: 'right',
     render(row) {
-      return h(NSpace, { justify: 'center' }, {
-        default: () => [
-          withDirectives(
-            h(
-              NButton,
-              { size: 'small', type: 'primary', onClick: () => handleEdit(row) },
-              { default: () => '编辑' }
+      return h(
+        NSpace,
+        { justify: 'center' },
+        {
+          default: () => [
+            withDirectives(
+              h(
+                NButton,
+                { size: 'small', type: 'primary', onClick: () => handleEdit(row) },
+                { default: () => '编辑' }
+              ),
+              [[vPermission, 'post/api/v1/alert/to/update']]
             ),
-            [[vPermission, 'post/api/v1/alert/to/update']]
-          ),
-          h(
-            NPopconfirm,
-            { onPositiveClick: () => handleDelete({ id: row.id }) },
-            {
-              trigger: () =>
-                withDirectives(
-                  h(NButton, { size: 'small', type: 'error' }, { default: () => '删除' }),
-                  [[vPermission, 'delete/api/v1/alert/to/delete']]
-                ),
-              default: () => h('div', {}, '确定删除该发送人吗?'),
-            }
-          ),
-        ],
-      })
+            h(
+              NPopconfirm,
+              { onPositiveClick: () => handleDelete({ id: row.id }) },
+              {
+                trigger: () =>
+                  withDirectives(
+                    h(NButton, { size: 'small', type: 'error' }, { default: () => '删除' }),
+                    [[vPermission, 'delete/api/v1/alert/to/delete']]
+                  ),
+                default: () => h('div', {}, '确定删除该发送人吗?'),
+              }
+            ),
+          ],
+        }
+      )
     },
   },
 ]

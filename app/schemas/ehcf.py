@@ -82,3 +82,34 @@ class WorkorderCreateTypeUpdateIn(BaseModel):
     create_type: int = Field(..., description="单据来源类型值")
     operator_id: str = Field(default="", description="操作人Id")
     remark: str = Field(default="", description="运维备注")
+
+
+class ResourceQueryIn(BaseModel):
+    """附件管理-查询入参"""
+
+    keyword: str = Field(default="", description="工单编码或Id（非必填）")
+    source_type: int | None = Field(default=None, description="附件类型（SourceType枚举值）")
+    deleted_by_id: str = Field(
+        default="", description="删除人用户中心Id（非必填，不填则查询所有删除人下的附件）"
+    )
+    include_deleted: bool = Field(default=False, description="是否包含已删除附件")
+    page: int = Field(default=1, ge=1, description="页码")
+    page_size: int = Field(default=20, ge=1, le=100, description="每页条数")
+
+
+class ResourceDeleteIn(BaseModel):
+    """附件管理-逻辑删除入参"""
+
+    resource_ids: list[str] = Field(..., min_length=1, description="附件Id列表")
+    operator_id: str = Field(..., description="操作人Id（GUID格式，写入删除人）")
+    remark: str = Field(default="", description="原因备注（非必填）")
+
+
+class ResourceRestoreIn(BaseModel):
+    """附件管理-恢复入参"""
+
+    resource_ids: list[str] = Field(..., min_length=1, description="附件Id列表")
+    operator_id: str = Field(
+        default="", description="操作人Id（GUID格式，非必填；填写后仅恢复该删除人删除的附件）"
+    )
+    remark: str = Field(default="", description="原因备注（非必填）")

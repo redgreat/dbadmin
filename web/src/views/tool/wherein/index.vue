@@ -103,9 +103,18 @@
           <div class="guide-title">使用说明</div>
           <ul class="guide-list">
             <li>在输入框中输入数据，每行一个值</li>
-            <li><strong>格式化为 IN 语句</strong>：生成 WHERE IN 条件语句，如 ('value1', 'value2', ...)</li>
-            <li><strong>格式化为 VALUES</strong>：生成 INSERT VALUES 语句，如 VALUES ('value1'), ('value2'), ...</li>
-            <li><strong>生成临时表SQL</strong>：创建临时表 tm_年月日时分秒，包含自增主键和 InsValues 字段，并插入数据</li>
+            <li>
+              <strong>格式化为 IN 语句</strong>：生成 WHERE IN 条件语句，如 ('value1', 'value2',
+              ...)
+            </li>
+            <li>
+              <strong>格式化为 VALUES</strong>：生成 INSERT VALUES 语句，如 VALUES ('value1'),
+              ('value2'), ...
+            </li>
+            <li>
+              <strong>生成临时表SQL</strong>：创建临时表 tm_年月日时分秒，包含自增主键和 InsValues
+              字段，并插入数据
+            </li>
           </ul>
         </div>
       </n-alert>
@@ -127,7 +136,7 @@ const sqlResult = ref('')
 
 const form = ref({
   inputData: '',
-  dbType: 'mysql'
+  dbType: 'mysql',
 })
 
 /** 处理输入数据，去除空行和首尾空格 */
@@ -139,8 +148,8 @@ const processInputData = () => {
 
   const lines = form.value.inputData
     .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
 
   if (lines.length === 0) {
     message.warning('没有有效的数据')
@@ -155,9 +164,9 @@ const handleFormatIn = () => {
   const lines = processInputData()
   if (!lines) return
 
-  const quotedLines = lines.map(line => `'${line}'`)
+  const quotedLines = lines.map((line) => `'${line}'`)
   const result = `(${quotedLines.join(',\n')})`
-  
+
   sqlResult.value = result
   message.success('IN 语句生成成功')
 }
@@ -167,9 +176,9 @@ const handleFormatValues = () => {
   const lines = processInputData()
   if (!lines) return
 
-  const valuesLines = lines.map(line => `('${line}')`)
+  const valuesLines = lines.map((line) => `('${line}')`)
   const result = `VALUES ${valuesLines.join(',\n')}`
-  
+
   sqlResult.value = result
   message.success('VALUES 语句生成成功')
 }
@@ -181,7 +190,12 @@ const handleFormatTempTable = () => {
 
   // 生成表名：tm_年月日时分秒
   const now = new Date()
-  const tableName = `tm_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+  const tableName = `tm_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
+    now.getDate()
+  ).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(
+    2,
+    '0'
+  )}${String(now.getSeconds()).padStart(2, '0')}`
 
   let createTableSql = ''
   const isPostgreSQL = form.value.dbType === 'postgresql'
@@ -201,7 +215,7 @@ const handleFormatTempTable = () => {
   }
 
   // 生成 VALUES 语句
-  const valuesLines = lines.map(line => `('${line}')`)
+  const valuesLines = lines.map((line) => `('${line}')`)
   const insertSql = isPostgreSQL
     ? `INSERT INTO "${tableName}" ("InsValues") VALUES\n${valuesLines.join(',\n')};`
     : `INSERT INTO \`${tableName}\` (\`InsValues\`) VALUES\n${valuesLines.join(',\n')};`

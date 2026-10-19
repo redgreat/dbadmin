@@ -4,8 +4,20 @@
       <n-card title="Python脚本管理" size="small">
         <n-space justify="space-between" class="mb-3">
           <n-space>
-            <n-input v-model:value="searchParams.name" clearable placeholder="搜索脚本名称" style="width: 200px" @keyup.enter="handleSearch" />
-            <n-select v-model:value="searchParams.status" :options="statusOptions" clearable placeholder="状态" style="width: 120px" />
+            <n-input
+              v-model:value="searchParams.name"
+              clearable
+              placeholder="搜索脚本名称"
+              style="width: 200px"
+              @keyup.enter="handleSearch"
+            />
+            <n-select
+              v-model:value="searchParams.status"
+              :options="statusOptions"
+              clearable
+              placeholder="状态"
+              style="width: 120px"
+            />
             <n-button type="primary" @click="handleSearch">搜索</n-button>
             <n-button @click="handleReset">重置</n-button>
           </n-space>
@@ -32,19 +44,39 @@
     </n-space>
 
     <!-- 脚本编辑弹窗 -->
-    <n-modal v-model:show="showModal" :title="modalTitle" preset="card" style="width: 900px; max-width: 90vw">
-      <n-form ref="formRef" :model="formData" :rules="formRules" label-placement="left" :label-width="90">
+    <n-modal
+      v-model:show="showModal"
+      :title="modalTitle"
+      preset="card"
+      style="width: 900px; max-width: 90vw"
+    >
+      <n-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-placement="left"
+        :label-width="90"
+      >
         <n-form-item label="脚本名称" path="name">
           <n-input v-model:value="formData.name" placeholder="请输入脚本名称" />
         </n-form-item>
         <n-form-item label="描述" path="description">
-          <n-input v-model:value="formData.description" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="请输入脚本描述" />
+          <n-input
+            v-model:value="formData.description"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            placeholder="请输入脚本描述"
+          />
         </n-form-item>
         <n-form-item label="Cron表达式" path="cron">
           <template #label>
             <span style="white-space: nowrap">Cron表达式</span>
           </template>
-          <n-input v-model:value="formData.cron" clearable placeholder="示例: 0 9 * * * (留空则不启用定时)" />
+          <n-input
+            v-model:value="formData.cron"
+            clearable
+            placeholder="示例: 0 9 * * * (留空则不启用定时)"
+          />
         </n-form-item>
         <n-form-item label="状态" path="status">
           <n-switch v-model:value="formData.status">
@@ -87,7 +119,12 @@
     </n-modal>
 
     <!-- 执行日志弹窗 -->
-    <n-modal v-model:show="showLogModal" title="执行日志" preset="card" style="width: 800px; max-width: 90vw">
+    <n-modal
+      v-model:show="showLogModal"
+      title="执行日志"
+      preset="card"
+      style="width: 800px; max-width: 90vw"
+    >
       <n-data-table
         :columns="logColumns"
         :data="logData"
@@ -99,23 +136,55 @@
     </n-modal>
 
     <!-- 日志详情弹窗 -->
-    <n-modal v-model:show="showLogDetailModal" title="日志详情" preset="card" style="width: 800px; max-width: 90vw">
+    <n-modal
+      v-model:show="showLogDetailModal"
+      title="日志详情"
+      preset="card"
+      style="width: 800px; max-width: 90vw"
+    >
       <n-descriptions :column="2" label-placement="left" bordered size="small">
         <n-descriptions-item label="日志ID">{{ currentLog.id }}</n-descriptions-item>
         <n-descriptions-item label="执行状态">
-          <n-tag :type="currentLog.status === 'success' ? 'success' : currentLog.status === 'failed' ? 'error' : 'warning'" size="small">
-            {{ currentLog.status === 'success' ? '成功' : currentLog.status === 'failed' ? '失败' : '运行中' }}
+          <n-tag
+            :type="
+              currentLog.status === 'success'
+                ? 'success'
+                : currentLog.status === 'failed'
+                ? 'error'
+                : 'warning'
+            "
+            size="small"
+          >
+            {{
+              currentLog.status === 'success'
+                ? '成功'
+                : currentLog.status === 'failed'
+                ? '失败'
+                : '运行中'
+            }}
           </n-tag>
         </n-descriptions-item>
         <n-descriptions-item label="开始时间">{{ currentLog.start_time }}</n-descriptions-item>
         <n-descriptions-item label="结束时间">{{ currentLog.end_time || '-' }}</n-descriptions-item>
-        <n-descriptions-item label="执行时长">{{ currentLog.duration ? currentLog.duration + '秒' : '-' }}</n-descriptions-item>
+        <n-descriptions-item label="执行时长">{{
+          currentLog.duration ? currentLog.duration + '秒' : '-'
+        }}</n-descriptions-item>
       </n-descriptions>
       <n-divider>执行输出</n-divider>
-      <n-input :default-value="currentLog.output || '无输出'" type="textarea" :autosize="{ minRows: 10, maxRows: 20 }" readonly />
+      <n-input
+        :default-value="currentLog.output || '无输出'"
+        type="textarea"
+        :autosize="{ minRows: 10, maxRows: 20 }"
+        readonly
+      />
       <template v-if="currentLog.error">
         <n-divider>错误信息</n-divider>
-        <n-input :default-value="currentLog.error" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }" readonly />
+        <n-input
+          :default-value="currentLog.error"
+          type="textarea"
+          :autosize="{ minRows: 5, maxRows: 10 }"
+          readonly
+        />
       </template>
     </n-modal>
   </CommonPage>
@@ -123,7 +192,16 @@
 
 <script setup>
 import { h, ref, reactive, onMounted } from 'vue'
-import { useMessage, useDialog, NButton, NSpace, NTag, NDynamicInput, NDivider, NText } from 'naive-ui'
+import {
+  useMessage,
+  useDialog,
+  NButton,
+  NSpace,
+  NTag,
+  NDynamicInput,
+  NDivider,
+  NText,
+} from 'naive-ui'
 import CommonPage from '@/components/page/CommonPage.vue'
 import api from '@/api'
 
@@ -141,7 +219,13 @@ const dialog = useDialog()
 const loading = ref(false)
 const submitting = ref(false)
 const tableData = ref([])
-const pagination = reactive({ page: 1, pageSize: 10, itemCount: 0, showSizePicker: true, pageSizes: [10, 20, 50] })
+const pagination = reactive({
+  page: 1,
+  pageSize: 10,
+  itemCount: 0,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50],
+})
 
 const searchParams = reactive({ name: '', status: null })
 
@@ -159,23 +243,31 @@ const envConfigList = ref([])
 const formRules = {
   name: [{ required: true, message: '请输入脚本名称' }],
   code: [{ required: true, message: '请输入脚本内容' }],
-  cron: [{
-    validator(_rule, value) {
-      if (!value) return true
-      const parts = value.trim().split(/\s+/)
-      if (parts.length !== 5 && parts.length !== 6) {
-        return new Error('Cron表达式格式错误，请使用5位或6位格式，如: 0 9 * * *')
-      }
-      return true
+  cron: [
+    {
+      validator(_rule, value) {
+        if (!value) return true
+        const parts = value.trim().split(/\s+/)
+        if (parts.length !== 5 && parts.length !== 6) {
+          return new Error('Cron表达式格式错误，请使用5位或6位格式，如: 0 9 * * *')
+        }
+        return true
+      },
+      trigger: 'blur',
     },
-    trigger: 'blur',
-  }],
+  ],
 }
 
 const showLogModal = ref(false)
 const logLoading = ref(false)
 const logData = ref([])
-const logPagination = reactive({ page: 1, pageSize: 10, itemCount: 0, showSizePicker: true, pageSizes: [10, 20, 50] })
+const logPagination = reactive({
+  page: 1,
+  pageSize: 10,
+  itemCount: 0,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50],
+})
 const currentScriptId = ref(null)
 
 const showLogDetailModal = ref(false)
@@ -193,12 +285,37 @@ const columns = [
     key: 'status',
     width: 80,
     render(row) {
-      return h(NTag, { type: row.status ? 'success' : 'default', size: 'small' }, { default: () => (row.status ? '启用' : '禁用') })
+      return h(
+        NTag,
+        { type: row.status ? 'success' : 'default', size: 'small' },
+        { default: () => (row.status ? '启用' : '禁用') }
+      )
     },
   },
-  { title: 'Cron', key: 'cron', width: 140, render(row) { return row.cron || '-' } },
-  { title: '上次执行', key: 'last_run_time', width: 160, render(row) { return row.last_run_time || '-' } },
-  { title: '下次执行', key: 'next_run_time', width: 160, render(row) { return row.next_run_time || '-' } },
+  {
+    title: 'Cron',
+    key: 'cron',
+    width: 140,
+    render(row) {
+      return row.cron || '-'
+    },
+  },
+  {
+    title: '上次执行',
+    key: 'last_run_time',
+    width: 160,
+    render(row) {
+      return row.last_run_time || '-'
+    },
+  },
+  {
+    title: '下次执行',
+    key: 'next_run_time',
+    width: 160,
+    render(row) {
+      return row.next_run_time || '-'
+    },
+  },
   { title: '创建时间', key: 'created_at', width: 160 },
   { title: '更新时间', key: 'updated_at', width: 160 },
   {
@@ -208,10 +325,22 @@ const columns = [
     render(row) {
       return h(NSpace, null, {
         default: () => [
-          h(NButton, { size: 'small', type: 'primary', onClick: () => handleViewLog(row) }, { default: () => '日志' }),
+          h(
+            NButton,
+            { size: 'small', type: 'primary', onClick: () => handleViewLog(row) },
+            { default: () => '日志' }
+          ),
           h(NButton, { size: 'small', onClick: () => handleEdit(row) }, { default: () => '编辑' }),
-          h(NButton, { size: 'small', type: 'success', onClick: () => handleExecute(row) }, { default: () => '执行' }),
-          h(NButton, { size: 'small', type: 'error', onClick: () => handleDelete(row) }, { default: () => '删除' }),
+          h(
+            NButton,
+            { size: 'small', type: 'success', onClick: () => handleExecute(row) },
+            { default: () => '执行' }
+          ),
+          h(
+            NButton,
+            { size: 'small', type: 'error', onClick: () => handleDelete(row) },
+            { default: () => '删除' }
+          ),
         ],
       })
     },
@@ -225,17 +354,39 @@ const logColumns = [
     key: 'status',
     width: 100,
     render(row) {
-      return h(NTag, { type: row.status === 'success' ? 'success' : row.status === 'failed' ? 'error' : 'warning', size: 'small' }, { default: () => (row.status === 'success' ? '成功' : row.status === 'failed' ? '失败' : '运行中') })
+      return h(
+        NTag,
+        {
+          type:
+            row.status === 'success' ? 'success' : row.status === 'failed' ? 'error' : 'warning',
+          size: 'small',
+        },
+        {
+          default: () =>
+            row.status === 'success' ? '成功' : row.status === 'failed' ? '失败' : '运行中',
+        }
+      )
     },
   },
   { title: '开始时间', key: 'start_time', width: 160 },
-  { title: '执行时长', key: 'duration', width: 100, render(row) { return row.duration ? row.duration + '秒' : '-' } },
+  {
+    title: '执行时长',
+    key: 'duration',
+    width: 100,
+    render(row) {
+      return row.duration ? row.duration + '秒' : '-'
+    },
+  },
   {
     title: '操作',
     key: 'actions',
     width: 100,
     render(row) {
-      return h(NButton, { size: 'small', onClick: () => handleViewLogDetail(row) }, { default: () => '详情' })
+      return h(
+        NButton,
+        { size: 'small', onClick: () => handleViewLogDetail(row) },
+        { default: () => '详情' }
+      )
     },
   },
 ]
