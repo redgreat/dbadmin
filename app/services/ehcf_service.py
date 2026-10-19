@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 ALLOWED_SERVICE_PROVIDER_CODE = "1067"
 
 _ehcf_conn_id = None
+_order_conn_id = None
 
 
 async def _get_conn_id():
@@ -21,12 +22,34 @@ async def _get_conn_id():
     return _ehcf_conn_id
 
 
+async def _get_order_conn_id():
+    global _order_conn_id
+    if _order_conn_id is None:
+        _order_conn_id = await settings.ORDER_CONN_ID()
+    return _order_conn_id
+
+
 class EhcfService:
     """壹好车服业务服务"""
 
     async def _ensure_pool(self) -> None:
         """确保连接池已注册"""
         await db_pool.ensure_pool(await _get_conn_id())
+
+    async def _get_order_pool(self):
+        """获取订单中心数据库连接池（OE/OI 序列与订单编码均在订单中心库）"""
+        await db_pool.ensure_pool(await _get_order_conn_id())
+        pool = db_pool.get_pool(await _get_order_conn_id())
+        if pool is None:
+            raise ValueError("订单中心连接池不存在")
+        return pool
+
+    @staticmethod
+    async def _next_val(cur, seq_no: str) -> str:
+        """在指定连接上调用 fn_nextval 生成序列值（序列均在订单中心库）"""
+        await cur.execute("SELECT fn_nextval(%s);", (seq_no,))
+        row = await cur.fetchone()
+        return str(row[0]) if row and row[0] else ""
 
     async def query_workorder(self, keyword: str) -> Dict:
         """查询工单基础信息，支持AppCode或Id"""
@@ -159,16 +182,22 @@ class EhcfService:
                                 "old_detail_id": str(row[1]) if row[1] else "",
                             })
 
-                    # 按原始 OrderDetailId 去重，为每个不同值生成新的 OE 编号
+                    # 按原始 OrderDetailId 去重，为每个不同值生成新的 OE 编号（OE 序列在订单中心库）
                     unique_old_ids = list({r["old_detail_id"] for r in all_rows})
                     oe_mapping = {}
-                    for old_id in unique_old_ids:
-                        await cur.execute("SELECT fn_nextval('OE');")
-                        oe_row = await cur.fetchone()
-                        new_id = str(oe_row[0]) if oe_row else ""
-                        if not new_id:
-                            return {"success": False, "message": "生成OE编号失败"}
-                        oe_mapping[old_id] = new_id
+                    order_pool = await self._get_order_pool()
+                    if isinstance(order_pool, aiomysql.Pool):
+                        async with order_pool.acquire() as order_conn:
+                            async with order_conn.cursor() as order_cur:
+                                for old_id in unique_old_ids:
+                                    await order_cur.execute("SELECT fn_nextval('OE');")
+                                    oe_row = await order_cur.fetchone()
+                                    new_id = str(oe_row[0]) if oe_row else ""
+                                    if not new_id:
+                                        return {"success": False, "message": "生成OE编号失败"}
+                                    oe_mapping[old_id] = new_id
+                    else:
+                        raise ValueError("不支持的连接池类型")
 
                     # 更新所有明细行
                     for r in all_rows:
@@ -211,8 +240,11 @@ class EhcfService:
         results = {"updated": [], "failed": []}
 
         if isinstance(pool, aiomysql.Pool):
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
+            order_pool = await self._get_order_pool()
+            if not isinstance(order_pool, aiomysql.Pool):
+                raise ValueError("不支持的连接池类型")
+            async with pool.acquire() as conn, order_pool.acquire() as order_conn:
+                async with conn.cursor() as cur, order_conn.cursor() as order_cur:
                     # 1. 收集所有明细行，按原始 OrderDetailId 分组并生成新值
                     detail_tables = [
                         ("tb_workgoodsdetail", "WorkOrderId"),
@@ -236,13 +268,11 @@ class EhcfService:
                                 "old_detail_id": str(row[1]) if row[1] else "",
                             })
 
-                    # 为每个不同的原始 OrderDetailId 生成新的 OI 编号
+                    # 为每个不同的原始 OrderDetailId 生成新的 OI 编号（OI 序列在订单中心库）
                     unique_old_ids = list({r["old_detail_id"] for r in all_detail_rows})
                     oi_mapping = {}
                     for old_id in unique_old_ids:
-                        await cur.execute("SELECT fn_nextval('OI');")
-                        oi_row = await cur.fetchone()
-                        new_id = str(oi_row[0]) if oi_row else ""
+                        new_id = await self._next_val(order_cur, 'OI')
                         if not new_id:
                             return {"success": False, "message": "生成OI编号失败"}
                         oi_mapping[old_id] = new_id
@@ -280,15 +310,14 @@ class EhcfService:
                     mall_oi_mapping = {}
                     mall_order_no_mapping = {}
                     for old_mall_id in unique_mall_ids:
-                        await cur.execute("SELECT fn_nextval('OI');")
-                        oi_row = await cur.fetchone()
-                        new_oi_id = str(oi_row[0]) if oi_row else ""
+                        new_oi_id = await self._next_val(order_cur, 'OI')
                         if not new_oi_id:
                             return {"success": False, "message": "生成OI编号失败"}
                         mall_oi_mapping[old_mall_id] = new_oi_id
 
-                        await cur.execute("SELECT fn_GetOrderNoByPrefix('');")
-                        on_row = await cur.fetchone()
+                        # 订单编码在订单中心库生成
+                        await order_cur.execute("SELECT fn_GetOrderNoByPrefix('');")
+                        on_row = await order_cur.fetchone()
                         new_order_no = str(on_row[0]) if on_row else ""
                         mall_order_no_mapping[old_mall_id] = new_order_no
 
@@ -323,9 +352,7 @@ class EhcfService:
                     unique_fix_ids = list({str(row[1]) if row[1] else "" for row in fixgoods_rows})
                     fix_oi_mapping = {}
                     for old_id in unique_fix_ids:
-                        await cur.execute("SELECT fn_nextval('OI');")
-                        oi_row = await cur.fetchone()
-                        new_oi_id = str(oi_row[0]) if oi_row else ""
+                        new_oi_id = await self._next_val(order_cur, 'OI')
                         if not new_oi_id:
                             return {"success": False, "message": "生成OI编号失败"}
                         fix_oi_mapping[old_id] = new_oi_id
@@ -362,9 +389,7 @@ class EhcfService:
                     unique_fixitem_ids = list({str(row[1]) if row[1] else "" for row in fixitem_rows})
                     fixitem_oi_mapping = {}
                     for old_id in unique_fixitem_ids:
-                        await cur.execute("SELECT fn_nextval('OI');")
-                        oi_row = await cur.fetchone()
-                        new_oi_id = str(oi_row[0]) if oi_row else ""
+                        new_oi_id = await self._next_val(order_cur, 'OI')
                         if not new_oi_id:
                             return {"success": False, "message": "生成OI编号失败"}
                         fixitem_oi_mapping[old_id] = new_oi_id
