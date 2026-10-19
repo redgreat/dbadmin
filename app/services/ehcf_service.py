@@ -148,7 +148,7 @@ class EhcfService:
         }
 
     async def fix_order_detail_ids(self, workorder_id: str) -> Dict:
-        """修复订单明细Id（按原始值分组，每个不同原始值生成一个新的OE编号）"""
+        """修复订单明细Id（每行明细生成一个新的OE编号）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -182,26 +182,22 @@ class EhcfService:
                                 "old_detail_id": str(row[1]) if row[1] else "",
                             })
 
-                    # 按原始 OrderDetailId 去重，为每个不同值生成新的 OE 编号（OE 序列在订单中心库）
-                    unique_old_ids = list({r["old_detail_id"] for r in all_rows})
-                    oe_mapping = {}
+                    # 为每行明细生成新的 OE 编号（每行一个，OE 序列在订单中心库）
                     order_pool = await self._get_order_pool()
                     if isinstance(order_pool, aiomysql.Pool):
                         async with order_pool.acquire() as order_conn:
                             async with order_conn.cursor() as order_cur:
-                                for old_id in unique_old_ids:
-                                    await order_cur.execute("SELECT fn_nextval('OE');")
-                                    oe_row = await order_cur.fetchone()
-                                    new_id = str(oe_row[0]) if oe_row else ""
+                                for r in all_rows:
+                                    new_id = await self._next_val(order_cur, 'OE')
                                     if not new_id:
                                         return {"success": False, "message": "生成OE编号失败"}
-                                    oe_mapping[old_id] = new_id
+                                    r["new_id"] = new_id
                     else:
                         raise ValueError("不支持的连接池类型")
 
                     # 更新所有明细行
                     for r in all_rows:
-                        new_oe_id = oe_mapping[r["old_detail_id"]]
+                        new_oe_id = r["new_id"]
                         try:
                             await cur.execute(
                                 f"UPDATE {r['table']} SET {r['detail_field']}=%s WHERE Id=%s",
@@ -231,7 +227,7 @@ class EhcfService:
         }
 
     async def regenerate_order_ids(self, workorder_id: str) -> Dict:
-        """重新生成订单Id和明细Id（按原始值分组，每个不同原始值生成一个新值）"""
+        """重新生成订单Id和明细Id（明细每行生成一个新值，订单级字段按原始值分组）"""
         await self._ensure_pool()
         pool = db_pool.get_pool(await _get_conn_id())
         if pool is None:
@@ -268,18 +264,16 @@ class EhcfService:
                                 "old_detail_id": str(row[1]) if row[1] else "",
                             })
 
-                    # 为每个不同的原始 OrderDetailId 生成新的 OI 编号（OI 序列在订单中心库）
-                    unique_old_ids = list({r["old_detail_id"] for r in all_detail_rows})
-                    oi_mapping = {}
-                    for old_id in unique_old_ids:
+                    # 为每行明细生成新的 OI 编号（每行一个，OI 序列在订单中心库）
+                    for r in all_detail_rows:
                         new_id = await self._next_val(order_cur, 'OI')
                         if not new_id:
                             return {"success": False, "message": "生成OI编号失败"}
-                        oi_mapping[old_id] = new_id
+                        r["new_id"] = new_id
 
                     # 更新明细表
                     for r in all_detail_rows:
-                        new_oi_id = oi_mapping[r["old_detail_id"]]
+                        new_oi_id = r["new_id"]
                         try:
                             await cur.execute(
                                 f"UPDATE {r['table']} SET {r['detail_field']}=%s WHERE Id=%s",
