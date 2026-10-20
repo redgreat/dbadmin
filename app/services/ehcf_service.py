@@ -620,13 +620,15 @@ class EhcfService:
                         where.append("b.DeletedById=%s")
                         params.append(deleted_by_id)
                     if not include_deleted:
+                        # 默认只查正常数据；包含已删除时两表删除标记均不过滤，全部查出
                         where.append("b.Deleted=0")
+                        where.append("c.Deleted=0")
                     where_sql = " AND ".join(where)
 
                     await cur.execute(
                         "SELECT COUNT(*) FROM tb_workorderinfo a "
                         "JOIN tb_workresourceinfo b ON b.WorkOrderId=a.Id "
-                        "JOIN basic_resourceitem c ON c.Id=b.ResourceId AND c.Deleted=0 "
+                        "JOIN basic_resourceitem c ON c.Id=b.ResourceId "
                         f"WHERE {where_sql}",
                         tuple(params),
                     )
@@ -641,7 +643,7 @@ class EhcfService:
                         "b.Deleted, b.DeletedById, b.DeletedAt, c.Url "
                         "FROM tb_workorderinfo a "
                         "JOIN tb_workresourceinfo b ON b.WorkOrderId=a.Id "
-                        "JOIN basic_resourceitem c ON c.Id=b.ResourceId AND c.Deleted=0 "
+                        "JOIN basic_resourceitem c ON c.Id=b.ResourceId "
                         f"WHERE {where_sql} "
                         "ORDER BY b.Id DESC LIMIT %s OFFSET %s",
                         (*params, page_size, (page - 1) * page_size),
