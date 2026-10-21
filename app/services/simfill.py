@@ -411,7 +411,7 @@ class SIMFillService:
             "fields": [{
                 "field": "ExpiryDate",
                 "current": _to_str(sim_current.get("ExpiryDate")),
-                "new": f"{sim_age}年+{GRACE_MONTH}个月" if sim_age else None,
+                "new": f"{sim_age}年+{GRACE_MONTHS}个月" if sim_age else None,
             }],
             "blocked": need_expiry and sim_age is None,
         }
