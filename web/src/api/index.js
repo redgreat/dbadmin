@@ -91,6 +91,9 @@ export default {
   // simtrans - SIM卡同步
   syncSimCards: (data = {}) => request.post('/sim/simtrans/sync', data),
   getSimSyncStatus: (params = {}) => request.get('/sim/simtrans/sync/status', { params }),
+  // simfill - SIM卡批发数据补录
+  querySimFillPending: (data = {}) => request.post('/sim/simfill/query', data),
+  executeSimFill: (data = {}) => request.post('/sim/simfill/execute', data),
   // tool - excelimp
   generateExcelSql: (formData) =>
     request.post('/tool/excelimp/generate', formData, {
